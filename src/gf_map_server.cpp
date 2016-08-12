@@ -400,6 +400,7 @@ void load(const std::string &filename)
     //geometry_msgs::Pose origin;
     ogrid.header.stamp = current_time;
     ogrid.header.frame_id = "gfframe";
+  //  ogrid.header.frame_id = "map";
     ogrid.info.map_load_time = current_time;
     ogrid.info.resolution = 1.0;
     ogrid.info.width = gridwidth;
@@ -408,6 +409,7 @@ void load(const std::string &filename)
     ogrid.info.origin.position.y = length;
     std::vector<signed char> g(grid,grid + (gridsize));
     ogrid.data=g;
+    ogrid.info.origin.orientation.z=-1;
     pub.publish(ogrid);
     //ogrid.info.origin.position.z = 0;
     //ogrid.info.origin.orientation.
@@ -426,7 +428,8 @@ int main(int argc, char **argv)
         ros::init(argc, argv, "talker");
         ros::NodeHandle n;
         
-        pub = n.advertise<nav_msgs::OccupancyGrid>("gfgrid", 1000);
+//        pub = n.advertise<nav_msgs::OccupancyGrid>("gfgrid", 1000);
+        pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1000);
         while (n.ok())
         {
             load("zappos.json");
