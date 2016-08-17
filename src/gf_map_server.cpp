@@ -47,150 +47,7 @@ using namespace std;
 
 #define noop
 
-ros::Publisher pub;
 
-struct geojson_coordinates {
-  double longitude;
-  double latitude;
-};
-
-struct geojson_data {
-  std::vector<geojson_coordinates> coordinates;
-};
-
-struct xy_coordinates {
-  double x;
-  double y;
-};
-
-struct xy_data {
-  std::vector<xy_coordinates> coordinates;
-};
-
-using namespace std;
-using boost::property_tree::ptree;
-
-void geotosquare(double lat, double lon, double& x, double& y) {
-  ;
-  double earth_cir = 40.057 * 1000000;
-
-  double mapHeight = earth_cir;
-  double mapWidth = earth_cir;
-
-  x = (lon + 180) * (mapWidth / 360);
-  double latRad = lat * M_PIl / 180;
-  double mercN = log(tan((M_PIl / 4) + latRad / 2));
-  // y = (mapHeight/2) -(mapHeight*mercN/(2*M_PIl));
-  y = (mapHeight / 2) - (lat * mapHeight) / 180;
-
-  // y = (mapHeight/2)-(mapHeight*mercN/(2*PI))
-
-  //  double adjustedlat = lat - latmin
-  //  double scaledlat = lat * 1000000;
-  //  double scaledlon = lon * 1000000;
-}
-
-void geotoxyz(double lat, double lon, double& x, double& y, double& z) {
-  double rad = 6378137.0;
-  ;
-  double f = 1.0 / 298.257224;
-  double h = 0.0;
-  double cosLat = cos(lat * M_PI / 180.0);
-  double sinLat = sin(lat * M_PI / 180.0);
-  double cosLon = cos(lon * M_PI / 180.0);
-  double sinLon = sin(lon * M_PI / 180.0);
-  double C = 1.0 / sqrt(cosLat * cosLat + (1 - f) * (1 - f) * sinLat * sinLat);
-  double S = (1.0 - f) * (1.0 - f) * C;
-  x = (rad * C + h) * cosLat * cosLon;
-  y = (rad * C + h) * cosLat * sinLon;
-  z = (rad * S + h) * sinLat;
-}
-
-void xyztogeo(double x, double y, double z, double& lat, double& lon) {
-  double a = 6378137.0;
-  double e = 8.1819190842622e-2;
-  double asq = pow(a, 2);
-  double esq = pow(e, 2);
-
-  double b = sqrt(asq * (1 - esq));
-  double bsq = pow(b, 2);
-  double ep = sqrt((asq - bsq) / bsq);
-  double p = sqrt(pow(x, 2) + pow(y, 2));
-  double th = atan2(a * z, b * p);
-
-  lon = atan2(y, x);
-  lat = atan2((z + pow(ep, 2) * b * pow(sin(th), 3)),
-              (p - esq * a * pow(cos(th), 3)));
-  double N = a / (sqrt(1 - esq * pow(sin(lat), 2)));
-  double alt = p / cos(lat) - N;
-  // mod lat to 0-2pi
-  lon = fmod(lon, (2 * M_PI));
-}
-
-void Line(double x1, double y1, double x2, double y2, int width, int height,
-          int8_t grid[]) {
-  // Bresenham's line algorithm
-  const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
-  if (steep) {
-    std::swap(x1, y1);
-    std::swap(x2, y2);
-  }
-
-  if (x1 > x2) {
-    std::swap(x1, x2);
-    std::swap(y1, y2);
-  }
-
-  const double dx = x2 - x1;
-  const double dy = fabs(y2 - y1);
-
-  float error = dx / 2.0f;
-  const int ystep = (y1 < y2) ? 1 : -1;
-  int y = (int)y1;
-
-  const int maxX = (int)x2;
-
-  for (int x = (int)x1; x < maxX; x++) {
-    if (steep) {
-      //  SetPixel(y,x);
-      grid[(x * (int)width) + (int)y] = 100;
-    } else {
-      grid[(y * (int)width) + (int)x] = 100;
-    }
-
-    error -= dy;
-    if (error < 0) {
-      y += ystep;
-      error += dx;
-    }
-  }
-}
-
-string indent(int level) {
-  string s;
-  for (int i = 0; i < level; i++) s += "  ";
-  return s;
-}
-
-void printTree(ptree& pt, int level) {
-  if (pt.empty()) {
-    cerr << "\"" << pt.data() << "\"";
-  } else {
-    if (level) cerr << endl;
-    cerr << indent(level) << "{" << endl;
-    for (ptree::iterator pos = pt.begin(); pos != pt.end();) {
-      cerr << indent(level + 1) << "\"" << pos->first << "\": ";
-      printTree(pos->second, level + 1);
-      ++pos;
-      if (pos != pt.end()) {
-        cerr << ",";
-      }
-      cerr << endl;
-    }
-    cerr << indent(level) << " }";
-  }
-  return;
-}
 
 class MapServer
 
@@ -414,6 +271,25 @@ class MapServer
   };
   
    private:
+   ros::Publisher pub;
+
+struct geojson_coordinates {
+  double longitude;
+  double latitude;
+};
+
+struct geojson_data {
+  std::vector<geojson_coordinates> coordinates;
+};
+
+struct xy_coordinates {
+  double x;
+  double y;
+};
+
+struct xy_data {
+  std::vector<xy_coordinates> coordinates;
+};
     ros::NodeHandle n;
     ros::Publisher map_pub;
     ros::Publisher metadata_pub;
@@ -430,7 +306,7 @@ class MapServer
       ROS_INFO("Sending map");
 
       return true;
-    }
+    };
 
     /** The map data is cached here, to be sent out to service callers*/
     nav_msgs::MapMetaData meta_data_message_;
@@ -442,6 +318,131 @@ class MapServer
       pub.publish( meta_data_message_ );
     }
     */
+
+//using namespace std;
+//using boost::property_tree::ptree;
+
+void geotosquare(double lat, double lon, double& x, double& y) {
+  ;
+  double earth_cir = 40.057 * 1000000;
+
+  double mapHeight = earth_cir;
+  double mapWidth = earth_cir;
+
+  x = (lon + 180) * (mapWidth / 360);
+  double latRad = lat * M_PIl / 180;
+  double mercN = log(tan((M_PIl / 4) + latRad / 2));
+  // y = (mapHeight/2) -(mapHeight*mercN/(2*M_PIl));
+  y = (mapHeight / 2) - (lat * mapHeight) / 180;
+
+  // y = (mapHeight/2)-(mapHeight*mercN/(2*PI))
+
+  //  double adjustedlat = lat - latmin
+  //  double scaledlat = lat * 1000000;
+  //  double scaledlon = lon * 1000000;
+}
+
+void geotoxyz(double lat, double lon, double& x, double& y, double& z) {
+  double rad = 6378137.0;
+  ;
+  double f = 1.0 / 298.257224;
+  double h = 0.0;
+  double cosLat = cos(lat * M_PI / 180.0);
+  double sinLat = sin(lat * M_PI / 180.0);
+  double cosLon = cos(lon * M_PI / 180.0);
+  double sinLon = sin(lon * M_PI / 180.0);
+  double C = 1.0 / sqrt(cosLat * cosLat + (1 - f) * (1 - f) * sinLat * sinLat);
+  double S = (1.0 - f) * (1.0 - f) * C;
+  x = (rad * C + h) * cosLat * cosLon;
+  y = (rad * C + h) * cosLat * sinLon;
+  z = (rad * S + h) * sinLat;
+}
+
+void xyztogeo(double x, double y, double z, double& lat, double& lon) {
+  double a = 6378137.0;
+  double e = 8.1819190842622e-2;
+  double asq = pow(a, 2);
+  double esq = pow(e, 2);
+
+  double b = sqrt(asq * (1 - esq));
+  double bsq = pow(b, 2);
+  double ep = sqrt((asq - bsq) / bsq);
+  double p = sqrt(pow(x, 2) + pow(y, 2));
+  double th = atan2(a * z, b * p);
+
+  lon = atan2(y, x);
+  lat = atan2((z + pow(ep, 2) * b * pow(sin(th), 3)),
+              (p - esq * a * pow(cos(th), 3)));
+  double N = a / (sqrt(1 - esq * pow(sin(lat), 2)));
+  double alt = p / cos(lat) - N;
+  // mod lat to 0-2pi
+  lon = fmod(lon, (2 * M_PI));
+}
+
+void Line(double x1, double y1, double x2, double y2, int width, int height,
+          int8_t grid[]) {
+  // Bresenham's line algorithm
+  const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
+  if (steep) {
+    std::swap(x1, y1);
+    std::swap(x2, y2);
+  }
+
+  if (x1 > x2) {
+    std::swap(x1, x2);
+    std::swap(y1, y2);
+  }
+
+  const double dx = x2 - x1;
+  const double dy = fabs(y2 - y1);
+
+  float error = dx / 2.0f;
+  const int ystep = (y1 < y2) ? 1 : -1;
+  int y = (int)y1;
+
+  const int maxX = (int)x2;
+
+  for (int x = (int)x1; x < maxX; x++) {
+    if (steep) {
+      //  SetPixel(y,x);
+      grid[(x * (int)width) + (int)y] = 100;
+    } else {
+      grid[(y * (int)width) + (int)x] = 100;
+    }
+
+    error -= dy;
+    if (error < 0) {
+      y += ystep;
+      error += dx;
+    }
+  }
+}
+
+string indent(int level) {
+  string s;
+  for (int i = 0; i < level; i++) s += "  ";
+  return s;
+}
+
+void printTree(boost::property_tree::ptree& pt, int level) {
+  if (pt.empty()) {
+    cerr << "\"" << pt.data() << "\"";
+  } else {
+    if (level) cerr << endl;
+    cerr << indent(level) << "{" << endl;
+    for (boost::property_tree::ptree::iterator pos = pt.begin(); pos != pt.end();) {
+      cerr << indent(level + 1) << "\"" << pos->first << "\": ";
+      printTree(pos->second, level + 1);
+      ++pos;
+      if (pos != pt.end()) {
+        cerr << ",";
+      }
+      cerr << endl;
+    }
+    cerr << indent(level) << " }";
+  }
+  return;
+}
 
 };
 
