@@ -37,6 +37,13 @@ using namespace std;
 #include <limits>
 #include <iterator>
 
+#include <string>
+#include <fstream>
+#include <streambuf>
+#include "jsoncpp/json/json.h"
+#include <iostream>
+
+
 #include "ros/ros.h"
 #include "std_msgs/String.h"
 #include "geodesy/wgs84.h"
@@ -51,408 +58,499 @@ using namespace std;
 
 class MapServer
 
-    {
- public:
-  MapServer(const std::string& filename) {
-    std::string frame_id;
-    ros::NodeHandle private_nh("~");
-    private_nh.param("frame_id", frame_id, std::string("map"));
-    // deprecated = (res != 0);
-    // ros::Rate loop_rate(10);
+{
+    public:
+        MapServer(const std::string& filename) {
+            std::string frame_id;
+            ros::NodeHandle private_nh("~");
+            private_nh.param("frame_id", frame_id, std::string("map"));
 
-    // Create empty property tree object
-    using boost::property_tree::ptree;
-    ptree pt;
 
-    // Load json file and put its contents in property tree.
-    // No namespace qualification is needed, because of Koenig
-    // lookup on the second argument. If reading fails, exception
-    // is thrown.
-    read_json(filename, pt);
+            Json::Value root;   // will contains the root value after parsing.
+            Json::Reader reader;
+            std::ifstream t("large.json");
+            bool parsingSuccessful = reader.parse( t, root );
+            if ( !parsingSuccessful )
+            {
+                // report to the user the failure and their locations in the document.
+                std::cout  << "Failed to parse configuration\n"
+                           << reader.getFormattedErrorMessages();
+                return ;
+            }
 
-    int j = 0;
-    double xlow;
-    double ylow;
-    double xhigh;
-    double yhigh;
-    double zhigh;
-    double zlow;
-    double latlow;
-    double longlow;
-    double lathigh;
-    double longhigh;
-    std::vector<double> xpoints;
-    std::vector<double> ypoints;
-    std::vector<double> zpoints;
+            geojson_root_fc gj_root;
+            gj_root.type = root["type"].asString();
+            Json::Value features = root["features"];
+            geojson_feature_collection gj_fc;
+            for (int findex = 0; findex < features.size(); ++findex)
+            {
+                geojson_feature gj_feature;
+                gj_feature.type = features[findex]["type"].asString();
+                gj_feature.properties = "PLACEHOLDER";
+                Json::Value geometry = features[findex]["geometry"];
+                geojson_geometry gj_geom;
+                gj_geom.type=geometry["type"].asString();
+                Json::Value coordinates = geometry["coordinates"];
+                for (int cindex = 0; cindex < coordinates.size(); ++cindex)
+                {
+                    Json::Value rings = coordinates[cindex];
+                    geojson_poly_rings gj_ring_list;
+                    for (int rindex = 0; rindex < rings.size(); ++rindex) {
+                        Json::Value points = rings[rindex];
+                        geojson_points gj_point_list;
 
-    std::vector<geojson_coordinates> coord_vector;
-    std::vector<xy_coordinates> xy_vector;
+                        for (int pindex = 0; pindex < points.size(); ++pindex)
+                        {
+                            Json::Value gj_point = points[pindex];
+                            geojson_point point;
+                            point.longitude = gj_point[0].asDouble();
+                            point.latitude = gj_point[1].asDouble();
+                            gj_point_list.point.push_back(point);
+                        }
+                        gj_ring_list.ring.push_back(gj_point_list);
+                    }
+                    gj_geom.coordinates.rings.push_back(gj_ring_list);
+                }
+                gj_feature.geometry = gj_geom;
+                gj_fc.feature.push_back(gj_feature);
+            }
+            gj_root.features = gj_fc;
 
-    ptree ww = pt.get_child("features");
-    // printTree(ww, 4);
-    for (ptree::iterator pos = ww.begin(); pos != ww.end(); ++pos) {
-      printTree(pos->second, 4);
-      printf("break\n");
-    }
 
-    BOOST_FOREACH (ptree::value_type& v,
-                   ww.get_child(".geometry.coordinates..")) {
-      double coordinates[2];
-      int i = 0;
-      BOOST_FOREACH (ptree::value_type& vv, v.second.get_child("")) {
-        string test;
-        test = vv.second.get<string>("");
-        printf("%s", test.c_str());
-        coordinates[i] = strtod(test.c_str(), NULL);
-        printf("|%lf|\n", coordinates[i]);
-        i++;
-      };
 
-      geojson_coordinates coords;
-      geojson_data polygon;
-      coords.longitude = coordinates[0];
-      coords.latitude = coordinates[1];
-      coord_vector.push_back(coords);
 
-      geographic_msgs::GeoPoint ll;
-      ll.latitude = coordinates[1];
-      ll.longitude = coordinates[0];
-      ll.altitude = std::numeric_limits<double>::quiet_NaN();
-      //     geodesy::UTMPoint utmpoints(ll);
-      //     printf("%d",utmpoints.zone);
-      //     geometry_msgs::Point mypoints = geodesy::toGeometry(utmpoints);
+            int j = 0;
+            double xlow;
+            double ylow;
+            double xhigh;
+            double yhigh;
+            double zhigh;
+            double zlow;
+            double latlow;
+            double longlow;
+            double lathigh;
+            double longhigh;
+            std::vector<double> xpoints;
+            std::vector<double> ypoints;
+            std::vector<double> zpoints;
 
-      // ros::spinOnce();
-      // loop_rate.sleep();
-    };
+            std::vector<geojson_coordinates> coord_vector;
+            std::vector<xy_coordinates> xy_vector;
 
-    geojson_coordinates anchor = *coord_vector.begin();
-    std::vector<double> latvector;
-    std::vector<double> longvector;
-    // OK let's do two passes through
-    // one to get the max/min lat long so we can define the frame anchor
-    // two to adjust the data before sticking it in the grid
-    // here we go with finding the frame anchor
-    for (std::vector<geojson_coordinates>::iterator it = coord_vector.begin();
-         it != coord_vector.end(); ++it) {
-      double latanchor = anchor.latitude;
-      double longanchor = anchor.longitude;
-      geojson_coordinates location = *it;
-      latvector.push_back(location.latitude);
-      longvector.push_back(location.longitude);
-    }
-    latlow = *min_element(latvector.begin(), latvector.end());
-    longlow = *min_element(longvector.begin(), longvector.end());
-    lathigh = *max_element(latvector.begin(), latvector.end());
-    longhigh = *max_element(longvector.begin(), longvector.end());
-    double anchorx;
-    double anchory;
-    double anchorlat = lathigh;
-    double anchorlong = longlow;
+            //ptree ww = pt.get_child("features");
+            //// printTree(ww, 4);
 
-    geotosquare(lathigh, longlow, anchorx, anchory);
-    printf("\nanchorx=%lf\n", anchorx);
-    printf("\nanchory=%lf\n", anchory);
-    // OK now we have the upper left corner of the frame
+            //// iterate over the features
+            //for (ptree::iterator feature = ww.begin(); feature != ww.end(); ++feature) {
+            //printf("ONE\n");
+            //ptree vv = feature->second.get_child("geometry.coordinates");
+            //for (ptree::iterator pos = vv.begin(); pos != vv.end(); ++pos) {
+            //printf("TWO\n");
+            //double coordinates[2];
+            //int i = 0;
+            //// iterate through and get each lat long and put them in coordinates
+            //ptree uu = pos->second.get_child("");
+            //for (ptree::iterator tval = uu.begin(); tval != uu.end(); ++tval)
+            //{
+            //if (tval == uu.begin())
+            //{
+            //printf("done!!!!!\n");
+            //}
+            //ptree ss = tval->second.get_child("");
+            //for (ptree::iterator val = ss.begin(); val != ss.end(); ++ val)
 
-    for (std::vector<geojson_coordinates>::iterator it = coord_vector.begin();
-         it != coord_vector.end(); ++it) {
-      double x;
-      double y;
+            //{
+            //printf("THREE\n");
+            //printTree(val->second, 4);
+            //printf("\n");
+            //string test;
+            //string test2;
+            //test = val->second.get<string>("");
+            ////  printf("test=%s\n", test.c_str());
+            //coordinates[i] = strtod(test.c_str(), NULL);
+            //printf("|%lf|\n", coordinates[i]);
+            //i++;
+            //};
 
-      geojson_coordinates location = *it;
-      xy_coordinates xylocation;
-      geotosquare(location.latitude, location.longitude, x, y);
+            //geojson_coordinates coords;
+            //geojson_data polygon;
+            //coords.longitude = coordinates[0];
+            //coords.latitude = coordinates[1];
+            //coord_vector.push_back(coords);
 
-      // ok let's shift everything from a global frame to a local frame
-      x = x - anchorx;
-      y = y - anchory;
+            //geographic_msgs::GeoPoint ll;
+            //ll.latitude = coordinates[1];
+            //ll.longitude = coordinates[0];
+            //ll.altitude = std::numeric_limits<double>::quiet_NaN();
+            ////     geodesy::UTMPoint utmpoints(ll);
+            ////     printf("%d",utmpoints.zone);
+            ////     geometry_msgs::Point mypoints = geodesy::toGeometry(utmpoints);
 
-      xpoints.push_back(x);
-      ypoints.push_back(y);
-      printf("x=%lf\n", x);
-      printf("y=%lf\n", y);
-      xylocation.x = x;
-      xylocation.y = y;
-      xy_vector.push_back(xylocation);
-    }
+            //// ros::spinOnce();
+            //// loop_rate.sleep();
+            //};
+            //}
 
-    xlow = *min_element(xpoints.begin(), xpoints.end());
-    ylow = *min_element(ypoints.begin(), ypoints.end());
-    xhigh = *max_element(xpoints.begin(), xpoints.end());
-    yhigh = *max_element(ypoints.begin(), ypoints.end());
-    double width = xhigh - xlow;
-    double length = yhigh - ylow;
+            //}
 
-    printf("\nxlow=%lf\n", xlow);
-    printf("\nylow=%lf\n", ylow);
-    printf("\nxhigh=%lf\n", xhigh);
-    printf("\nyhigh=%lf\n", yhigh);
-    printf("\nwidth=%lf\n", width);
-    printf("\nlength=%lf\n", length);
-    printf("\nlatlow=%lf\n", latlow);
-    printf("\nlonglow=%lf\n", longlow);
-    printf("\nlathigh=%lf\n", lathigh);
-    printf("\nlonghigh=%lf\n", longhigh);
 
-    // OK now that all of the data is together need to put it all in one place
-    // latlow and longlow = 0,0
-    // lat ~ Y
-    // long ~ X
-    // lat++ => north
-    // long++ => east
-    // lat = 90 ; long = 180  ===  x = 0 ; y = 0
+            // OK first iterator feature_collection
+            for (std::vector<geojson_feature>::iterator it = gj_root.features.feature.begin();
+            it != gj_root.features.feature.end();
+            ++it)
+            {
+                printf("type=%s\n",*it.type.c_str());
+                geojson_geometry geometry = *it.geometry;
+                // OK iterate rings
+                for std::vector<geojson_poly_rings>::iterator rit = geometry.coordinates.rings.begin();
+                rit != geometry.coordinates.rings.end();
+                ++rit) {
 
-    int gridwidth = (int)width + 100;
-    int gridlength = (int)length + 100;
-    int gridsize = gridwidth * gridlength;
-    printf("gridwidth=%d\n", gridwidth);
-    printf("gridlength=%d\n", gridlength);
-    printf("gridsize=%d\n", gridsize);
-    int8_t grid[gridsize];
-    std::fill_n(grid, gridsize, 0);
+                    geojson_points anchor = *rit.ring;
+                    std::vector<double> latvector;
+                    std::vector<double> longvector;
+                    // OK let's do two passes through
+                    // one to get the max/min lat long so we can define the frame anchor
+                    // two to adjust the data before sticking it in the grid
+                    // here we go with finding the frame anchor
+                    for (std::vector<geojson_points>::iterator pit = coord_vector.begin();
+                            it != coord_vector.end(); ++it) {
+                        //  double latanchor = anchor.latitude;
+                        //  double longanchor = anchor.longitude;
+                        geojson_coordinates location = *it;
+                        latvector.push_back(location.latitude);
+                        longvector.push_back(location.longitude);
+                    }
+                    latlow = *min_element(latvector.begin(), latvector.end());
+                    longlow = *min_element(longvector.begin(), longvector.end());
+                    lathigh = *max_element(latvector.begin(), latvector.end());
+                    longhigh = *max_element(longvector.begin(), longvector.end());
+                    double anchorx;
+                    double anchory;
+                    double anchorlat = lathigh;
+                    double anchorlong = longlow;
 
-    for (std::vector<xy_coordinates>::iterator it = xy_vector.begin();
-         it != xy_vector.end(); ++it) {
-      xy_coordinates a = *it;
-      std::vector<xy_coordinates>::iterator dupe = it;
-      ++dupe;
-      xy_coordinates b = *dupe;
-      if ((a.x == b.x) and (a.y == b.y))
-        // 0 length segment no point in drawing it
-        noop;
-      else if (dupe == xy_vector.end())
-        // at end of vector, b has no meaning
-        noop;
-      else {
-        Line(a.x, a.y, b.x, b.y, gridwidth, gridlength, grid);
-        printf("a.x=%lf,", a.x);
-        printf("a.y=%lf\n", a.y);
-        printf("b.x=%lf,", b.x);
-        printf("b.y=%lf\n\n", b.y);
-      }
-    }
-    // let's define the occ
-    ros::Time current_time;
-    //   current_time = ros::Time::now();
-    nav_msgs::OccupancyGrid ogrid;
-    // nav_msgs::MapMetaData info;
-    // geometry_msgs::Pose origin;
-    map_resp_.map.info.map_load_time = ros::Time::now();
-    map_resp_.map.header.frame_id = "map";
-    map_resp_.map.header.stamp = ros::Time::now();
-    //  map_resp_.map.header.frame_id = "map";
-    map_resp_.map.info.resolution = 1.0;
-    map_resp_.map.info.width = gridwidth;
-    map_resp_.map.info.height = gridlength;
-    map_resp_.map.info.origin.position.x = -1;
-    map_resp_.map.info.origin.position.y = -1;
-    map_resp_.map.info.origin.orientation.z = 0;
-    tf::Quaternion q;
-    q.setRPY(0, 0, 0);
-    map_resp_.map.info.origin.orientation.x = q.x();
-    map_resp_.map.info.origin.orientation.x = q.y();
-    map_resp_.map.info.origin.orientation.x = q.z();
-    map_resp_.map.info.origin.orientation.x = q.w();
+                    geotosquare(lathigh, longlow, anchorx, anchory);
+                    printf("\nanchorx=%lf\n", anchorx);
+                    printf("\nanchory=%lf\n", anchory);
+                    // OK now we have the upper left corner of the frame
 
-    meta_data_message_ = map_resp_.map.info;
 
-    std::vector<signed char> g(grid, grid + (gridsize));
-    map_resp_.map.data = g;
+                }
+            }
 
-    service = n.advertiseService("static_map", &MapServer::mapCallback, this);
+            for (std::vector<geojson_coordinates>::iterator it = coord_vector.begin();
+            it != coord_vector.end(); ++it) {
+                double x;
+                double y;
 
-    metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
-    metadata_pub.publish(meta_data_message_);
+                geojson_coordinates location = *it;
+                xy_coordinates xylocation;
+                geotosquare(location.latitude, location.longitude, x, y);
 
-    map_pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
-    map_pub.publish( map_resp_.map );
+                // ok let's shift everything from a global frame to a local frame
+                x = x - anchorx;
+                y = y - anchory;
 
-  };
-  
-   private:
-   ros::Publisher pub;
+                xpoints.push_back(x);
+                ypoints.push_back(y);
+                printf("x=%lf\n", x);
+                printf("y=%lf\n", y);
+                xylocation.x = x;
+                xylocation.y = y;
+                xy_vector.push_back(xylocation);
+            }
 
-struct geojson_coordinates {
-  double longitude;
-  double latitude;
-};
+            xlow = *min_element(xpoints.begin(), xpoints.end());
+            ylow = *min_element(ypoints.begin(), ypoints.end());
+            xhigh = *max_element(xpoints.begin(), xpoints.end());
+            yhigh = *max_element(ypoints.begin(), ypoints.end());
+            double width = xhigh - xlow;
+            double length = yhigh - ylow;
 
-struct geojson_data {
-  std::vector<geojson_coordinates> coordinates;
-};
+            printf("\nxlow=%lf\n", xlow);
+            printf("\nylow=%lf\n", ylow);
+            printf("\nxhigh=%lf\n", xhigh);
+            printf("\nyhigh=%lf\n", yhigh);
+            printf("\nwidth=%lf\n", width);
+            printf("\nlength=%lf\n", length);
+            printf("\nlatlow=%lf\n", latlow);
+            printf("\nlonglow=%lf\n", longlow);
+            printf("\nlathigh=%lf\n", lathigh);
+            printf("\nlonghigh=%lf\n", longhigh);
 
-struct xy_coordinates {
-  double x;
-  double y;
-};
+            // OK now that all of the data is together need to put it all in one place
+            // latlow and longlow = 0,0
+            // lat ~ Y
+            // long ~ X
+            // lat++ => north
+            // long++ => east
+            // lat = 90 ; long = 180  ===  x = 0 ; y = 0
 
-struct xy_data {
-  std::vector<xy_coordinates> coordinates;
-};
-    ros::NodeHandle n;
-    ros::Publisher map_pub;
-    ros::Publisher metadata_pub;
-    ros::ServiceServer service;
-    bool deprecated;
+            int gridwidth = (int)width + 100;
+            int gridlength = (int)length + 100;
+            int gridsize = gridwidth * gridlength;
+            printf("gridwidth=%d\n", gridwidth);
+            printf("gridlength=%d\n", gridlength);
+            printf("gridsize=%d\n", gridsize);
+            int8_t grid[gridsize];
+            std::fill_n(grid, gridsize, 0);
 
-    /** Callback invoked when someone requests our service */
-    bool mapCallback(nav_msgs::GetMap::Request & req,
-                     nav_msgs::GetMap::Response & res) {
-      // request is empty; we ignore it
+            for (std::vector<xy_coordinates>::iterator it = xy_vector.begin();
+            it != xy_vector.end(); ++it) {
+                xy_coordinates a = *it;
+                std::vector<xy_coordinates>::iterator dupe = it;
+                ++dupe;
+                xy_coordinates b = *dupe;
+                if ((a.x == b.x) and (a.y == b.y))
+                    // 0 length segment no point in drawing it
+                    noop;
+                else if (dupe == xy_vector.end())
+                    // at end of vector, b has no meaning
+                    noop;
+                else {
+                    Line(a.x, a.y, b.x, b.y, gridwidth, gridlength, grid);
+                    printf("a.x=%lf,", a.x);
+                    printf("a.y=%lf\n", a.y);
+                    printf("b.x=%lf,", b.x);
+                    printf("b.y=%lf\n\n", b.y);
+                }
+            }
+            // let's define the occ
+            ros::Time current_time;
+            //   current_time = ros::Time::now();
+            nav_msgs::OccupancyGrid ogrid;
+            // nav_msgs::MapMetaData info;
+            // geometry_msgs::Pose origin;
+            map_resp_.map.info.map_load_time = ros::Time::now();
+            map_resp_.map.header.frame_id = "map";
+            map_resp_.map.header.stamp = ros::Time::now();
+            //  map_resp_.map.header.frame_id = "map";
+            map_resp_.map.info.resolution = 1.0;
+            map_resp_.map.info.width = gridwidth;
+            map_resp_.map.info.height = gridlength;
+            map_resp_.map.info.origin.position.x = -1;
+            map_resp_.map.info.origin.position.y = -1;
+            map_resp_.map.info.origin.orientation.z = 0;
+            tf::Quaternion q;
+            q.setRPY(0, 0, 0);
+            map_resp_.map.info.origin.orientation.x = q.x();
+            map_resp_.map.info.origin.orientation.x = q.y();
+            map_resp_.map.info.origin.orientation.x = q.z();
+            map_resp_.map.info.origin.orientation.x = q.w();
 
-      // = operator is overloaded to make deep copy (tricky!)
-      res = map_resp_;
-      ROS_INFO("Sending map");
+            meta_data_message_ = map_resp_.map.info;
 
-      return true;
-    };
+            std::vector<signed char> g(grid, grid + (gridsize));
+            map_resp_.map.data = g;
 
-    /** The map data is cached here, to be sent out to service callers*/
-    nav_msgs::MapMetaData meta_data_message_;
-    nav_msgs::GetMap::Response map_resp_;
+            service = n.advertiseService("static_map", &MapServer::mapCallback, this);
 
-    /*
-    void metadataSubscriptionCallback(const ros::SingleSubscriberPublisher& pub)
-    {
-      pub.publish( meta_data_message_ );
-    }
-    */
+            metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
+            metadata_pub.publish(meta_data_message_);
 
-//using namespace std;
-//using boost::property_tree::ptree;
+            map_pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
+            map_pub.publish( map_resp_.map );
 
-void geotosquare(double lat, double lon, double& x, double& y) {
-  ;
-  double earth_cir = 40.057 * 1000000;
+        };
 
-  double mapHeight = earth_cir;
-  double mapWidth = earth_cir;
 
-  x = (lon + 180) * (mapWidth / 360);
-  double latRad = lat * M_PIl / 180;
-  double mercN = log(tan((M_PIl / 4) + latRad / 2));
-  // y = (mapHeight/2) -(mapHeight*mercN/(2*M_PIl));
-  y = (mapHeight / 2) - (lat * mapHeight) / 180;
 
-  // y = (mapHeight/2)-(mapHeight*mercN/(2*PI))
 
-  //  double adjustedlat = lat - latmin
-  //  double scaledlat = lat * 1000000;
-  //  double scaledlon = lon * 1000000;
-}
+    private:
+        ros::Publisher pub;
 
-void geotoxyz(double lat, double lon, double& x, double& y, double& z) {
-  double rad = 6378137.0;
-  ;
-  double f = 1.0 / 298.257224;
-  double h = 0.0;
-  double cosLat = cos(lat * M_PI / 180.0);
-  double sinLat = sin(lat * M_PI / 180.0);
-  double cosLon = cos(lon * M_PI / 180.0);
-  double sinLon = sin(lon * M_PI / 180.0);
-  double C = 1.0 / sqrt(cosLat * cosLat + (1 - f) * (1 - f) * sinLat * sinLat);
-  double S = (1.0 - f) * (1.0 - f) * C;
-  x = (rad * C + h) * cosLat * cosLon;
-  y = (rad * C + h) * cosLat * sinLon;
-  z = (rad * S + h) * sinLat;
-}
+        struct geojson_point {
+            double longitude;
+            double latitude;
+        };
 
-void xyztogeo(double x, double y, double z, double& lat, double& lon) {
-  double a = 6378137.0;
-  double e = 8.1819190842622e-2;
-  double asq = pow(a, 2);
-  double esq = pow(e, 2);
+        struct geojson_points {
+            std::vector<geojson_point> point;
+        };
 
-  double b = sqrt(asq * (1 - esq));
-  double bsq = pow(b, 2);
-  double ep = sqrt((asq - bsq) / bsq);
-  double p = sqrt(pow(x, 2) + pow(y, 2));
-  double th = atan2(a * z, b * p);
+        struct geojson_poly_rings {
+            std::vector<geojson_points> ring;
+        };
 
-  lon = atan2(y, x);
-  lat = atan2((z + pow(ep, 2) * b * pow(sin(th), 3)),
-              (p - esq * a * pow(cos(th), 3)));
-  double N = a / (sqrt(1 - esq * pow(sin(lat), 2)));
-  double alt = p / cos(lat) - N;
-  // mod lat to 0-2pi
-  lon = fmod(lon, (2 * M_PI));
-}
+        struct geojson_coordinates {
+            std::vector<geojson_poly_rings> rings;
+        };
 
-void Line(double x1, double y1, double x2, double y2, int width, int height,
-          int8_t grid[]) {
-  // Bresenham's line algorithm
-  const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
-  if (steep) {
-    std::swap(x1, y1);
-    std::swap(x2, y2);
-  }
+        struct geojson_geometry {
+            std::string type;
+            geojson_coordinates coordinates;
+        };
 
-  if (x1 > x2) {
-    std::swap(x1, x2);
-    std::swap(y1, y2);
-  }
+        struct geojson_feature {
+            std::string type;
+            std::string properties;  ////// PLACEHOLDER UNTIL WE START PASSING MORE INFO
+            geojson_geometry geometry;
+        };
 
-  const double dx = x2 - x1;
-  const double dy = fabs(y2 - y1);
+        struct geojson_feature_collection {
+            std::vector<geojson_feature> feature;
+        };
 
-  float error = dx / 2.0f;
-  const int ystep = (y1 < y2) ? 1 : -1;
-  int y = (int)y1;
+        struct geojson_root_fc {
+            std::string type;
+            geojson_feature_collection features;
+        };
 
-  const int maxX = (int)x2;
+        struct xy_coordinates {
+            double x;
+            double y;
+        };
 
-  for (int x = (int)x1; x < maxX; x++) {
-    if (steep) {
-      //  SetPixel(y,x);
-      grid[(x * (int)width) + (int)y] = 100;
-    } else {
-      grid[(y * (int)width) + (int)x] = 100;
-    }
+        struct xy_data {
+            std::vector<xy_coordinates> coordinates;
+        };
 
-    error -= dy;
-    if (error < 0) {
-      y += ystep;
-      error += dx;
-    }
-  }
-}
+        ros::NodeHandle n;
+        ros::Publisher map_pub;
+        ros::Publisher metadata_pub;
+        ros::ServiceServer service;
+        bool deprecated;
 
-string indent(int level) {
-  string s;
-  for (int i = 0; i < level; i++) s += "  ";
-  return s;
-}
+        /** Callback invoked when someone requests our service */
+        bool mapCallback(nav_msgs::GetMap::Request & req,
+                         nav_msgs::GetMap::Response & res) {
+            // request is empty; we ignore it
 
-void printTree(boost::property_tree::ptree& pt, int level) {
-  if (pt.empty()) {
-    cerr << "\"" << pt.data() << "\"";
-  } else {
-    if (level) cerr << endl;
-    cerr << indent(level) << "{" << endl;
-    for (boost::property_tree::ptree::iterator pos = pt.begin(); pos != pt.end();) {
-      cerr << indent(level + 1) << "\"" << pos->first << "\": ";
-      printTree(pos->second, level + 1);
-      ++pos;
-      if (pos != pt.end()) {
-        cerr << ",";
-      }
-      cerr << endl;
-    }
-    cerr << indent(level) << " }";
-  }
-  return;
-}
+            // = operator is overloaded to make deep copy (tricky!)
+            res = map_resp_;
+            ROS_INFO("Sending map");
 
-};
+            return true;
+        };
 
-int main(int argc, char** argv) {
-  ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
-  try {
-     MapServer ms("zappos.json");
-    ros::spin();
-  } catch (std::exception& e) {
-    std::cout << "Error: " << e.what() << "\n";
-  }
-  return 0;
-}
+        /** The map data is cached here, to be sent out to service callers*/
+        nav_msgs::MapMetaData meta_data_message_;
+        nav_msgs::GetMap::Response map_resp_;
+
+        /*
+        void metadataSubscriptionCallback(const ros::SingleSubscriberPublisher& pub)
+        {
+          pub.publish( meta_data_message_ );
+        }
+        */
+
+        //using namespace std;
+        //using boost::property_tree::ptree;
+
+        void geotosquare(double lat, double lon, double& x, double& y) {
+            ;
+            double earth_cir = 40.057 * 1000000;
+
+            double mapHeight = earth_cir;
+            double mapWidth = earth_cir;
+
+            x = (lon + 180) * (mapWidth / 360);
+            double latRad = lat * M_PIl / 180;
+            double mercN = log(tan((M_PIl / 4) + latRad / 2));
+            // y = (mapHeight/2) -(mapHeight*mercN/(2*M_PIl));
+            y = (mapHeight / 2) - (lat * mapHeight) / 180;
+
+            // y = (mapHeight/2)-(mapHeight*mercN/(2*PI))
+
+            //  double adjustedlat = lat - latmin
+            //  double scaledlat = lat * 1000000;
+            //  double scaledlon = lon * 1000000;
+        }
+
+        void geotoxyz(double lat, double lon, double& x, double& y, double& z) {
+            double rad = 6378137.0;
+            ;
+            double f = 1.0 / 298.257224;
+            double h = 0.0;
+            double cosLat = cos(lat * M_PI / 180.0);
+            double sinLat = sin(lat * M_PI / 180.0);
+            double cosLon = cos(lon * M_PI / 180.0);
+            double sinLon = sin(lon * M_PI / 180.0);
+            double C = 1.0 / sqrt(cosLat * cosLat + (1 - f) * (1 - f) * sinLat * sinLat);
+            double S = (1.0 - f) * (1.0 - f) * C;
+            x = (rad * C + h) * cosLat * cosLon;
+            y = (rad * C + h) * cosLat * sinLon;
+            z = (rad * S + h) * sinLat;
+        }
+
+        void xyztogeo(double x, double y, double z, double& lat, double& lon) {
+            double a = 6378137.0;
+            double e = 8.1819190842622e-2;
+            double asq = pow(a, 2);
+            double esq = pow(e, 2);
+
+            double b = sqrt(asq * (1 - esq));
+            double bsq = pow(b, 2);
+            double ep = sqrt((asq - bsq) / bsq);
+            double p = sqrt(pow(x, 2) + pow(y, 2));
+            double th = atan2(a * z, b * p);
+
+            lon = atan2(y, x);
+            lat = atan2((z + pow(ep, 2) * b * pow(sin(th), 3)),
+                        (p - esq * a * pow(cos(th), 3)));
+            double N = a / (sqrt(1 - esq * pow(sin(lat), 2)));
+            double alt = p / cos(lat) - N;
+            // mod lat to 0-2pi
+            lon = fmod(lon, (2 * M_PI));
+        }
+
+        void Line(double x1, double y1, double x2, double y2, int width, int height,
+                  int8_t grid[]) {
+            // Bresenham's line algorithm
+            const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
+            if (steep) {
+                std::swap(x1, y1);
+                std::swap(x2, y2);
+            }
+
+            if (x1 > x2) {
+                std::swap(x1, x2);
+                std::swap(y1, y2);
+            }
+
+            const double dx = x2 - x1;
+            const double dy = fabs(y2 - y1);
+
+            float error = dx / 2.0f;
+            const int ystep = (y1 < y2) ? 1 : -1;
+            int y = (int)y1;
+
+            const int maxX = (int)x2;
+
+            for (int x = (int)x1; x < maxX; x++) {
+                if (steep) {
+                    //  SetPixel(y,x);
+                    grid[(x * (int)width) + (int)y] = 100;
+                } else {
+                    grid[(y * (int)width) + (int)x] = 100;
+                }
+
+                error -= dy;
+                if (error < 0) {
+                    y += ystep;
+                    error += dx;
+                }
+            }
+        }
+
+
+
+        int main(int argc, char** argv) {
+            ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
+            try {
+                MapServer ms("two.json");
+                ros::spin();
+            } catch (std::exception& e) {
+                std::cout << "Error: " << e.what() << "\n";
+            }
+            return 0;
+        }
+
+
+
+
+
+
+
+
