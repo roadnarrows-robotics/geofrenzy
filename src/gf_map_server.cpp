@@ -196,77 +196,69 @@ class MapServer
 
             // OK first iterator feature_collection
             for (std::vector<geojson_feature>::iterator it = gj_root.features.feature.begin();
-                    it != gj_root.features.feature.end();
-                    ++it)
+            it != gj_root.features.feature.end();
+            ++it)
             {
-                geojson_feature  feature = *it;
-                printf("type=%s\n",feature.type.c_str());
-                geojson_geometry geometry = feature.geometry;
+                printf("type=%s\n",*it.type.c_str());
+                geojson_geometry geometry = *it.geometry;
                 // OK iterate rings
-                for (std::vector<geojson_poly_rings>::iterator rit = geometry.coordinates.rings.begin();
-                        rit != geometry.coordinates.rings.end();
-                        ++rit) {
-                    geojson_poly_rings rings = *rit;
+                for std::vector<geojson_poly_rings>::iterator rit = geometry.coordinates.rings.begin();
+                rit != geometry.coordinates.rings.end();
+                ++rit) {
+
+                    geojson_points anchor = *rit.ring;
                     std::vector<double> latvector;
                     std::vector<double> longvector;
-                    std::vector<geojson_points> ring = rings.ring;
-                    for (std::vector<geojson_points>::iterator gpit = ring.begin(); gpit != ring.end(); ++ gpit)
-                    {
-                        //    geojson_points anchor = *gpit;
-                        geojson_points points = *gpit;
-
-                        // OK let's do two passes through
-                        // one to get the max/min lat long so we can define the frame anchor
-                        // two to adjust the data before sticking it in the grid
-                        // here we go with finding the frame anchor
-                        for (std::vector<geojson_point>::iterator pit = points.point.begin();
-                                pit != points.point.end(); ++pit) {
-                            //  double latanchor = anchor.latitude;
-                            //  double longanchor = anchor.longitude;
-                            geojson_point location = *pit;
-                            latvector.push_back(location.latitude);
-                            longvector.push_back(location.longitude);
-                        }
-                        latlow = *min_element(latvector.begin(), latvector.end());
-                        longlow = *min_element(longvector.begin(), longvector.end());
-                        lathigh = *max_element(latvector.begin(), latvector.end());
-                        longhigh = *max_element(longvector.begin(), longvector.end());
-                        double anchorx;
-                        double anchory;
-                        double anchorlat = lathigh;
-                        double anchorlong = longlow;
-
-                        geotosquare(lathigh, longlow, anchorx, anchory);
-                        printf("\nanchorx=%lf\n", anchorx);
-                        printf("\nanchory=%lf\n", anchory);
-                        // OK now we have the upper left corner of the frame
-
-
-
-
-                        for (std::vector<geojson_point>::iterator pit = points.point.begin();
-                                pit != points.point.end(); ++pit) {
-                            double x;
-                            double y;
-
-                            geojson_point location = *pit;
-                            xy_coordinates xylocation;
-                            geotosquare(location.latitude, location.longitude, x, y);
-
-                            // ok let's shift everything from a global frame to a local frame
-                            x = x - anchorx;
-                            y = y - anchory;
-
-                            xpoints.push_back(x);
-                            ypoints.push_back(y);
-                            printf("x=%lf\n", x);
-                            printf("y=%lf\n", y);
-                            xylocation.x = x;
-                            xylocation.y = y;
-                            xy_vector.push_back(xylocation);
-                        }
+                    // OK let's do two passes through
+                    // one to get the max/min lat long so we can define the frame anchor
+                    // two to adjust the data before sticking it in the grid
+                    // here we go with finding the frame anchor
+                    for (std::vector<geojson_points>::iterator pit = coord_vector.begin();
+                            it != coord_vector.end(); ++it) {
+                        //  double latanchor = anchor.latitude;
+                        //  double longanchor = anchor.longitude;
+                        geojson_coordinates location = *it;
+                        latvector.push_back(location.latitude);
+                        longvector.push_back(location.longitude);
                     }
+                    latlow = *min_element(latvector.begin(), latvector.end());
+                    longlow = *min_element(longvector.begin(), longvector.end());
+                    lathigh = *max_element(latvector.begin(), latvector.end());
+                    longhigh = *max_element(longvector.begin(), longvector.end());
+                    double anchorx;
+                    double anchory;
+                    double anchorlat = lathigh;
+                    double anchorlong = longlow;
+
+                    geotosquare(lathigh, longlow, anchorx, anchory);
+                    printf("\nanchorx=%lf\n", anchorx);
+                    printf("\nanchory=%lf\n", anchory);
+                    // OK now we have the upper left corner of the frame
+
+
                 }
+            }
+
+            for (std::vector<geojson_coordinates>::iterator it = coord_vector.begin();
+            it != coord_vector.end(); ++it) {
+                double x;
+                double y;
+
+                geojson_coordinates location = *it;
+                xy_coordinates xylocation;
+                geotosquare(location.latitude, location.longitude, x, y);
+
+                // ok let's shift everything from a global frame to a local frame
+                x = x - anchorx;
+                y = y - anchory;
+
+                xpoints.push_back(x);
+                ypoints.push_back(y);
+                printf("x=%lf\n", x);
+                printf("y=%lf\n", y);
+                xylocation.x = x;
+                xylocation.y = y;
+                xy_vector.push_back(xylocation);
             }
 
             xlow = *min_element(xpoints.begin(), xpoints.end());
@@ -305,7 +297,7 @@ class MapServer
             std::fill_n(grid, gridsize, 0);
 
             for (std::vector<xy_coordinates>::iterator it = xy_vector.begin();
-                    it != xy_vector.end(); ++it) {
+            it != xy_vector.end(); ++it) {
                 xy_coordinates a = *it;
                 std::vector<xy_coordinates>::iterator dupe = it;
                 ++dupe;
@@ -541,18 +533,19 @@ class MapServer
                 }
             }
         }
-};
 
-int main(int argc, char** argv) {
-    ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
-    try {
-        MapServer ms("two.json");
-        ros::spin();
-    } catch (std::exception& e) {
-        std::cout << "Error: " << e.what() << "\n";
-    }
-    return 0;
-}
+
+
+        int main(int argc, char** argv) {
+            ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
+            try {
+                MapServer ms("two.json");
+                ros::spin();
+            } catch (std::exception& e) {
+                std::cout << "Error: " << e.what() << "\n";
+            }
+            return 0;
+        }
 
 
 
