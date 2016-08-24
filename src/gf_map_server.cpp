@@ -68,7 +68,7 @@ class MapServer
 
             Json::Value root;   // will contains the root value after parsing.
             Json::Reader reader;
-            std::ifstream t("large.json");
+            std::ifstream t(filename.c_str());
             bool parsingSuccessful = reader.parse( t, root );
             if ( !parsingSuccessful )
             {
@@ -79,35 +79,38 @@ class MapServer
             }
 
             geojson_root_fc gj_root;
+            printf("gj_root\n");
+
             gj_root.type = root["type"].asString();
             Json::Value features = root["features"];
             geojson_feature_collection gj_fc;
+            printf("features\n");
             for (int findex = 0; findex < features.size(); ++findex)
             {
                 geojson_feature gj_feature;
                 gj_feature.type = features[findex]["type"].asString();
                 gj_feature.properties = "PLACEHOLDER";
                 Json::Value geometry = features[findex]["geometry"];
+                printf("geometry\n");
                 geojson_geometry gj_geom;
                 gj_geom.type=geometry["type"].asString();
                 Json::Value coordinates = geometry["coordinates"];
+                printf("coordinates\n");
                 for (int cindex = 0; cindex < coordinates.size(); ++cindex)
                 {
                     Json::Value rings = coordinates[cindex];
+                    printf("rings\n");
                     geojson_poly_rings gj_ring_list;
                     for (int rindex = 0; rindex < rings.size(); ++rindex) {
                         Json::Value points = rings[rindex];
+                        printf("points\n");
+                        cout << points;
                         geojson_points gj_point_list;
-                        cout << rings;
-                        for (int pindex = 0; pindex < points.size(); ++pindex)
-                        {
-                            Json::Value gj_point = points[pindex];
-                            cout << points;
-                            geojson_point point;
-                            point.longitude = gj_point[0].asDouble();
-                            point.latitude = gj_point[1].asDouble();
-                            gj_point_list.point.push_back(point);
-                        }
+                        geojson_point point;
+                        point.longitude = points[0].asDouble();
+                        point.latitude = points[1].asDouble();
+                        gj_point_list.point.push_back(point);
+
                         gj_ring_list.ring.push_back(gj_point_list);
                     }
                     gj_geom.coordinates.rings.push_back(gj_ring_list);
@@ -136,63 +139,8 @@ class MapServer
             std::vector<double> zpoints;
 
             std::vector<geojson_coordinates> coord_vector;
-            std::vector<xy_coordinates> xy_vector;
 
-            //ptree ww = pt.get_child("features");
-            //// printTree(ww, 4);
-
-            //// iterate over the features
-            //for (ptree::iterator feature = ww.begin(); feature != ww.end(); ++feature) {
-            //printf("ONE\n");
-            //ptree vv = feature->second.get_child("geometry.coordinates");
-            //for (ptree::iterator pos = vv.begin(); pos != vv.end(); ++pos) {
-            //printf("TWO\n");
-            //double coordinates[2];
-            //int i = 0;
-            //// iterate through and get each lat long and put them in coordinates
-            //ptree uu = pos->second.get_child("");
-            //for (ptree::iterator tval = uu.begin(); tval != uu.end(); ++tval)
-            //{
-            //if (tval == uu.begin())
-            //{
-            //printf("done!!!!!\n");
-            //}
-            //ptree ss = tval->second.get_child("");
-            //for (ptree::iterator val = ss.begin(); val != ss.end(); ++ val)
-
-            //{
-            //printf("THREE\n");
-            //printTree(val->second, 4);
-            //printf("\n");
-            //string test;
-            //string test2;
-            //test = val->second.get<string>("");
-            ////  printf("test=%s\n", test.c_str());
-            //coordinates[i] = strtod(test.c_str(), NULL);
-            //printf("|%lf|\n", coordinates[i]);
-            //i++;
-            //};
-
-            //geojson_coordinates coords;
-            //geojson_data polygon;
-            //coords.longitude = coordinates[0];
-            //coords.latitude = coordinates[1];
-            //coord_vector.push_back(coords);
-
-            //geographic_msgs::GeoPoint ll;
-            //ll.latitude = coordinates[1];
-            //ll.longitude = coordinates[0];
-            //ll.altitude = std::numeric_limits<double>::quiet_NaN();
-            ////     geodesy::UTMPoint utmpoints(ll);
-            ////     printf("%d",utmpoints.zone);
-            ////     geometry_msgs::Point mypoints = geodesy::toGeometry(utmpoints);
-
-            //// ros::spinOnce();
-            //// loop_rate.sleep();
-            //};
-            //}
-
-            //}
+            xy_feature xy_features;
 
 
             // OK first iterator feature_collection
@@ -200,6 +148,7 @@ class MapServer
                     it != gj_root.features.feature.end();
                     ++it)
             {
+                xy_data xy_vector;
                 geojson_feature  feature = *it;
                 printf("type=%s\n",feature.type.c_str());
                 geojson_geometry geometry = feature.geometry;
@@ -264,10 +213,11 @@ class MapServer
                             printf("y=%lf\n", y);
                             xylocation.x = x;
                             xylocation.y = y;
-                            xy_vector.push_back(xylocation);
+                            xy_vector.coordinates.push_back(xylocation);
                         }
                     }
                 }
+                xy_features.polygon.push_back(xy_vector);
             }
 
 
@@ -306,25 +256,31 @@ class MapServer
             int8_t grid[gridsize];
             std::fill_n(grid, gridsize, 0);
 
-            for (std::vector<xy_coordinates>::iterator it = xy_vector.begin();
-                    it != xy_vector.end(); ++it) {
-                xy_coordinates a = *it;
-                std::vector<xy_coordinates>::iterator dupe = it;
-                ++dupe;
-                xy_coordinates b = *dupe;
-                if ((a.x == b.x) and (a.y == b.y))
-                    // 0 length segment no point in drawing it
-                    noop;
-                else if (dupe == xy_vector.end())
-                    // at end of vector, b has no meaning
-                    noop;
-                else {
-                    Line(a.x, a.y, b.x, b.y, gridwidth, gridlength, grid);
-                    printf("a.x=%lf,", a.x);
-                    printf("a.y=%lf\n", a.y);
-                    printf("b.x=%lf,", b.x);
-                    printf("b.y=%lf\n\n", b.y);
+            for (std::vector<xy_data>::iterator oit = xy_features.polygon.begin();
+                    oit != xy_features.polygon.end(); ++oit) {
+                xy_data xy_vector = *oit;
+                for (std::vector<xy_coordinates>::iterator it = xy_vector.coordinates.begin();
+                        it != xy_vector.coordinates.end(); ++it) {
+                    xy_coordinates a = *it;
+                    std::vector<xy_coordinates>::iterator dupe = it;
+                    ++dupe;
+                    xy_coordinates b = *dupe;
+                    if ((a.x == b.x) and (a.y == b.y))
+                        // 0 length segment no point in drawing it
+                        noop;
+                    else if (dupe == xy_vector.coordinates.end())
+                        // at end of vector, b has no meaning
+                        noop;
+                    else {
+                        Line(a.x, a.y, b.x, b.y, gridwidth, gridlength, grid);
+                        printf("a.x=%lf,", a.x);
+                        printf("a.y=%lf\n", a.y);
+                        printf("b.x=%lf,", b.x);
+                        printf("b.y=%lf\n\n", b.y);
+                    }
                 }
+            
+            printf("polygon end\n");
             }
             // let's define the occ
             ros::Time current_time;
@@ -414,6 +370,10 @@ class MapServer
 
         struct xy_data {
             std::vector<xy_coordinates> coordinates;
+        };
+
+        struct xy_feature {
+            std::vector<xy_data> polygon;
         };
 
         ros::NodeHandle n;
