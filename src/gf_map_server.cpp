@@ -54,6 +54,26 @@ using namespace std;
 
 #define noop
 
+class MapGrid
+{
+
+    public:
+        int gridwidth ;
+        int gridlength ;
+        int gridsize ;
+        int8_t  * grid;
+
+        MapGrid(int width, int length);
+};
+
+MapGrid::MapGrid( int width,  int length )
+{
+    gridwidth = (int)width + 100;
+    gridlength = (int)length + 100;
+    gridsize = gridwidth * gridlength;
+    grid = new int8_t[gridsize];
+    std::fill_n(grid, gridsize, 0);
+}
 
 
 class MapServer
@@ -220,6 +240,7 @@ class MapServer
                 xy_features.polygon.push_back(xy_vector);
             }
 
+            // OK we are done with the overall calculations now we need to  use them to build the map
 
             xlow = *min_element(xpoints.begin(), xpoints.end());
             ylow = *min_element(ypoints.begin(), ypoints.end());
@@ -247,14 +268,8 @@ class MapServer
             // long++ => east
             // lat = 90 ; long = 180  ===  x = 0 ; y = 0
 
-            int gridwidth = (int)width + 100;
-            int gridlength = (int)length + 100;
-            int gridsize = gridwidth * gridlength;
-            printf("gridwidth=%d\n", gridwidth);
-            printf("gridlength=%d\n", gridlength);
-            printf("gridsize=%d\n", gridsize);
-            int8_t grid[gridsize];
-            std::fill_n(grid, gridsize, 0);
+
+            MapGrid grid((int)width,(int)length);
 
             for (std::vector<xy_data>::iterator oit = xy_features.polygon.begin();
                     oit != xy_features.polygon.end(); ++oit) {
@@ -272,15 +287,15 @@ class MapServer
                         // at end of vector, b has no meaning
                         noop;
                     else {
-                        Line(a.x, a.y, b.x, b.y, gridwidth, gridlength, grid);
+                        Line(a.x, a.y, b.x, b.y, grid);
                         printf("a.x=%lf,", a.x);
                         printf("a.y=%lf\n", a.y);
                         printf("b.x=%lf,", b.x);
                         printf("b.y=%lf\n\n", b.y);
                     }
                 }
-            
-            printf("polygon end\n");
+
+                printf("polygon end\n");
             }
             // let's define the occ
             ros::Time current_time;
@@ -293,8 +308,8 @@ class MapServer
             map_resp_.map.header.stamp = ros::Time::now();
             //  map_resp_.map.header.frame_id = "map";
             map_resp_.map.info.resolution = 1.0;
-            map_resp_.map.info.width = gridwidth;
-            map_resp_.map.info.height = gridlength;
+            map_resp_.map.info.width = grid.gridwidth;
+            map_resp_.map.info.height = grid.gridlength;
             map_resp_.map.info.origin.position.x = -1;
             map_resp_.map.info.origin.position.y = -1;
             map_resp_.map.info.origin.orientation.z = 0;
@@ -307,7 +322,7 @@ class MapServer
 
             meta_data_message_ = map_resp_.map.info;
 
-            std::vector<signed char> g(grid, grid + (gridsize));
+            std::vector<signed char> g(grid.grid, grid.grid + (grid.gridsize));
             map_resp_.map.data = g;
 
             service = n.advertiseService("static_map", &MapServer::mapCallback, this);
@@ -465,8 +480,8 @@ class MapServer
             lon = fmod(lon, (2 * M_PI));
         }
 
-        void Line(double x1, double y1, double x2, double y2, int width, int height,
-                  int8_t grid[]) {
+        void Line(double x1, double y1, double x2, double y2, MapGrid grid)
+        {
             // Bresenham's line algorithm
             const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
             if (steep) {
@@ -491,9 +506,9 @@ class MapServer
             for (int x = (int)x1; x < maxX; x++) {
                 if (steep) {
                     //  SetPixel(y,x);
-                    grid[(x * (int)width) + (int)y] = 100;
+                    grid.grid[(x * (int)grid.gridwidth) + (int)y] = 100;
                 } else {
-                    grid[(y * (int)width) + (int)x] = 100;
+                    grid.grid[(y * (int)grid.gridwidth) + (int)x] = 100;
                 }
 
                 error -= dy;
@@ -516,6 +531,8 @@ int main(int argc, char** argv) {
     }
     return 0;
 }
+
+
 
 
 
