@@ -54,7 +54,7 @@ using namespace std;
 
 #define noop
 class map_point {
-	public:
+    public:
         double longitude;
         double latitude;
 };
@@ -244,31 +244,35 @@ class MapServer
                     printf("\nanchory=%lf\n", xy_features.xyanchor.y);
 
                     // OK now we have the upper left corner of the frame
-
-
-                    // now to adjust the data
-                    for (std::vector<xy_data>::iterator fit = xy_features.polygon.begin();
-                            fit != xy_features.polygon.end(); ++fit)
-                    {
-                        xy_data points = *fit;
-                        for (std::vector<xy_coordinates>::iterator pit = points.coordinates.begin();
-                                pit != points.coordinates.end(); ++pit) {
-                            xy_coordinates location = *pit;
-
-
-                            // ok let's shift everything from a global frame to a local frame
-                            location.x = location.x - xy_features.xyanchor.x;
-                            location.y = location.y - xy_features.xyanchor.y;
-
-                            xpoints.push_back(location.x);
-                            ypoints.push_back(location.y);
-                            printf("x=%lf\n", location.x);
-                            printf("y=%lf\n", location.y);
-
-                        }
-                    }
                 }
             }
+
+            // now to adjust the data
+            for (std::vector<xy_data>::iterator fit = xy_features.polygon.begin();
+                    fit != xy_features.polygon.end(); ++fit)
+            {
+                xy_data points = *fit;
+                for (std::vector<xy_coordinates>::iterator pit = points.coordinates.begin();
+                        pit != points.coordinates.end(); ++pit) {
+                    xy_coordinates location=*pit;
+                    xy_coordinates newlocation;
+
+
+                    // ok let's shift everything from a global frame to a local frame
+                    newlocation.x = location.x - xy_features.xyanchor.x;
+                    newlocation.y = location.y - xy_features.xyanchor.y;
+
+                    xpoints.push_back(location.x);
+                    ypoints.push_back(location.y);
+                    printf("x=%lf\n", location.x);
+                    printf("y=%lf\n", location.y);
+                    *pit = newlocation;
+
+                }
+             //   *fit = points;
+            }
+
+
 
             // OK we are done with the overall calculations now we need to  use them to build the map
 
