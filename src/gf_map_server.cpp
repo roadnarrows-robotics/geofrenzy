@@ -12,10 +12,7 @@
 #include <libgen.h>
 #include <fstream>
 
-#include "ros/ros.h"
-#include "ros/console.h"
-#include "nav_msgs/MapMetaData.h"
-#include <tf/tf.h>
+
 
 #include <cmath>
 #include <iostream>
@@ -26,11 +23,7 @@ using namespace std;
 #include <algorithm>
 
 #include <vector>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/xml_parser.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/foreach.hpp>
-#include <string>
+
 #include <set>
 #include <exception>
 #include <iostream>
@@ -45,6 +38,9 @@ using namespace std;
 
 
 #include "ros/ros.h"
+#include "ros/console.h"
+#include "nav_msgs/MapMetaData.h"
+#include <tf/tf.h>
 #include "std_msgs/String.h"
 #include "geodesy/wgs84.h"
 #include "geodesy/utm.h"
@@ -95,13 +91,6 @@ class geojson_root_fc {
         std::string type;
         geojson_feature_collection features;
 };
-
-
-//class map_point {
-//public:
-//double longitude;
-//double latitude;
-//};
 
 class MapGrid
 {
@@ -181,11 +170,11 @@ class MapServer
                 gj_feature.type = features[findex]["type"].asString();
                 gj_feature.properties = "PLACEHOLDER";
                 Json::Value geometry = features[findex]["geometry"];
-                printf("geometry\n");
+             //   printf("geometry\n");
                 geojson_geometry gj_geom;
                 gj_geom.type=geometry["type"].asString();
                 Json::Value coordinates = geometry["coordinates"];
-                printf("coordinates\n");
+               // printf("coordinates\n");
                 for (int cindex = 0; cindex < coordinates.size(); ++cindex)
                 {
                     Json::Value rings = coordinates[cindex];
@@ -193,7 +182,7 @@ class MapServer
                     geojson_poly_rings gj_ring_list;
                     for (int rindex = 0; rindex < rings.size(); ++rindex) {
                         Json::Value points = rings[rindex];
-                        printf("points\n");
+                       // printf("points\n");
                         //cout << points;
                         geojson_points gj_point_list;
                         geojson_point point;
@@ -213,7 +202,7 @@ class MapServer
 
 
 
-            int j = 0;
+         //   int j = 0;
             double xlow;
             double ylow;
             double xhigh;
@@ -228,10 +217,11 @@ class MapServer
             std::vector<double> ypoints;
             std::vector<double> zpoints;
 
-            std::vector<geojson_coordinates> coord_vector;
+          //  std::vector<geojson_coordinates> coord_vector;
 
 
-
+            std::vector<double> latvector;
+            std::vector<double> longvector;
 
             // OK first iterator feature_collection
             for (std::vector<geojson_feature>::iterator it = gj_root.features.feature.begin();
@@ -243,12 +233,12 @@ class MapServer
                 printf("type=%s\n",feature.type.c_str());
                 geojson_geometry geometry = feature.geometry;
                 // OK iterate rings
+
                 for (std::vector<geojson_poly_rings>::iterator rit = geometry.coordinates.rings.begin();
                         rit != geometry.coordinates.rings.end();
                         ++rit) {
                     geojson_poly_rings rings = *rit;
-                    std::vector<double> latvector;
-                    std::vector<double> longvector;
+
                     std::vector<geojson_points> ring = rings.ring;
                     // OK let's do two passes through
                     // one to get the max/min lat long so we can define the frame anchor
@@ -275,22 +265,25 @@ class MapServer
                         }
 
                     }
-                    xy_features.polygon.push_back(xy_vector);
-                    latlow = *min_element(latvector.begin(), latvector.end());
-                    longlow = *min_element(longvector.begin(), longvector.end());
-                    lathigh = *max_element(latvector.begin(), latvector.end());
-                    longhigh = *max_element(longvector.begin(), longvector.end());
-                    double anchorx;
-                    double anchory;
-                    xy_features.llanchor.latitude = lathigh;
-                    xy_features.llanchor.longitude = longlow;
-                    geotosquare(lathigh, longlow, xy_features.xyanchor.x, xy_features.xyanchor.y);
-                    printf("\nanchorx=%lf\n", xy_features.xyanchor.x);
-                    printf("\nanchory=%lf\n", xy_features.xyanchor.y);
 
-                    // OK now we have the upper left corner of the frame
                 }
+                xy_features.polygon.push_back(xy_vector);
             }
+            latlow = *min_element(latvector.begin(), latvector.end());
+            longlow = *min_element(longvector.begin(), longvector.end());
+            lathigh = *max_element(latvector.begin(), latvector.end());
+            longhigh = *max_element(longvector.begin(), longvector.end());
+            double anchorx;
+            double anchory;
+            xy_features.llanchor.latitude = lathigh;
+            xy_features.llanchor.longitude = longlow;
+            geotosquare(lathigh, longlow, xy_features.xyanchor.x, xy_features.xyanchor.y);
+            printf("\nanchorx=%lf\n", xy_features.xyanchor.x);
+            printf("\nanchory=%lf\n", xy_features.xyanchor.y);
+
+            // OK now we have the upper left corner of the frame
+
+
 
             // now to adjust the data
             for (std::vector<xy_data>::iterator fit = xy_features.polygon.begin();
@@ -309,8 +302,8 @@ class MapServer
 
                     xpoints.push_back(location.x);
                     ypoints.push_back(location.y);
-                    printf("x=%lf\n", location.x);
-                    printf("y=%lf\n", location.y);
+                    printf("x=%lf,newx=%lf\n", location.x,newlocation.x);
+                    printf("y=%lf,newy=%lf\n", location.y,newlocation.y);
                     *pit = newlocation;
 
                 }
@@ -355,20 +348,28 @@ class MapServer
             for (std::vector<xy_data>::iterator oit = xy_features.polygon.begin();
                     oit != xy_features.polygon.end(); ++oit) {
                 xy_data xy_line_vector = *oit;
+                printf("xy_line_vector length = %ld\n",xy_line_vector.coordinates.size());
                 for (std::vector<xy_coordinates>::iterator it = xy_line_vector.coordinates.begin();
                         it != xy_line_vector.coordinates.end(); ++it) {
                     xy_coordinates a = *it;
                     std::vector<xy_coordinates>::iterator dupe = it;
                     ++dupe;
+                    std::cout << "The distance is: " << std::distance(it,dupe) << '\n';
                     xy_coordinates b = *dupe;
                     if ((a.x == b.x) and (a.y == b.y))
+                    {
+						printf("zero\n");
                         // 0 length segment no point in drawing it
                         noop;
+					}
                     else if (dupe == xy_line_vector.coordinates.end())
+                    {
                         // at end of vector, b has no meaning
+                        printf("end\n");
                         noop;
+					}
                     else {
-						cout << grid.grid;
+                       // cout << grid.grid;
                         Line(a.x, a.y, b.x, b.y, grid);
                         printf("a.x=%lf,", a.x);
                         printf("a.y=%lf\n", a.y);
@@ -422,7 +423,7 @@ class MapServer
 
         };
 
-        //  private:
+    private:
         ros::Publisher pub;
         ros::NodeHandle n;
         ros::Publisher map_pub;
@@ -433,6 +434,7 @@ class MapServer
         /** Callback invoked when someone requests our service */
         bool mapCallback(nav_msgs::GetMap::Request & req,
                          nav_msgs::GetMap::Response & res) {
+            ROS_INFO("Requestin Map");
             // request is empty; we ignore it
 
             // = operator is overloaded to make deep copy (tricky!)
@@ -537,12 +539,13 @@ class MapServer
             for (int x = (int)x1; x < maxX; x++) {
                 if (steep) {
                     //  SetPixel(y,x);
+                    //printf("steep y=%u,gridwidth=%u,x=%u\n",y,grid.gridwidth,x);
                     grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
                 } else {
-					printf("%u,%u,%u\n",y,grid.gridwidth,x);
-				//	printf("location=%ud\n",((y* (int)grid.gridwidth) + (int)x));
+                    //printf("not steep y=%u,gridwidth=%u,x=%u\n",y,grid.gridwidth,x);
+                    //	printf("location=%ud\n",((y* (int)grid.gridwidth) + (int)x));
                     grid.grid[(y * (int)grid.gridwidth) + (int)x] = (int8_t)100;
-                  //  printf("grid=%d\n",grid.grid[(y * (int)grid.gridwidth) + (int)x]);
+                    //  printf("grid=%d\n",grid.grid[(y * (int)grid.gridwidth) + (int)x]);
                 }
 
                 error -= dy;
