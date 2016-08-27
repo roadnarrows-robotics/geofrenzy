@@ -53,11 +53,55 @@ using namespace std;
 #include "nav_msgs/GetMap.h"
 
 #define noop
-class map_point {
+
+class geojson_point {
     public:
         double longitude;
         double latitude;
 };
+class geojson_points {
+    public:
+        std::vector<geojson_point> point;
+};
+
+class geojson_poly_rings {
+    public:
+        std::vector<geojson_points> ring;
+};
+
+class geojson_coordinates {
+    public:
+        std::vector<geojson_poly_rings> rings;
+};
+
+class geojson_geometry {
+    public:
+        std::string type;
+        geojson_coordinates coordinates;
+};
+
+class geojson_feature {
+    public:
+        std::string type;
+        std::string properties;  ////// PLACEHOLDER UNTIL WE START PASSING MORE INFO
+        geojson_geometry geometry;
+};
+class geojson_feature_collection {
+    public:
+        std::vector<geojson_feature> feature;
+};
+class geojson_root_fc {
+    public:
+        std::string type;
+        geojson_feature_collection features;
+};
+
+
+//class map_point {
+//public:
+//double longitude;
+//double latitude;
+//};
 
 class MapGrid
 {
@@ -67,7 +111,7 @@ class MapGrid
         int gridlength ;
         int gridsize ;
         int8_t  * grid;
-        map_point origin;
+        geojson_point origin;
 
         MapGrid(int width, int length);
 };
@@ -99,7 +143,7 @@ class xy_feature
     public:
         std::vector<xy_data> polygon;
         xy_coordinates xyanchor;
-        map_point llanchor;
+        geojson_point llanchor;
 };
 
 class MapServer
@@ -111,7 +155,7 @@ class MapServer
             ros::NodeHandle private_nh("~");
             private_nh.param("frame_id", frame_id, std::string("map"));
 
-
+            xy_feature xy_features;
             Json::Value root;   // will contains the root value after parsing.
             Json::Reader reader;
             std::ifstream t(filename.c_str());
@@ -150,7 +194,7 @@ class MapServer
                     for (int rindex = 0; rindex < rings.size(); ++rindex) {
                         Json::Value points = rings[rindex];
                         printf("points\n");
-                        cout << points;
+                        //cout << points;
                         geojson_points gj_point_list;
                         geojson_point point;
                         point.longitude = points[0].asDouble();
@@ -186,7 +230,7 @@ class MapServer
 
             std::vector<geojson_coordinates> coord_vector;
 
-            xy_feature xy_features;
+
 
 
             // OK first iterator feature_collection
@@ -229,8 +273,9 @@ class MapServer
                             geotosquare(location.latitude, location.longitude, xylocation.x, xylocation.y);
                             xy_vector.coordinates.push_back(xylocation);
                         }
-                        xy_features.polygon.push_back(xy_vector);
+
                     }
+                    xy_features.polygon.push_back(xy_vector);
                     latlow = *min_element(latvector.begin(), latvector.end());
                     longlow = *min_element(longvector.begin(), longvector.end());
                     lathigh = *max_element(latvector.begin(), latvector.end());
@@ -269,7 +314,7 @@ class MapServer
                     *pit = newlocation;
 
                 }
-             //   *fit = points;
+                *fit = points;
             }
 
 
@@ -309,9 +354,9 @@ class MapServer
 
             for (std::vector<xy_data>::iterator oit = xy_features.polygon.begin();
                     oit != xy_features.polygon.end(); ++oit) {
-                xy_data xy_vector = *oit;
-                for (std::vector<xy_coordinates>::iterator it = xy_vector.coordinates.begin();
-                        it != xy_vector.coordinates.end(); ++it) {
+                xy_data xy_line_vector = *oit;
+                for (std::vector<xy_coordinates>::iterator it = xy_line_vector.coordinates.begin();
+                        it != xy_line_vector.coordinates.end(); ++it) {
                     xy_coordinates a = *it;
                     std::vector<xy_coordinates>::iterator dupe = it;
                     ++dupe;
@@ -319,10 +364,11 @@ class MapServer
                     if ((a.x == b.x) and (a.y == b.y))
                         // 0 length segment no point in drawing it
                         noop;
-                    else if (dupe == xy_vector.coordinates.end())
+                    else if (dupe == xy_line_vector.coordinates.end())
                         // at end of vector, b has no meaning
                         noop;
                     else {
+						cout << grid.grid;
                         Line(a.x, a.y, b.x, b.y, grid);
                         printf("a.x=%lf,", a.x);
                         printf("a.y=%lf\n", a.y);
@@ -333,6 +379,7 @@ class MapServer
 
                 printf("polygon end\n");
             }
+            printf("start building ros messages\n");
             // let's define the occ
             ros::Time current_time;
             //   current_time = ros::Time::now();
@@ -342,6 +389,7 @@ class MapServer
             map_resp_.map.info.map_load_time = ros::Time::now();
             map_resp_.map.header.frame_id = "map";
             map_resp_.map.header.stamp = ros::Time::now();
+            printf("header done\n");
             //  map_resp_.map.header.frame_id = "map";
             map_resp_.map.info.resolution = 1.0;
             map_resp_.map.info.width = grid.gridwidth;
@@ -355,69 +403,27 @@ class MapServer
             map_resp_.map.info.origin.orientation.x = q.y();
             map_resp_.map.info.origin.orientation.x = q.z();
             map_resp_.map.info.origin.orientation.x = q.w();
-
+            printf("pose done\n");
             meta_data_message_ = map_resp_.map.info;
 
             std::vector<signed char> g(grid.grid, grid.grid + (grid.gridsize));
             map_resp_.map.data = g;
-
+            //cout << map_resp_;
             service = n.advertiseService("static_map", &MapServer::mapCallback, this);
+            printf("service advertised\n");
 
             metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
             metadata_pub.publish(meta_data_message_);
+            printf("metadata published\n");
 
             map_pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
             map_pub.publish( map_resp_.map );
+            printf("done\n");
 
         };
 
-
-
-
-    private:
+        //  private:
         ros::Publisher pub;
-
-        struct geojson_point {
-            double longitude;
-            double latitude;
-        };
-
-        struct geojson_points {
-            std::vector<geojson_point> point;
-        };
-
-        struct geojson_poly_rings {
-            std::vector<geojson_points> ring;
-        };
-
-        struct geojson_coordinates {
-            std::vector<geojson_poly_rings> rings;
-        };
-
-        struct geojson_geometry {
-            std::string type;
-            geojson_coordinates coordinates;
-        };
-
-        struct geojson_feature {
-            std::string type;
-            std::string properties;  ////// PLACEHOLDER UNTIL WE START PASSING MORE INFO
-            geojson_geometry geometry;
-        };
-
-        struct geojson_feature_collection {
-            std::vector<geojson_feature> feature;
-        };
-
-        struct geojson_root_fc {
-            std::string type;
-            geojson_feature_collection features;
-        };
-
-
-
-
-
         ros::NodeHandle n;
         ros::Publisher map_pub;
         ros::Publisher metadata_pub;
@@ -447,8 +453,6 @@ class MapServer
         }
         */
 
-        //using namespace std;
-        //using boost::property_tree::ptree;
 
         void geotosquare(double lat, double lon, double& x, double& y) {
             ;
@@ -507,7 +511,7 @@ class MapServer
             lon = fmod(lon, (2 * M_PI));
         }
 
-        void Line(double x1, double y1, double x2, double y2, MapGrid grid)
+        void Line(double x1, double y1, double x2, double y2, MapGrid& grid)
         {
             // Bresenham's line algorithm
             const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
@@ -533,9 +537,12 @@ class MapServer
             for (int x = (int)x1; x < maxX; x++) {
                 if (steep) {
                     //  SetPixel(y,x);
-                    grid.grid[(x * (int)grid.gridwidth) + (int)y] = 100;
+                    grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
                 } else {
-                    grid.grid[(y * (int)grid.gridwidth) + (int)x] = 100;
+					printf("%u,%u,%u\n",y,grid.gridwidth,x);
+				//	printf("location=%ud\n",((y* (int)grid.gridwidth) + (int)x));
+                    grid.grid[(y * (int)grid.gridwidth) + (int)x] = (int8_t)100;
+                  //  printf("grid=%d\n",grid.grid[(y * (int)grid.gridwidth) + (int)x]);
                 }
 
                 error -= dy;
@@ -552,12 +559,18 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
     try {
         MapServer ms("two.json");
+        printf("hmmmmmmm\n");
         ros::spin();
+        printf("haaaaa\n");
     } catch (std::exception& e) {
         std::cout << "Error: " << e.what() << "\n";
     }
     return 0;
 }
+
+
+
+
 
 
 
