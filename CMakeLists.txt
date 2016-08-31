@@ -192,9 +192,16 @@ include_directories(
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
+
 include_directories(include $(catkin_INCLUDE_DIRS))
 add_executable(gf_map_server src/gf_map_server.cpp)
 add_executable(point_cloud_publisher src/testpc.cpp)
+add_executable(gf_color_node  src/gf_color.cpp)
+add_executable(gf_color_publisher src/gf_color_pub.cpp)
+target_compile_options(gf_color_node PUBLIC -DUSE_HIDDATA)
+target_include_directories(gf_color_node PUBLIC usb/blink1/commandline/)
 target_link_libraries(point_cloud_publisher ${catkin_LIBRARIES})
 target_link_libraries(gf_map_server ${catkin_LIBRARIES} jsoncpp)
+target_link_libraries(gf_color_node  ${catkin_LIBRARIES})
+target_link_libraries(gf_color_publisher ${catkin_LIBRARIES})
 #add_dependencies(talker beginner_tutorials_generate_messages_cpp)
