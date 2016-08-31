@@ -92,7 +92,7 @@ int main(int argc, char **argv)
    * a unique string for each message.
    */
 // %Tag(ROS_OK)%
-  int count = 0;
+  float count = 0;
   while (ros::ok())
   {
 // %EndTag(ROS_OK)%
@@ -101,9 +101,9 @@ int main(int argc, char **argv)
      */
 // %Tag(FILL_MESSAGE)%
     std_msgs::ColorRGBA msg;
-	msg.r = 90.0;
-	msg.g = 60.0;
-	msg.b = 30.0;
+	msg.r = count;
+	msg.g = 0.0;
+	msg.b = 0.0;
 	msg.a = 0.99;
 // %EndTag(FILL_MESSAGE)%
 

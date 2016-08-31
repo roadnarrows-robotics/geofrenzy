@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   tf
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -196,12 +197,20 @@ include_directories(
 include_directories(include $(catkin_INCLUDE_DIRS))
 add_executable(gf_map_server src/gf_map_server.cpp)
 add_executable(point_cloud_publisher src/testpc.cpp)
-add_executable(gf_color_node  src/gf_color.cpp)
+add_executable(gf_color_node  src/gf_color.cpp src/hiddata.cpp)
 add_executable(gf_color_publisher src/gf_color_pub.cpp)
-target_compile_options(gf_color_node PUBLIC -DUSE_HIDDATA)
+target_compile_options(gf_color_node PUBLIC -std=c++11 -fpermissive)
 target_include_directories(gf_color_node PUBLIC usb/blink1/commandline/)
 target_link_libraries(point_cloud_publisher ${catkin_LIBRARIES})
 target_link_libraries(gf_map_server ${catkin_LIBRARIES} jsoncpp)
-target_link_libraries(gf_color_node  ${catkin_LIBRARIES})
+target_link_libraries(gf_color_node usb ${catkin_LIBRARIES})
 target_link_libraries(gf_color_publisher ${catkin_LIBRARIES})
 #add_dependencies(talker beginner_tutorials_generate_messages_cpp)
+#add_executable(blink1_node src/blink1_node.cpp src/hiddata.cpp)
+#target_link_libraries(blink1_node usb ${catkin_LIBRARIES})
+#add_dependencies(blink1_node blink1_gencpp)
+#add_executable(blink1_example examples/blink1_example.cpp)
+#target_link_libraries(blink1_example ${catkin_LIBRARIES})
+#add_dependencies(blink1_example blink1_gencpp) 
+
+
