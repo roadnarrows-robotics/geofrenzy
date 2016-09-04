@@ -48,7 +48,18 @@ using namespace std;
 #include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/GetMap.h"
 
+//#include "faresolv.h"
+
 #define noop
+
+extern "C" char* ambient_fences_geojson(double lng, double lat, int lvl);
+
+class gf_fence_request {
+	public:
+		double longitude;
+		double latitude;
+		int zoom;
+	};
 
 class geojson_point {
     public:
@@ -139,7 +150,7 @@ class MapServer
 
 {
     public:
-        MapServer(const std::string& filename) {
+        MapServer(gf_fence_request gpsfix) {
             std::string frame_id;
             ros::NodeHandle private_nh("~");
             private_nh.param("frame_id", frame_id, std::string("map"));
@@ -147,7 +158,8 @@ class MapServer
             xy_feature xy_features;
             Json::Value root;   // will contains the root value after parsing.
             Json::Reader reader;
-            std::ifstream t(filename.c_str());
+           // std::ifstream t(filename.c_str());
+            char *t = ambient_fences_geojson(gpsfix.longitude,gpsfix.latitude,gpsfix.zoom);
             bool parsingSuccessful = reader.parse( t, root );
             if ( !parsingSuccessful )
             {
@@ -560,8 +572,13 @@ class MapServer
 
 int main(int argc, char** argv) {
     ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
+    gf_fence_request gpsfix;
+    gpsfix.longitude = -115.1455;
+    gpsfix.latitude = 36.1685;
+    gpsfix.zoom = 16;
+    
     try {
-        MapServer ms("two.json");
+        MapServer ms(gpsfix);
         printf("hmmmmmmm\n");
         ros::spin();
         printf("haaaaa\n");
