@@ -34,6 +34,7 @@ using namespace std;
 #include <fstream>
 #include <streambuf>
 #include "jsoncpp/json/json.h"
+#include "jsoncpp/json/writer.h"
 #include <iostream>
 
 
@@ -87,10 +88,16 @@ class geojson_geometry {
         geojson_coordinates coordinates;
 };
 
+class geojson_gfproperties {
+	public:
+		std::string entitlement;
+		std::string inout;
+};
+
 class geojson_feature {
     public:
         std::string type;
-        std::string properties;  ////// PLACEHOLDER UNTIL WE START PASSING MORE INFO
+        geojson_gfproperties properties;  ////// PLACEHOLDER UNTIL WE START PASSING MORE INFO
         geojson_geometry geometry;
 };
 class geojson_feature_collection {
@@ -180,7 +187,18 @@ class MapServer
             {
                 geojson_feature gj_feature;
                 gj_feature.type = features[findex]["type"].asString();
-                gj_feature.properties = "PLACEHOLDER";
+                geojson_gfproperties gj_properties;
+                try {
+                gj_properties.entitlement = features[findex]["properties"]["entitlement"].asString();
+                gj_properties.inout = features[findex]["properties"]["inout"].asString();
+                gj_feature.properties = gj_properties;
+                Json::StyledWriter writer;
+                cout << gj_feature.properties.entitlement;
+                cout << gj_feature.properties.inout;
+			}
+			catch(int e) {
+				cout << "no properties \n";
+							}
                 Json::Value geometry = features[findex]["geometry"];
              //   printf("geometry\n");
                 geojson_geometry gj_geom;
@@ -573,9 +591,12 @@ class MapServer
 int main(int argc, char** argv) {
     ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
     gf_fence_request gpsfix;
-    gpsfix.longitude = -115.1455;
-    gpsfix.latitude = 36.1685;
-    gpsfix.zoom = 16;
+    //gpsfix.longitude = -115.1455;
+    //gpsfix.latitude = 36.1685;
+    //gpsfix.zoom = 10;
+    gpsfix.longitude = -115.18817;
+    gpsfix.latitude = 35.976224;
+    gpsfix.zoom = 10;
     
     try {
         MapServer ms(gpsfix);
