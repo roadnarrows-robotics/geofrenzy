@@ -591,12 +591,12 @@ class MapServer
 int main(int argc, char** argv) {
     ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
     gf_fence_request gpsfix;
-    //gpsfix.longitude = -115.1455;
-    //gpsfix.latitude = 36.1685;
+    gpsfix.longitude = -115.1455;
+    gpsfix.latitude = 36.1685;
+    gpsfix.zoom = 14;
+    //gpsfix.longitude = -115.18817;
+    //gpsfix.latitude = 35.976224;
     //gpsfix.zoom = 10;
-    gpsfix.longitude = -115.18817;
-    gpsfix.latitude = 35.976224;
-    gpsfix.zoom = 10;
     
     try {
         MapServer ms(gpsfix);
