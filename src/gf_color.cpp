@@ -88,14 +88,17 @@ void colorCallback(const std_msgs::ColorRGBA::ConstPtr& msg)
   printf("convert\n");
   // for the sake of the conversion since there is no backgroup defines 
   // we are setting the background color to white (255,255,255)
- float a = msg->a;
- float r = (1-a) * 255 + a * msg->r;
- float g = (1-a) * 255 + a * msg->g;
- float b = (1-a) * 255 + a * msg->b;
+ float a = (float)msg->a;
+ float r = (((1.0-a) * 1.0) + (a * (msg->r/255))) * 255.0;
+ float g = (((1.0-a) * 1.0 )+ (a * (msg->g/255))) * 255.0;
+ float b = (((1.0-a) * 1.0 ) + (a * (msg->b/255))) * 255.0 ;
   std::cout << r;
+  std::cout << "\n";
  std::cout << g;
+   std::cout << "\n";
  std::cout << b;
  printf("done\n");
+   std::cout << "\n";
  blink1_fadeToRGB(dev, 0.0, r, g, b);
  
 }
@@ -288,7 +291,7 @@ int main(int argc, char **argv)
    * away the oldest ones.
    */
 // %Tag(SUBSCRIBER)%
-  ros::Subscriber sub = n.subscribe("gf_led_color", 1000, colorCallback);
+  ros::Subscriber sub = n.subscribe("Blink", 1000, colorCallback);
 // %EndTag(SUBSCRIBER)%
 
   /**
