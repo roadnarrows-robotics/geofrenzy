@@ -129,7 +129,8 @@ class MapGrid
         int gridwidth ;
         int gridlength ;
         int gridsize ;
-        int8_t  * grid;
+        std::vector<signed char> grid;
+        //int8_t  *grid;
         geojson_point origin;
 
         MapGrid(int width, int length);
@@ -145,8 +146,8 @@ MapGrid::MapGrid( int width,  int length )
     gridwidth = (int)width;
     gridlength = (int)length;
     gridsize = gridwidth * gridlength;
-    grid = new int8_t[gridsize];
-    std::fill_n(grid, gridsize, 0);
+    grid.assign(gridsize,0);
+    //std::fill_n(grid, gridsize, 0);
 }
 
 
@@ -203,6 +204,15 @@ void geotosquare(double lat, double lon, double& x, double& y) {
 
 void Line(double x1, double y1, double x2, double y2, MapGrid& grid)
 {
+	    /**
+    * This function uses Bresenham's line algorithm to "draw" the edges
+    * in the grid between the points listed in the polygon definition
+    * \param x1 x location of first point
+    * \param y1 y location of first point
+    * \param x2 x location of second point
+    * \param y2 y location of the second point
+    * \param grid - output grid to "draw" line in
+    */
     // Bresenham's line algorithm
     const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
     if (steep) {
@@ -225,6 +235,7 @@ void Line(double x1, double y1, double x2, double y2, MapGrid& grid)
     const int maxX = (int)x2;
 
     for (int x = (int)x1; x < maxX; x++) {
+		cout << x;
         if (steep) {
             grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
         } else {
@@ -239,9 +250,23 @@ void Line(double x1, double y1, double x2, double y2, MapGrid& grid)
     }
 }
 
+// output contents of array to screen
+void printArray(int8_t arr[], int size) {
+    for ( int i = 0; i < size; i++ ) {
+        cout << arr[i] << ' ';
+    }
+    cout << endl;
+}
+
 class MapServer
 
 {
+	    /**
+        * This class holds the map server that does most of the work to 
+        * convert the Geofrenzy FDN data to ROS messages and services
+        * to be easily used by ROS nodes
+        */
+	
     public:
         void mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         MapServer();
@@ -586,10 +611,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     map_resp_.map.header.stamp = ros::Time::now();
     printf("header done\n");
     map_resp_.map.info.resolution = 1.0;
-    map_resp_.map.info.width = grid.gridwidth;
-    map_resp_.map.info.height = grid.gridlength;
-    map_resp_.map.info.origin.position.x = -1;
-    map_resp_.map.info.origin.position.y = -1;
+    map_resp_.map.info.width = grid.gridwidth ;
+    map_resp_.map.info.height = grid.gridlength ;
+    map_resp_.map.info.origin.position.x = grid.gridwidth/2;
+    map_resp_.map.info.origin.position.y = grid.gridlength/2;
     map_resp_.map.info.origin.orientation.z = 0;
     tf::Quaternion q;
     q.setRPY(0, 0, 0);
@@ -598,9 +623,11 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     map_resp_.map.info.origin.orientation.x = q.z();
     map_resp_.map.info.origin.orientation.x = q.w();
     printf("pose done\n");
+    cout << grid.grid.size();
     meta_data_message_ = map_resp_.map.info;
-    std::vector<signed char> g(grid.grid, grid.grid + (grid.gridsize));
-    map_resp_.map.data = g;
+    //std::vector<signed char> g(grid.grid, grid.grid + (grid.gridsize));
+    //std::vector<signed char> g(std::begin(grid.grid), std::end(grid.grid));
+    map_resp_.map.data = grid.grid;
     metadata_pub.publish(meta_data_message_);
     printf("metadata published\n");
     map_pub.publish( map_resp_.map );

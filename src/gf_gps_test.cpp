@@ -8,8 +8,8 @@
  * This node generates a pseudo GPS signal for use in testing the geofrenzy dns fence queries.
  * Currently it justs advertises a static location.
  * @todo Make the location dynamic
- * \param latitude Latitude of the fake signal, defaults to 36.160979
- * \param longitude Longitude of the fake signal, defaults to -115,139648
+ * \param latitude Latitude of the fake signal, defaults to 36.168186
+ * \param longitude Longitude of the fake signal, defaults to -115.138836
  */
 int main(int argc, char **argv)
 {
@@ -22,8 +22,8 @@ int main(int argc, char **argv)
  
 
   ros::Rate loop_rate(2);
-	n.param("latitide",latitude,36.160979);
-	n.param("longitude",latitude,-115.139648);
+	n.param("latitide",latitude,36.168684);
+	n.param("longitude",longitude,-115.139390);
 
   float count = 0;
   while (ros::ok())
@@ -33,6 +33,7 @@ int main(int argc, char **argv)
 	msg.latitude=latitude; //+(count/1000);
 	msg.longitude=longitude;
 	msg.header.stamp= ros::Time::now();
+	msg.status.status = 1;
 
     ROS_INFO("latitude=%lf,longitude=%lf", latitude,longitude);
 
