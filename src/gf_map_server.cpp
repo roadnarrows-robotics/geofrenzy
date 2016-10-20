@@ -50,6 +50,7 @@ using namespace std;
 #include "nav_msgs/GetMap.h"
 
 #include "geofrenzy/gf_entitlement.h"
+#include "swri_transform_util/local_xy_util.h"
 
 
 #define noop
@@ -143,11 +144,10 @@ MapGrid::MapGrid( int width,  int length )
  * \param length length in meters of the occupancy map
  */
 {
-    gridwidth = (int)width;
-    gridlength = (int)length;
+    gridwidth = (int)(width);
+    gridlength = (int)(length);
     gridsize = gridwidth * gridlength;
     grid.assign(gridsize,0);
-    //std::fill_n(grid, gridsize, 0);
 }
 
 
@@ -168,6 +168,7 @@ class xy_data {
         */
     public:
         std::vector<xy_coordinates> coordinates;
+        std::vector<geojson_point> original_ll;
 };
 
 class xy_feature
@@ -202,9 +203,14 @@ void geotosquare(double lat, double lon, double& x, double& y) {
     y = (mapHeight / 2) - (lat * mapHeight) / 180;
 }
 
+
+
+
+
+
 void Line(double x1, double y1, double x2, double y2, MapGrid& grid)
 {
-	    /**
+    /**
     * This function uses Bresenham's line algorithm to "draw" the edges
     * in the grid between the points listed in the polygon definition
     * \param x1 x location of first point
@@ -235,11 +241,13 @@ void Line(double x1, double y1, double x2, double y2, MapGrid& grid)
     const int maxX = (int)x2;
 
     for (int x = (int)x1; x < maxX; x++) {
-		cout << x;
+        cout << x;
         if (steep) {
             grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
+             grid.grid[(x * (int)grid.gridwidth) + (int)y+1] = (int8_t)100;
         } else {
             grid.grid[(y * (int)grid.gridwidth) + (int)x] = (int8_t)100;
+            grid.grid[(y * (int)grid.gridwidth) + (int)x+1] = (int8_t)100;
         }
 
         error -= dy;
@@ -261,12 +269,12 @@ void printArray(int8_t arr[], int size) {
 class MapServer
 
 {
-	    /**
-        * This class holds the map server that does most of the work to 
+        /**
+        * This class holds the map server that does most of the work to
         * convert the Geofrenzy FDN data to ROS messages and services
         * to be easily used by ROS nodes
         */
-	
+
     public:
         void mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         MapServer();
@@ -304,7 +312,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     xy_feature xy_features;
     Json::Value root;   // will contains the root value after parsing.
     Json::Reader reader;
-    // std::ifstream t(filename.c_str());
+
     std::cout << previous_lat;
     std::cout << previous_long;
     std::cout << "*******************************************************************latlong\n";
@@ -326,7 +334,27 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         previous_lat = msg->latitude;
         previous_long = msg->longitude;
     }
-    char *t = ambient_fences_geojson(msg->longitude,msg->latitude,16);
+    std::string filename;
+    char *t;
+    if (n.getParam("geojson_file", filename))
+    {
+        std::ifstream in(filename.c_str());
+        string message;
+        while (in) {
+            message.push_back(in.get());
+        }
+        std::vector<char> t(message.c_str(), message.c_str() + message.size() + 1);
+    }
+    else
+    {
+        char *td = ambient_fences_geojson(msg->longitude,msg->latitude,16);
+        t = td;
+    }
+    std::cout << "begin *t\n";
+    std::cout << t;
+    std::cout << "end *t\n";
+    std::cout.flush();
+
     bool parsingSuccessful = reader.parse( t, root );
     if ( !parsingSuccessful )
     {
@@ -348,18 +376,24 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     std::cout << "feature.len=";
     std::cout << features.size();
     std::cout << "\n";
+    std::cout.flush();
     if (features.size()==0)
     {
+        std::cout << "no features!\n";
         return;
     }
-    for (int findex = 0; findex < features.size(); ++findex)
+    for (int findex = 0; findex < features.size(); findex++)
     {
-
+        std::cout << "findex=";
+        std::cout << findex;
+        std::cout << "\n";
+        std::cout.flush();
         geojson_feature gj_feature;
         gj_feature.type = features[findex]["type"].asString();
         std::cout << "gj_feature.type=";
         std::cout << gj_feature.type;
         std::cout << "\n";
+        std::cout.flush();
         geojson_gfproperties gj_properties;
         try {
             gj_properties.entitlement = features[findex]["properties"]["entitlement"].asString();
@@ -367,6 +401,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         }
         catch(int e) {
             cout << "no properties \n";
+            std::cout.flush();
             return;
         }
         if (gj_properties.inout.compare("i") == 0) {
@@ -389,6 +424,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         cout << "\ninout=";
         cout << gj_feature.properties.inout;
         cout << "\n";
+        std::cout.flush();
 
 
         Json::Value geometry = features[findex]["geometry"];
@@ -419,6 +455,8 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         gj_feature.geometry = gj_geom;
         gj_fc.feature.push_back(gj_feature);
     }
+    std::cout << "done walking features\n";
+    std::cout.flush();
     gj_root.features = gj_fc;
 
 
@@ -452,7 +490,6 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     {
         xy_data xy_vector;
         geojson_feature  feature = *it;
-        printf("type=%s\n",feature.type.c_str());
         geojson_geometry geometry = feature.geometry;
         // OK iterate rings
 
@@ -460,6 +497,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
                 rit != geometry.rings.end();
                 ++rit) {
             geojson_linear_rings rings = *rit;
+            cout << "rings";
+            // cout << geometry;
+            cout << "\n";
+            cout.flush();
 
             std::vector<geojson_points> ring = rings.ring;
             // OK let's do two passes through
@@ -470,8 +511,6 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
             {
                 //    geojson_points anchor = *gpit;
                 geojson_points points = *gpit;
-
-
                 for (std::vector<geojson_point>::iterator pit = points.point.begin();
                         pit != points.point.end(); ++pit) {
                     //  double latanchor = anchor.latitude;
@@ -484,6 +523,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
                     xy_coordinates xylocation;
                     geotosquare(location.latitude, location.longitude, xylocation.x, xylocation.y);
                     xy_vector.coordinates.push_back(xylocation);
+                    xy_vector.original_ll.push_back(location);
                 }
 
             }
@@ -491,6 +531,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         }
         xy_features.polygon.push_back(xy_vector);
     }
+    cout << "end xy feature conversion";
+    // cout << geometry;
+    cout << "\n";
+    cout.flush();
     latlow = *min_element(latvector.begin(), latvector.end());
     longlow = *min_element(longvector.begin(), longvector.end());
     lathigh = *max_element(latvector.begin(), latvector.end());
@@ -505,7 +549,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
 
     // OK now we have the upper left corner of the frame
 
-
+    cout << "start data adjustment";
+    // cout << geometry;
+    cout << "\n";
+    cout.flush();
 
     // now to adjust the data
     for (std::vector<xy_data>::iterator fit = xy_features.polygon.begin();
@@ -519,8 +566,9 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
 
 
             // ok let's shift everything from a global frame to a local frame
-            newlocation.x = location.x - xy_features.xyanchor.x;
-            newlocation.y = location.y - xy_features.xyanchor.y;
+            // TODO: double check the shift by ten
+            newlocation.x = location.x - xy_features.xyanchor.x; + 10;
+            newlocation.y = location.y - xy_features.xyanchor.y; + 10;
 
             xpoints.push_back(location.x);
             ypoints.push_back(location.y);
@@ -532,7 +580,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         *fit = points;
     }
 
-
+    cout << "end data adjustment";
+    // cout << geometry;
+    cout << "\n";
+    cout.flush();
 
     // OK we are done with the overall calculations now we need to  use them to build the map
 
@@ -540,8 +591,9 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     ylow = *min_element(ypoints.begin(), ypoints.end());
     xhigh = *max_element(xpoints.begin(), xpoints.end());
     yhigh = *max_element(ypoints.begin(), ypoints.end());
-    double width = xhigh - xlow;
-    double length = yhigh - ylow;
+    // try to expand map so that it edges and vertex done touch the edge of the bounding box.
+    double width = xhigh - xlow + 20;
+    double length = yhigh - ylow; + 20;
 
     printf("\nxlow=%lf\n", xlow);
     printf("\nylow=%lf\n", ylow);
@@ -562,7 +614,20 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     // long++ => east
     // lat = 90 ; long = 180  ===  x = 0 ; y = 0
 
-
+    cout << "start building grid";
+    // cout << geometry;
+    cout << "\n";
+    cout.flush();
+    
+    /////
+    //swri_transform_util::LocalXyWgs84Util localtest = swri_transform_util::LocalXyWgs84Util(lathigh,longlow,0,0);
+    
+    
+    
+    
+    
+    ////
+    
     MapGrid grid((int)width,(int)length);
     grid.origin.latitude=lathigh;
     grid.origin.longitude=longlow;
@@ -571,67 +636,151 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
             oit != xy_features.polygon.end(); ++oit) {
         xy_data xy_line_vector = *oit;
         printf("xy_line_vector length = %ld\n",xy_line_vector.coordinates.size());
-        for (std::vector<xy_coordinates>::iterator it = xy_line_vector.coordinates.begin();
-                it != xy_line_vector.coordinates.end(); ++it) {
-            xy_coordinates a = *it;
-            std::vector<xy_coordinates>::iterator dupe = it;
-            ++dupe;
-            std::cout << "The distance is: " << std::distance(it,dupe) << '\n';
-            xy_coordinates b = *dupe;
-            if ((a.x == b.x) and (a.y == b.y))
-            {
+        /////////////////////////////////////
+        
+        for (std::vector<geojson_point>::iterator lt = xy_line_vector.original_ll.begin();
+                lt != xy_line_vector.original_ll.end(); ++lt) {
+                geojson_point ll = *lt;
+                std::vector<geojson_point>::iterator dupe = lt;
+                ++dupe;
+                geojson_point b = *dupe;
+                if ((ll.latitude == b.latitude) and (ll.longitude == b.longitude))
+                           {
                 printf("zero\n");
                 // 0 length segment no point in drawing it
                 noop;
             }
-            else if (dupe == xy_line_vector.coordinates.end())
+            else if (dupe == xy_line_vector.original_ll.end())
             {
-                // at end of vector, b has no meaning
+				                // at end of vector, b has no meaning
                 printf("end\n");
                 noop;
-            }
-            else {
-                // cout << grid.grid;
-                Line(a.x, a.y, b.x, b.y, grid);
-                printf("a.x=%lf,", a.x);
-                printf("a.y=%lf\n", a.y);
-                printf("b.x=%lf,", b.x);
-                printf("b.y=%lf\n\n", b.y);
-            }
-        }
+			}
+			else
+			{
+				               std::cout << "ll.latitude=" << ll.latitude << "\n";
+				std::cout << "ll.longitude=" << ll.longitude << "\n";
+				double tempx;
+				double tempy;
+				double btempx;
+				double btempy;
+				swri_transform_util::LocalXyFromWgs84(ll.latitude,ll.longitude,latlow,longlow,tempx,tempy);
+				swri_transform_util::LocalXyFromWgs84(b.latitude,b.longitude,latlow,longlow,btempx,btempy);
+				std::cout << "tempx=" << tempx << " tempy=" << tempy << "\n";
+				std::cout << "btempx=" << btempx << " btempy=" << btempy << "\n";
+				std::cout.flush();
+				                // cout << grid.grid;
+                Line(tempx, tempy, btempx, btempy, grid);
+			}
+ 
+	}
+        ///////////////////////////////////
+     //   for (std::vector<xy_coordinates>::iterator it = xy_line_vector.coordinates.begin();
+       //         it != xy_line_vector.coordinates.end(); ++it) {
+         //   xy_coordinates a = *it;
+        //    std::vector<xy_coordinates>::iterator dupe = it;
+         //   ++dupe;
+          //  std::cout << "The distance is: " << std::distance(it,dupe) << '\n';
+          //  xy_coordinates b = *dupe;
+          //  if ((a.x == b.x) and (a.y == b.y))
+          //  {
+          //      printf("zero\n");
+          //      // 0 length segment no point in drawing it
+          //      noop;
+          //  }
+         //   else if (dupe == xy_line_vector.coordinates.end())
+         //   {
+         //       // at end of vector, b has no meaning
+         //       printf("end\n");
+         //       noop;
+         //   }
+            //~ else {
+                //~ // cout << grid.grid;
+                //~ Line(a.x, a.y, b.x, b.y, grid);
+                //~ printf("a.x=%lf,", a.x);
+                //~ printf("a.y=%lf\n", a.y);
+                //~ printf("b.x=%lf,", b.x);
+                //~ printf("b.y=%lf\n\n", b.y);
+            //~ }
+      //  }
 
         printf("polygon end\n");
     }
-    printf("start building ros messages\n");
+    std::cout << "start bulding ros messages";
+    // cout << geometry;
+    std::cout << "\n";
+    std::cout.flush();
     // let's define the occ
     ros::Time current_time;
     nav_msgs::OccupancyGrid ogrid;
     map_resp_.map.info.map_load_time = ros::Time::now();
     map_resp_.map.header.frame_id = "map";
     map_resp_.map.header.stamp = ros::Time::now();
-    printf("header done\n");
+    cout << "header done";
+    // cout << geome
+    cout << "\n";
+    cout.flush();
     map_resp_.map.info.resolution = 1.0;
     map_resp_.map.info.width = grid.gridwidth ;
     map_resp_.map.info.height = grid.gridlength ;
-    map_resp_.map.info.origin.position.x = grid.gridwidth/2;
-    map_resp_.map.info.origin.position.y = grid.gridlength/2;
-    map_resp_.map.info.origin.orientation.z = 0;
+   // map_resp_.map.info.origin.position.x = grid.gridwidth/2;
+   // map_resp_.map.info.origin.position.y = grid.gridlength/2;
+  //  map_resp_.map.info.origin.orientation.z = 0;
     tf::Quaternion q;
-    q.setRPY(0, 0, 0);
+    q.setRPY(0, 0, 3.14);
     map_resp_.map.info.origin.orientation.x = q.x();
     map_resp_.map.info.origin.orientation.x = q.y();
     map_resp_.map.info.origin.orientation.x = q.z();
     map_resp_.map.info.origin.orientation.x = q.w();
-    printf("pose done\n");
+    cout << "pose done";
+    // cout << geometry;
+    cout << "\n";
+
     cout << grid.grid.size();
+    cout.flush();
     meta_data_message_ = map_resp_.map.info;
+                cout << "meta_data_messages";
+    cout << "\n";
+    cout.flush();
     //std::vector<signed char> g(grid.grid, grid.grid + (grid.gridsize));
     //std::vector<signed char> g(std::begin(grid.grid), std::end(grid.grid));
-    map_resp_.map.data = grid.grid;
+    //int8_t* tempgrid = &grid.grid[0];
+    
+    //signed char j , tempgrid[grid.grid.size()];
+    //j=0;
+    		    std::cout << "max_size:" << map_resp_.map.data.max_size() << "\n";
+    std::cout << "max_size:" << map_resp_.map.data.max_size() << "\n";
+    std::cout.flush();
+    //map_resp_.map.data.resize(grid.grid.size());
+    //for  (std::vector<signed char>::const_iterator i = grid.grid.begin(); i != grid.grid.end(); ++i)
+    //{
+
+		    		    //std::cout << "capacity:" << map_resp_.map.data.capacity() << "\n";
+		    		    		    //std::cout << "size:" << map_resp_.map.data.size() << "\n";
+    //std::cout.flush();
+		//map_resp_.map.data.push_back(*i);
+	//}
+	//map_resp_.map.data = tempgrid;
+    //std::copy(tempgrid.begin(), tempgrid.end(), map_resp_.map.data);
+    //std::memcpy(tempgrid,grid.grid,sizeof tempgrid);
+    //map_resp_.map.data = &tempgrid[0];
+    //map_resp_.map.data = &tempgrid;
+    //std::memcpy(map_resp_.map.data,grid.grid,sizeof map_resp_.map.data);
+   map_resp_.map.data = grid.grid;
+  // map_resp_.map.data.swap(grid.grid);
+                    cout << "grid.grid";
+    cout << "\n";
+    cout.flush();
     metadata_pub.publish(meta_data_message_);
-    printf("metadata published\n");
+    cout << "metadata published";
+    // cout << geometry;
+    cout << "\n";
+    cout.flush();
     map_pub.publish( map_resp_.map );
-    printf("done\n");
+    cout << "done";
+    // cout << geometry;
+    cout << "\n";
+    cout.flush();
 
 };
 

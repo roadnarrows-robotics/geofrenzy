@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   message_generation
   occupancy_grid_utils
+  swri_transform_util
 )
 
 ## System dependencies are found with CMake's conventions

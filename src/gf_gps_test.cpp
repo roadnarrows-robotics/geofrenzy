@@ -22,8 +22,9 @@ int main(int argc, char **argv)
  
 
   ros::Rate loop_rate(2);
-	n.param("latitide",latitude,36.168684);
+	n.param("latitude",latitude,36.168684);
 	n.param("longitude",longitude,-115.139390);
+	    ROS_INFO("initial latitude=%lf,longitude=%lf", latitude,longitude);
 
   float count = 0;
   while (ros::ok())
