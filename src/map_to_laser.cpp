@@ -51,6 +51,7 @@ class MapToLaser
            laser.angle_max=1;
             laser.angle_increment= .01;
             laser.range_max=100; 
+            laser.scan_time=0.3333;
             printf("Laser\n");
 	    //cout << input;
 	    //cout.flush();
