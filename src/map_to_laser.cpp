@@ -49,6 +49,7 @@ class MapToLaser
            laser.angle_max=1;
             laser.angle_increment= .01;
             laser.range_max=100; 
+            laser.scan_time=0.3333
             printf("Laser\n");
                       sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input.pose.pose,laser,true);
                   //              sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input,laser,false);
