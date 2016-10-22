@@ -7,6 +7,7 @@
 #include <occupancy_grid_utils/ray_tracer.h>
 #include "occupancy_grid_utils/exceptions.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
+#include "geometry_msgs/PoseStamped.h"
 
 /**
  * This node subscribes to a topic of "dwell" with a message type of gf_entitlement and
@@ -24,11 +25,12 @@ class MapToLaser
             pub_ = n_.advertise<sensor_msgs::LaserScan>("/gfscan", 1);
 //            sub_ = n_.subscribe("/map", 1, &MapToLaser::callback, this);
            // sub_ = n_.subscribe("/mapviz/clicked_point", 1, &MapToLaser::callback, this);
-               sub_ = n_.subscribe("/initialpose", 1, &MapToLaser::callback, this);
+//               sub_ = n_.subscribe("/initialpose", 1, &MapToLaser::callback, this);
+               sub_ = n_.subscribe("/mavros/local_position/pose", 1, &MapToLaser::callback, this);
         }
 
-        void callback(const geometry_msgs::PoseWithCovarianceStamped& input)
-    // void callback(const geometry_msgs::PointStamped& input)
+//        void callback(const geometry_msgs::PoseWithCovarianceStamped& input)
+     void callback(const geometry_msgs::PoseStamped& input)
         {
 
             ros::ServiceClient client = n_.serviceClient<nav_msgs::GetMap>("static_map");
@@ -50,7 +52,10 @@ class MapToLaser
             laser.angle_increment= .01;
             laser.range_max=100; 
             printf("Laser\n");
-                      sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input.pose.pose,laser,true);
+	    //cout << input;
+	    //cout.flush();
+                //      sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input.pose.pose,laser,true);
+                      sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input.pose,laser,true);
                   //              sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input,laser,false);
             scan->header.frame_id = "map";
             scan->header.stamp= ros::Time::now();
