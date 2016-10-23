@@ -338,6 +338,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     char *t;
     if (n.getParam("geojson_file", filename))
     {
+		std::cout << "read file *t\n";
         std::ifstream in(filename.c_str());
         string message;
         while (in) {
