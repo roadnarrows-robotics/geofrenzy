@@ -343,7 +343,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         string message;
         while (in) {
             message.push_back(in.get());
-            std::cout(messagc.str());
+            std::cout(message.c_str());
         }
         std::vector<char> t(message.c_str(), message.c_str() + message.size() + 1);
         std::cout.flush();
