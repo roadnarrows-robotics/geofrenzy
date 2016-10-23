@@ -24,8 +24,9 @@
 
 
 	<node name="GFServer" pkg="geofrenzy" type="gf_map_server" respawn="true" >
-	<param name="geojson_file" value="/home/cstradtman/geojsonsamples/swa.json" />
+	<param name="geojson_file" value="/home/ubuntu/geojsonsamples/swa.json" />
 	</node>
+	
 	<node name="GFScanner" pkg="geofrenzy" type="MapToLaser" respawn="true" />
 	<node name="gf_color_node" pkg="geofrenzy" type="gf_color_node" />
 	<node name="entitlement_to_blink_node" pkg="geofrenzy" type="EntitlementToBlink" respawn="true" />
