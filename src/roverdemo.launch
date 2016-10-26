@@ -30,28 +30,16 @@
 	<node name="gf_color_node" pkg="geofrenzy" type="gf_color_node" />
 	<node name="entitlement_to_blink_node" pkg="geofrenzy" type="EntitlementToBlink" respawn="true" />
 
-<node pkg="robot_pose_ekf" type="robot_pose_ekf" name="robot_pose_ekf" output="screen">
-  <param name="output_frame" value="odom"/>
-  <param name="freq" value="30.0"/>
-  <param name="debug" value="true"/>
-  <param name="sensor_timeout" value="1.0"/>  
-  <param name="odom_used" value="true"/>
-  <param name="imu_used" value="true"/>
-  <param name="vo_used" value="false"/>
-  <param name="gps_used" value="true"/>
-  <param name="two_d_mode" value="true"/>
-  <param name="imu0" value="mavros/imu/data"/>
-  <param name="print_diagnostics" value="true"/>
-  <remap from="imu_data" to="mavros/imu/data" />
-  <remap from="gps" to="mavros/global_postion/global" />
-  <remap from="odom" to="odom_combined" />
+  <node pkg="swri_transform_util" type="initialize_origin.py" name="initialize_origin">
+    <param name="local_xy_frame" value="map"/>
+    <param name="~local_xy_origin" value="auto"/>
+  </node>
 
 
-</node>
-
-  <node pkg="tf" type="static_transform_publisher" name="map_origin_broadcaster" args="0 0 0 0 0 0  map local_origin 100" />
-<node pkg="tf" type="static_transform_publisher" name="base_fcu_broadcaster" args="0.1 0 0.01 0 0 0  base_link fcu 100" />
-<node pkg="tf" type="static_transform_publisher" name="base_laser_broadcaster" args="0.1 0 0.01 0 0 0  base_link laser 100" />
+        <node pkg="tf" type="static_transform_publisher" name="base_link_base_laser_broadcaster" args="0.1 0 0.1 0 0 0  base_link base_laser 100" />
+        <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0 0 0 0 0 0 map odom  100" />
+        <node pkg="tf" type="static_transform_publisher" name="map_to_local_origin" args="0 0 0 0 0 0 map local_origin  100" />
+        <node pkg="tf" type="static_transform_publisher" name="fcu_to_base_link" args="0 0 0 0 0 0 fcu base_link 100" />
 
   <node pkg="swri_transform_util" type="initialize_origin.py" name="initialize_origin">
     <param name="local_xy_frame" value="/map"/>
