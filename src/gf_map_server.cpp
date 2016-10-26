@@ -51,6 +51,7 @@ using namespace std;
 
 #include "geofrenzy/gf_entitlement.h"
 #include "swri_transform_util/local_xy_util.h"
+#include "swri_transform_util/transform_util.h"
 
 
 #define noop
@@ -325,8 +326,13 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
         return;
     }
 
-    if ((msg->longitude == previous_long) && (msg->latitude == previous_lat) ) {
+double distance;
 
+distance = swri_transform_util::GreatCircleDistance(msg->latitude,msg->longitude,previous_lat,previous_long);
+std::cout << "distance=" << distance << "\n";
+
+//    if ((msg->longitude == previous_long) && (msg->latitude == previous_lat) ) {
+    if ( distance < 1 ) {
         return;
     }
     else
@@ -338,14 +344,18 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     char *t;
     if (n.getParam("geojson_file", filename))
     {
-		std::cout << "read file *t\n";
+	//char *buf;
+		std::cout << "read file \n";
         std::ifstream in(filename.c_str());
         string message;
         while (in) {
             message.push_back(in.get());
-            std::cout << message.c_str();
         }
-        std::vector<char> t(message.c_str(), message.c_str() + message.size() + 1);
+	char *bt = &message[0u];
+	t=bt;
+        //std::vector<char> buf(message.c_str(), message.c_str() + message.size() + 1);
+	//t = buf;
+	std::cout << "done read file \n";
         std::cout.flush();
     }
     else
@@ -540,6 +550,8 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     cout.flush();
     latlow = *min_element(latvector.begin(), latvector.end());
     longlow = *min_element(longvector.begin(), longvector.end());
+//    latlow = msg->latitude;
+//    longlow = msg->longitude;
     lathigh = *max_element(latvector.begin(), latvector.end());
     longhigh = *max_element(longvector.begin(), longvector.end());
     double anchorx;
@@ -730,11 +742,11 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
    // map_resp_.map.info.origin.position.y = grid.gridlength/2;
   //  map_resp_.map.info.origin.orientation.z = 0;
     tf::Quaternion q;
-    q.setRPY(0, 0, 3.14);
+    q.setRPY(0, 0, 0);
     map_resp_.map.info.origin.orientation.x = q.x();
-    map_resp_.map.info.origin.orientation.x = q.y();
-    map_resp_.map.info.origin.orientation.x = q.z();
-    map_resp_.map.info.origin.orientation.x = q.w();
+    map_resp_.map.info.origin.orientation.y = q.y();
+    map_resp_.map.info.origin.orientation.z = q.z();
+    map_resp_.map.info.origin.orientation.w = q.w();
     cout << "pose done";
     // cout << geometry;
     cout << "\n";

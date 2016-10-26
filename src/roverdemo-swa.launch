@@ -1,0 +1,42 @@
+<launch>
+	<!-- vim: set ft=xml noet : -->
+	<!-- example launch script for ArduPilotMega based FCU's -->
+
+	<arg name="fcu_url" default="/dev/ttyACM0:57600" />
+	<arg name="gcs_url" default="" />
+	<arg name="tgt_system" default="1" />
+	<arg name="tgt_component" default="1" />
+	<arg name="log_output" default="screen" />
+
+	<remap from="fix" to="mavros/global_position/global" />
+
+	<include file="$(find mavros)/launch/node.launch">
+		<arg name="pluginlists_yaml" value="$(find mavros)/launch/apm_pluginlists.yaml" />
+		<arg name="config_yaml" value="$(find mavros)/launch/apm_config.yaml" />
+
+		<arg name="fcu_url" value="$(arg fcu_url)" />
+		<arg name="gcs_url" value="$(arg gcs_url)" />
+		<arg name="tgt_system" value="$(arg tgt_system)" />
+		<arg name="tgt_component" value="$(arg tgt_component)" />
+		<arg name="log_output" value="$(arg log_output)" />
+	</include>
+
+
+	<param name="geojson_file" value="/home/ubuntu/geojsonsamples/swa.json" />
+
+	<node name="GFServer" pkg="geofrenzy" type="gf_map_server" respawn="true" >
+	</node>
+	
+	<node name="GFScanner" pkg="geofrenzy" type="MapToLaser" respawn="true" />
+	<node name="gf_color_node" pkg="geofrenzy" type="gf_color_node" />
+	<node name="entitlement_to_blink_node" pkg="geofrenzy" type="EntitlementToBlink" respawn="true" />
+
+  <node pkg="swri_transform_util" type="initialize_origin.py" name="initialize_origin">
+    <param name="local_xy_frame" value="/map"/>
+  </node>
+
+	<node pkg="tf" type="static_transform_publisher" name="gfmap_broadcaster" args="0.1 0 0.01 0 0 0  base_link fcu 100" />
+  <node pkg="tf" type="static_transform_publisher" name="swri_transform" args="0
+ 0 0 0 0 0 /map__identity /local_origin 100" />
+
+</launch>
