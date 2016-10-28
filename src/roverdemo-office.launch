@@ -9,6 +9,7 @@
 	<arg name="log_output" default="screen" />
 
 	<remap from="fix" to="mavros/global_position/global" />
+	<remap from="gps" to="mavros/global_position/global" />
 
 	<include file="$(find mavros)/launch/node.launch">
 		<arg name="pluginlists_yaml" value="$(find mavros)/launch/px4_pluginlists.yaml" />
@@ -22,6 +23,7 @@
 	</include>
 
 
+	<param name="geojson_file" value="/home/ubuntu/geojsonsamples/office.json" />
 
 	<node name="GFServer" pkg="geofrenzy" type="gf_map_server" respawn="true" >
 	</node>
@@ -35,15 +37,10 @@
     <param name="~local_xy_origin" value="auto"/>
   </node>
 
-
-        <node pkg="tf" type="static_transform_publisher" name="base_link_base_laser_broadcaster" args="0.1 0 0.1 0 0 0  base_link base_laser 100" />
-        <node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0 0 0 0 0 0 map odom  100" />
-        <node pkg="tf" type="static_transform_publisher" name="map_to_local_origin" args="0 0 0 0 0 0 map local_origin  100" />
-        <node pkg="tf" type="static_transform_publisher" name="fcu_to_base_link" args="0 0 0 0 0 0 fcu base_link 100" />
-
-  <node pkg="swri_transform_util" type="initialize_origin.py" name="initialize_origin">
-    <param name="local_xy_frame" value="/map"/>
-  </node>
+	<node pkg="tf" type="static_transform_publisher" name="base_link_base_laser_broadcaster" args="0.1 0 0.1 0 0 0  base_link base_laser 100" />
+	<node pkg="tf" type="static_transform_publisher" name="map_to_odom" args="0 0 0 0 0 0 map odom  100" />
+	<node pkg="tf" type="static_transform_publisher" name="map_to_local_origin" args="0 0 0 0 0 0 map local_origin  100" />
+	<node pkg="tf" type="static_transform_publisher" name="fcu_to_base_link" args="0 0 0 0 0 0 fcu base_link 100" />
 
 
 </launch>
