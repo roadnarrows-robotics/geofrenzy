@@ -29,13 +29,13 @@ class EntitlementToBlink
             std::string entitlement = input.entitlement;
             std_msgs::ColorRGBA msg;
             if (dwell.compare("i") == 0) {
-                std::string redstring = entitlement.substr(2,2);
+                std::string redstring = entitlement.substr(0,2);
                 std::transform(redstring.begin(), redstring.end(), redstring.begin(), ::toupper);
-                std::string bluestring = entitlement.substr(4,2);
+                std::string bluestring = entitlement.substr(2,2);
                 std::transform(bluestring.begin(), bluestring.end(), bluestring.begin(), ::toupper);
-                std::string greenstring = entitlement.substr(6,2);
+                std::string greenstring = entitlement.substr(4,2);
                 std::transform(greenstring.begin(), greenstring.end(), greenstring.begin(), ::toupper);
-                std::string alphastring = entitlement.substr(0,2);
+                std::string alphastring = entitlement.substr(6,2);
                 std::transform(alphastring.begin(), alphastring.end(), alphastring.begin(), ::toupper);
                 ROS_DEBUG("red=%s,blue=%s,green=%s,alpha=%s",redstring.c_str(),bluestring.c_str(),greenstring.c_str(),alphastring.c_str());
                 std::stringstream ssr,ssb,ssg,ssa;
