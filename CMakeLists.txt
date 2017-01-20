@@ -14,6 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   message_generation
+  occupancy_grid_utils
+  swri_transform_util
 )
 
 ## System dependencies are found with CMake's conventions
@@ -50,11 +52,12 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
+add_message_files(
+	FILES
 #   Message1.msg
 #   Message2.msg
-# )
+	gf_entitlement.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -71,10 +74,11 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   geographic_msgs#   geometry_msgs#   std_msgs
-# )
+generate_messages(
+   DEPENDENCIES
+#   geographic_msgs#   geometry_msgs#   
+	std_msgs
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -109,6 +113,7 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES geofrenzy
 #  CATKIN_DEPENDS geodesy geographic_msgs geometry_msgs roscpp rospy std_msgs tf
+CATKIN_DEPENDS message_runtime
 #  DEPENDS system_lib
 )
 
@@ -204,16 +209,23 @@ add_executable(gf_map_server src/gf_map_server.cpp)
 add_executable(point_cloud_publisher src/testpc.cpp)
 add_executable(gf_color_node  src/gf_color.cpp src/hiddata.cpp)
 add_executable(gf_color_publisher src/gf_color_pub.cpp)
+add_executable(gf_gps_test src/gf_gps_test.cpp)
+add_executable(EntitlementToBlink src/EntitlementToBlink.cpp)
+add_executable(MapToLaser src/map_to_laser.cpp)
 target_compile_options(gf_color_node PUBLIC -std=c++11 -fpermissive)
 target_include_directories(gf_color_node PUBLIC usb/blink1/commandline/)
 target_include_directories(gf_map_server PUBLIC fa-resolver-libresolv/include/)
+target_include_directories(MapToLaser PUBLIC occupancy_grid_utils/include/)
 target_link_libraries(point_cloud_publisher ${catkin_LIBRARIES})
 target_link_libraries(gf_map_server  ${catkin_LIBRARIES})
 target_link_libraries(gf_map_server jsoncpp)
+target_link_libraries(gf_gps_test  ${catkin_LIBRARIES})
+target_link_libraries(MapToLaser  ${catkin_LIBRARIES})
 message( STATUS ${FALIB})
 target_link_libraries(gf_map_server ${FALIB} agent)
 target_link_libraries(gf_color_node usb ${catkin_LIBRARIES})
 target_link_libraries(gf_color_publisher ${catkin_LIBRARIES})
+target_link_libraries(EntitlementToBlink ${catkin_LIBRARIES})
 
 #add_dependencies(talker beginner_tutorials_generate_messages_cpp)
 #add_executable(blink1_node src/blink1_node.cpp src/hiddata.cpp)

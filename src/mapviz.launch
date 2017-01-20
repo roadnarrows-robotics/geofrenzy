@@ -1,0 +1,17 @@
+<launch>
+    <node pkg="tf" type="static_transform_publisher" name="swri_transform" args="0 0 0 0 0 0 /map /dummy 100"  />
+
+    <node pkg="swri_transform_util" type="initialize_origin.py" name="initialize_origin" >
+        <param name="local_xy_frame" value="/map"/>
+        <param name="local_xy_origin" value="Spata"/>
+        <rosparam param="local_xy_origins">
+            [{ name: Spata,
+             latitude: 36.160852,
+             longitude: -115.139449,
+             altitude: 129.69,
+             heading: 0.0}]
+        </rosparam>
+    </node>
+
+    <node pkg="mapviz" type="mapviz" name="mapviz"/>
+</launch>
