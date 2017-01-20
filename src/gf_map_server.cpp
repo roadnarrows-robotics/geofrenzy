@@ -61,7 +61,7 @@ using namespace std;
  * @todo Allow for selection of specific entitlements for advertisement
  */
 
-extern "C" char *ambient_fences_geojson(double lng, double lat, int lvl);
+extern "C" char *ambient_fences_geojson_zoom(double lng, double lat, int lvl, int myclass);
 
 class gf_fence_request
 {
@@ -376,7 +376,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
     }
     else
     {
-        char *td = ambient_fences_geojson(msg->longitude, msg->latitude, 16);
+        char *td = ambient_fences_geojson_zoom(msg->longitude, msg->latitude, 4, 32);
         t = td;
     }
     std::cout << "begin *t\n";
