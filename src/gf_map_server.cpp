@@ -15,7 +15,7 @@
 #include <cmath>
 #include <iostream>
 #include <string>
-using namespace std;
+// using namespace std;
 #include <ctime>
 #include <cstdlib>
 #include <algorithm>
