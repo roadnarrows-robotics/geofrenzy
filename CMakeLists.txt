@@ -56,15 +56,19 @@ add_message_files(
 	FILES
 #   Message1.msg
 #   Message2.msg
-	gf_entitlement.msg
+	entitlement.msg
+	class.msg
 )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
+ add_service_files(
+   FILES
 #   Service1.srv
 #   Service2.srv
-# )
+	entitlement_service.srv
+	entitlement_list_service.srv
+	class_service.srv
+ )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -206,6 +210,7 @@ endif()
 #link_directories(/usr/local/lib)
 include_directories(include $(catkin_INCLUDE_DIRS))
 add_executable(gf_map_server src/gf_map_server.cpp)
+add_executable(gf_node src/gf_node.cpp)
 add_executable(point_cloud_publisher src/testpc.cpp)
 add_executable(gf_color_node  src/gf_color.cpp src/hiddata.cpp)
 add_executable(gf_color_publisher src/gf_color_pub.cpp)
@@ -215,14 +220,18 @@ add_executable(MapToLaser src/map_to_laser.cpp)
 target_compile_options(gf_color_node PUBLIC -std=c++11 -fpermissive)
 target_include_directories(gf_color_node PUBLIC usb/blink1/commandline/)
 target_include_directories(gf_map_server PUBLIC fa-resolver-libresolv/include/)
+target_include_directories(gf_map_server PUBLIC src/geofrenzy)
 target_include_directories(MapToLaser PUBLIC occupancy_grid_utils/include/)
 target_link_libraries(point_cloud_publisher ${catkin_LIBRARIES})
 target_link_libraries(gf_map_server  ${catkin_LIBRARIES})
+target_link_libraries(gf_node ${catkin_LIBRARIES})
 target_link_libraries(gf_map_server jsoncpp)
+target_link_libraries(gf_node jsoncpp)
 target_link_libraries(gf_gps_test  ${catkin_LIBRARIES})
 target_link_libraries(MapToLaser  ${catkin_LIBRARIES})
 message( STATUS ${FALIB})
 target_link_libraries(gf_map_server ${FALIB} agent)
+target_link_libraries(gf_node ${FALIB} agent)
 target_link_libraries(gf_color_node usb ${catkin_LIBRARIES})
 target_link_libraries(gf_color_publisher ${catkin_LIBRARIES})
 target_link_libraries(EntitlementToBlink ${catkin_LIBRARIES})

@@ -50,6 +50,8 @@
 #include "swri_transform_util/local_xy_util.h"
 #include "swri_transform_util/transform_util.h"
 
+#include "include/geofrenzy/gf_geojson.h"
+
 #define noop
 
 /**
@@ -62,6 +64,7 @@
  */
 
 extern "C" char *ambient_fences_geojson_zoom(double lng, double lat, int lvl, int myclass);
+
 
 class gf_fence_request
 {
@@ -191,7 +194,7 @@ void Line(double x1, double y1, double x2, double y2, MapGrid &grid)
 
     for (int x = (int)x1; x < maxX; x++)
     {
-        cout << x;
+       std::cout << x;
         if (steep)
         {
             grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
@@ -217,9 +220,9 @@ void printArray(int8_t arr[], int size)
 {
     for (int i = 0; i < size; i++)
     {
-        cout << arr[i] << ' ';
+       std::cout << arr[i] << ' ';
     }
-    cout << endl;
+   std::cout << std::endl;
 }
 
 class MapServer
@@ -307,7 +310,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         //char *buf;
         std::cout << "read file \n";
         std::ifstream in(filename.c_str());
-        string message;
+        std::string message;
         while (in)
         {
             message.push_back(in.get());
@@ -376,7 +379,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         }
         catch (int e)
         {
-            cout << "no properties \n";
+           std::cout << "no properties \n";
             std::cout.flush();
             return;
         }
@@ -397,11 +400,11 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         }
         gj_feature.properties = gj_properties;
 
-        cout << "entitlment=";
-        cout << gj_feature.properties.entitlement;
-        cout << "\ninout=";
-        cout << gj_feature.properties.inout;
-        cout << "\n";
+       std::cout << "entitlment=";
+       std::cout << gj_feature.properties.entitlement;
+       std::cout << "\ninout=";
+       std::cout << gj_feature.properties.inout;
+       std::cout << "\n";
         std::cout.flush();
 
         Json::Value geometry = features[findex]["geometry"];
@@ -472,10 +475,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
              ++rit)
         {
             geojson_linear_rings rings = *rit;
-            cout << "rings";
-            // cout << geometry;
-            cout << "\n";
-            cout.flush();
+           std::cout << "rings";
+            //std::cout << geometry;
+           std::cout << "\n";
+           std::cout.flush();
 
             std::vector<geojson_points> ring = rings.ring;
             // OK let's do two passes through
@@ -505,10 +508,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         }
         xy_features.polygon.push_back(xy_vector);
     }
-    cout << "end xy feature conversion";
-    // cout << geometry;
-    cout << "\n";
-    cout.flush();
+   std::cout << "end xy feature conversion";
+    //std::cout << geometry;
+   std::cout << "\n";
+   std::cout.flush();
     latlow = *min_element(latvector.begin(), latvector.end());
     longlow = *min_element(longvector.begin(), longvector.end());
     //    latlow = msg->latitude;
@@ -525,10 +528,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
 
     // OK now we have the upper left corner of the frame
 
-    cout << "start data adjustment";
-    // cout << geometry;
-    cout << "\n";
-    cout.flush();
+   std::cout << "start data adjustment";
+    //std::cout << geometry;
+   std::cout << "\n";
+   std::cout.flush();
 
     // now to adjust the data
     for (std::vector<xy_data>::iterator fit = xy_features.polygon.begin();
@@ -557,10 +560,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         *fit = points;
     }
 
-    cout << "end data adjustment";
-    // cout << geometry;
-    cout << "\n";
-    cout.flush();
+   std::cout << "end data adjustment";
+    //std::cout << geometry;
+   std::cout << "\n";
+   std::cout.flush();
 
     // OK we are done with the overall calculations now we need to  use them to build the map
 
@@ -592,10 +595,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
     // long++ => east
     // lat = 90 ; long = 180  ===  x = 0 ; y = 0
 
-    cout << "start building grid";
-    // cout << geometry;
-    cout << "\n";
-    cout.flush();
+   std::cout << "start building grid";
+    //std::cout << geometry;
+   std::cout << "\n";
+   std::cout.flush();
 
     /////
     //swri_transform_util::LocalXyWgs84Util localtest = swri_transform_util::LocalXyWgs84Util(lathigh,longlow,0,0);
@@ -645,7 +648,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
                 std::cout << "tempx=" << tempx << " tempy=" << tempy << "\n";
                 std::cout << "btempx=" << btempx << " btempy=" << btempy << "\n";
                 std::cout.flush();
-                // cout << grid.grid;
+                //std::cout << grid.grid;
                 Line(tempx, tempy, btempx, btempy, grid);
             }
         }
@@ -670,7 +673,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         //       noop;
         //   }
         //~ else {
-        //~ // cout << grid.grid;
+        //~ //std::cout << grid.grid;
         //~ Line(a.x, a.y, b.x, b.y, grid);
         //~ printf("a.x=%lf,", a.x);
         //~ printf("a.y=%lf\n", a.y);
@@ -682,7 +685,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         printf("polygon end\n");
     }
     std::cout << "start bulding ros messages";
-    // cout << geometry;
+    //std::cout << geometry;
     std::cout << "\n";
     std::cout.flush();
     // let's define the occ
@@ -691,10 +694,10 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
     map_resp_.map.info.map_load_time = ros::Time::now();
     map_resp_.map.header.frame_id = "map";
     map_resp_.map.header.stamp = ros::Time::now();
-    cout << "header done";
-    // cout << geome
-    cout << "\n";
-    cout.flush();
+   std::cout << "header done";
+    //std::cout << geome
+   std::cout << "\n";
+   std::cout.flush();
     map_resp_.map.info.resolution = 1.0;
     map_resp_.map.info.width = grid.gridwidth;
     map_resp_.map.info.height = grid.gridlength;
@@ -707,16 +710,16 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
     map_resp_.map.info.origin.orientation.y = q.y();
     map_resp_.map.info.origin.orientation.z = q.z();
     map_resp_.map.info.origin.orientation.w = q.w();
-    cout << "pose done";
-    // cout << geometry;
-    cout << "\n";
+   std::cout << "pose done";
+    //std::cout << geometry;
+   std::cout << "\n";
 
-    cout << grid.grid.size();
-    cout.flush();
+   std::cout << grid.grid.size();
+   std::cout.flush();
     meta_data_message_ = map_resp_.map.info;
-    cout << "meta_data_messages";
-    cout << "\n";
-    cout.flush();
+   std::cout << "meta_data_messages";
+   std::cout << "\n";
+   std::cout.flush();
     //std::vector<signed char> g(grid.grid, grid.grid + (grid.gridsize));
     //std::vector<signed char> g(std::begin(grid.grid), std::end(grid.grid));
     //int8_t* tempgrid = &grid.grid[0];
@@ -743,26 +746,26 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
     //std::memcpy(map_resp_.map.data,grid.grid,sizeof map_resp_.map.data);
     map_resp_.map.data = grid.grid;
     // map_resp_.map.data.swap(grid.grid);
-    cout << "grid.grid";
-    cout << "\n";
-    cout.flush();
+   std::cout << "grid.grid";
+   std::cout << "\n";
+   std::cout.flush();
     metadata_pub.publish(meta_data_message_);
-    cout << "metadata published";
-    // cout << geometry;
-    cout << "\n";
-    cout.flush();
+   std::cout << "metadata published";
+    //std::cout << geometry;
+   std::cout << "\n";
+   std::cout.flush();
     map_pub.publish(map_resp_.map);
-    cout << "done";
-    // cout << geometry;
-    cout << "\n";
-    cout.flush();
+   std::cout << "done";
+    //std::cout << geometry;
+   std::cout << "\n";
+   std::cout.flush();
 };
 
 /** Callback invoked when someone requests our service */
 bool MapServer::mapCallback(nav_msgs::GetMap::Request &req,
                             nav_msgs::GetMap::Response &res)
 {
-    ROS_INFO("Requestin Map");
+    ROS_INFO("Requesting Map");
     // request is empty; we ignore it
 
     // = operator is overloaded to make deep copy (tricky!)
@@ -825,7 +828,6 @@ int main(int argc, char **argv)
     //gf_fence_request gpsfix;
     ros::NodeHandle n;
     ros::Subscriber gps;
-
 
     try
     {
