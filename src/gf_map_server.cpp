@@ -46,7 +46,7 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/GetMap.h"
 
-#include "geofrenzy/gf_entitlement.h"
+#include "geofrenzy/entitlement.h"
 #include "swri_transform_util/local_xy_util.h"
 #include "swri_transform_util/transform_util.h"
 

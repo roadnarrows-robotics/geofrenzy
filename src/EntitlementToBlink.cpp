@@ -2,7 +2,7 @@
 #include <string>
 
 #include <ros/ros.h>
-#include "geofrenzy/gf_entitlement.h"
+#include "geofrenzy/entitlement.h"
 #include "std_msgs/ColorRGBA.h"
 
 /**
@@ -21,7 +21,7 @@ class EntitlementToBlink
         sub_ = n_.subscribe("/dwell", 1, &EntitlementToBlink::callback, this);
     }
 
-    void callback(const geofrenzy::gf_entitlement &input)
+    void callback(const geofrenzy::entitlement &input)
     {
         //00 eb ff ff ffffffffffffffffffff
         std::string dwell = input.dwell;

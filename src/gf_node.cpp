@@ -1,6 +1,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <fstream>
 
 #include "ros/ros.h"
 #include "ros/console.h"
@@ -33,18 +34,20 @@ class fence_server
 {
     public:
         void callback(const sensor_msgs::NavSatFix::ConstPtr &msg);
-        fence_server(uint64_t fence_class);
+        fence_server(uint64_t fence_class,ros::NodeHandle n);
     private:
         uint64_t fence_class;
         double_t previous_lat;
         double_t previous_long;
+        ros::NodeHandle n;
 
 
 };
 
-fence_server::fence_server(uint64_t fence_class)
+fence_server::fence_server(uint64_t fence_class, ros::NodeHandle n)
 {
     fence_server::fence_class = fence_class;
+    fence_server::n = n;
 };
 
 void fence_server::callback(const sensor_msgs::NavSatFix::ConstPtr &msg)
@@ -100,7 +103,7 @@ void fence_server::callback(const sensor_msgs::NavSatFix::ConstPtr &msg)
     }
     else
     {
-        char *td = ambient_fences_geojson_roi(msg->longitude, msg->latitude, 16, class);
+        char *td = ambient_fences_geojson_roi(msg->longitude, msg->latitude, 16, fence_class);
         t = td;
     }
     std::cout << "begin *t\n";
@@ -138,13 +141,13 @@ class list_metadata
 bool list_metadata::listCallback(geofrenzy::entitlement_list_service::Request &req,
                                  geofrenzy::entitlement_list_service::Response &res)
 {
-    ROS_INFO("Requesting entitlement");
+    ROS_INFO("Requesting entitlement list");
     // request is empty; we ignore it
 
     // = operator is overloaded to make deep copy (tricky!)
     list_resp_.entitlement = list_vec;
     res = list_resp_;
-    ROS_INFO("Sending entitlement");
+    ROS_INFO("Sending entitlement list");
 
     return true;
 };
@@ -182,6 +185,8 @@ entitlement_metadata::entitlement_metadata(uint64_t entitlement, std::string ent
 
     //ent_resp_.msg.header.frame_id = "entitlement";
     //ent_resp_.msg.header.stamp = ros::Time::now();
+        std::cout << entitlement << "\n";
+    std::cout << ent_base << "\n";
     ent_resp_.entitlement = entitlement;
     ent_resp_.ent_base = ent_base;
 
@@ -192,10 +197,14 @@ bool entitlement_metadata::entitlementCallback(geofrenzy::entitlement_service::R
         geofrenzy::entitlement_service::Response &res)
 {
     ROS_INFO("Requesting entitlement");
+        std::cout << ent_resp_.entitlement << "\n";
+    std::cout << ent_resp_.ent_base << "\n";
     // request is empty; we ignore it
 
     // = operator is overloaded to make deep copy (tricky!)
-    res = ent_resp_;
+    //res = ent_resp_;
+    res.entitlement = ent_resp_.entitlement;
+    res.ent_base = ent_resp_.ent_base;
     ROS_INFO("Sending entitlement");
 
     return true;
@@ -214,7 +223,7 @@ int main(int argc, char **argv)
 
 
     //gf_fence_request gpsfix;
-    ros::NodeHandle n;
+	ros::NodeHandle n;
     ros::Subscriber gps;
     Json::Value entitlements_root;
     Json::Reader reader;
@@ -244,27 +253,32 @@ int main(int argc, char **argv)
         Json::Value entitlements = entitlements_root["class_metadata"]["entitlements"];
         for (int i = 0; i < entitlements.size(); i++) {
             uint64_t ent_idx_int = entitlements[i]["ent_idx"].asInt();
+            std::ostringstream class_idx_ss;
+            class_idx_ss << class_idx;
+            std::string class_idx_str = class_idx_ss.str();
+            std::ostringstream ent_idx_ss;
+            ent_idx_ss << ent_idx_int;
+            std::string ent_idx_str = ent_idx_ss.str();
+            std::string ent_base_str = entitlements[i]["ent_base"].asString();
+            
             std::cout << "for class_idx=";
             std::cout << class_idx;
             std::cout << " ent_idx of ";
             std::cout << ent_idx_int;
             std::cout << " is of ent_base type ";
-            std::cout << entitlements[i]["ent_base"].asString();
+            std::cout <<  ent_base_str;
             std::cout << "\n";
             std::cout.flush();
-            std::ostringstream class_idx_str;
-            class_idx_str << class_idx;
-            std::ostringstream ent_idx_str;
-            ent_idx_str << ent_idx_int;
-            entitlement_metadata myentitlement(ent_idx_int,entitlements[i]["ent_base"].asString());
-            std::string mypath = "geofrenzy/" +class_idx_str.str() + "/" + ent_idx_str.str();
+
+            entitlement_metadata myentitlement(ent_idx_int,ent_base_str);
+            std::string mypath = "geofrenzy/" +class_idx_str + "/" + ent_idx_str;
             service_vec.push_back(n.advertiseService(mypath,&entitlement_metadata::entitlementCallback, &myentitlement));
             ent_list.append_entitlement(ent_idx_int);
         }
-        ros::ServiceServer cservice;
+      //  fence_server fs(class_idx,n);
         std::string mycpath = "geofrenzy/" + myclass_idx_str + "/list";
-        cservice = n.advertiseService(mycpath,&list_metadata::listCallback, &ent_list);
-        gps = n.subscribe("fix", 1, &MapServer::mapServerCallback, &ms);
+        service_vec.push_back(n.advertiseService(mycpath,&list_metadata::listCallback, &ent_list));
+      //  gps = n.subscribe("fix", 1, &fence_server::callback, &fs);
 
 
         ros::spin();
@@ -282,4 +296,5 @@ int main(int argc, char **argv)
     }
     return 0;
 }
+
 
