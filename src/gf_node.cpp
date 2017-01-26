@@ -42,10 +42,12 @@ class FenceServer
     public:
 
 
-        FenceServer(uint64_t fence_class, ros::NodeHandle n)
+        FenceServer( uint64_t new_class,  ros::NodeHandle newnh)
         {
-            fence_class = fence_class;
-            n = n;
+            fence_class = new_class;
+            n = newnh;
+            				             std::cout << "fence_class alloc=" << fence_class << "\n";
+            std::cout.flush();
         };
 
         void callback(const sensor_msgs::NavSatFix::ConstPtr &msg)
@@ -70,6 +72,7 @@ class FenceServer
 
             distance = swri_transform_util::GreatCircleDistance(msg->latitude, msg->longitude, previous_lat, previous_long);
             std::cout << "distance=" << distance << "\n";
+            std::cout.flush();
 
             if (distance < 1)
             {
@@ -82,10 +85,13 @@ class FenceServer
             }
             std::string filename;
             char *t;
+             std::cout << "ready to check params\n";
+            std::cout.flush();
             if (n.getParam("geojson_file", filename))
             {
                 //char *buf;
                 std::cout << "read file \n";
+                            std::cout.flush();
                 std::ifstream in(filename.c_str());
                 std::string message;
                 while (in)
@@ -101,7 +107,12 @@ class FenceServer
             }
             else
             {
-                char *td = ambient_fences_geojson_roi(msg->longitude, msg->latitude, 16, fence_class);
+				             std::cout << "ready to check fence roi\n";
+				             std::cout << "longitude=" << msg->longitude << "\n";
+				             std::cout << "latitude=" << msg->latitude << "\n";
+				             std::cout << "fence_class=" << fence_class << "\n";
+            std::cout.flush();
+                char *td = ambient_fences_geojson_roi(msg->longitude, msg->latitude, 600, fence_class);
                 t = td;
             }
             std::cout << "begin *t\n";
@@ -285,10 +296,12 @@ int main(int argc, char **argv)
             service_vec.push_back(eservice);
             ent_list.append_entitlement(ent_idx_int);
         }
-        //  FenceServer fs(class_idx,n);
+
         std::string mycpath = "geofrenzy/" + myclass_idx_str + "/list";
         ros::ServiceServer cservice = n.advertiseService(mycpath,&ListMetadata::listCallback, &ent_list);
-        //  gps = n.subscribe("fix", 1, &FenceServer::callback, &fs);
+        
+        FenceServer fs(class_idx, n);
+        gps = n.subscribe("fix", 1, &FenceServer::callback, &fs);
 
 
         ros::spin();
