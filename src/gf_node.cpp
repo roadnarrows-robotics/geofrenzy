@@ -6,6 +6,7 @@
 #include "ros/ros.h"
 #include "ros/console.h"
 #include "std_msgs/String.h"
+#include "nav_msgs/MapMetaData.h"
 
 #include "geodesy/wgs84.h"
 
@@ -39,7 +40,7 @@ class FenceServer
         double_t previous_long;
         ros::NodeHandle n;
         ros::Publisher metadata_pub;
-        std::vector<uint64_t> entitlement_vec;
+        std::map <uint64_t, ros::Publisher> entitlement_map;
 
     public:
 
@@ -55,8 +56,16 @@ class FenceServer
 
         void AppendEntitlement(uint64_t newentitlement)
         {
-            entitlement_vec.push_back(newentitlement);
+			std::stringstream fence_class_stream ;
+			fence_class_stream << fence_class;
+			std::stringstream newentitlement_stream;
+			newentitlement_stream << newentitlement;
+			std::string ad_string = "geofrenzy/" + fence_class_stream.str() + "/" + newentitlement_stream.str() + "/json";
+            entitlement_map[newentitlement] = n.advertise<std_msgs::String>(ad_string,1,false);
         }
+        
+        
+       
         void callback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         {
             std::cout << "start FenceServer Callback\n";
@@ -262,6 +271,7 @@ int main(int argc, char **argv)
 
     std::vector<ros::ServiceServer *> service_vec;
     ListMetadata ent_list;
+    FenceServer fs(myclass_idx, n);
 
     try
     {
@@ -310,12 +320,13 @@ int main(int argc, char **argv)
             *eservice = n.advertiseService(mypath,&EntitlementMetadata::entitlementCallback, myentitlement);
             service_vec.push_back(eservice);
             ent_list.append_entitlement(ent_idx_int);
+            fs.AppendEntitlement(ent_idx_int);
         }
 
         std::string mycpath = "geofrenzy/" + myclass_idx_str + "/list";
         ros::ServiceServer cservice = n.advertiseService(mycpath,&ListMetadata::listCallback, &ent_list);
         
-        FenceServer fs(class_idx, n);
+        
         gps = n.subscribe("fix", 1, &FenceServer::callback, &fs);
 
 
