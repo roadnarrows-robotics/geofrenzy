@@ -38,6 +38,8 @@ class FenceServer
         double_t previous_lat;
         double_t previous_long;
         ros::NodeHandle n;
+        ros::Publisher metadata_pub;
+        std::vector<uint64_t> entitlement_vec;
 
     public:
 
@@ -48,8 +50,13 @@ class FenceServer
             n = newnh;
             				             std::cout << "fence_class alloc=" << fence_class << "\n";
             std::cout.flush();
+             metadata_pub = newnh.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
         };
 
+        void AppendEntitlement(uint64_t newentitlement)
+        {
+            entitlement_vec.push_back(newentitlement);
+        }
         void callback(const sensor_msgs::NavSatFix::ConstPtr &msg)
         {
             std::cout << "start FenceServer Callback\n";
@@ -112,7 +119,7 @@ class FenceServer
 				             std::cout << "latitude=" << msg->latitude << "\n";
 				             std::cout << "fence_class=" << fence_class << "\n";
             std::cout.flush();
-                char *td = ambient_fences_geojson_roi(msg->longitude, msg->latitude, 600, fence_class);
+                char *td = ambient_fences_geojson_roi(msg->longitude, msg->latitude, 60, fence_class);
                 t = td;
             }
             std::cout << "begin *t\n";
@@ -128,6 +135,14 @@ class FenceServer
                           << reader.getFormattedErrorMessages();
                 return;
             }
+                    Json::Value FeatureList = root["features"];
+                    for(Json::Value::iterator feature = FeatureList.begin(); feature != FeatureList.end(); ++feature)
+                    {
+                        Json::Value Entitlements = (*feature)["properties"]["class_metadata"]["entitlements"];
+                        std::cout << Entitlements << "\n"; 
+                    }
+
+
         };
 };
 

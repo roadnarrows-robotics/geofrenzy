@@ -265,7 +265,7 @@ MapServer::MapServer(void)
     dwell_pub = n.advertise<geofrenzy::gf_entitlement>("dwell", 1, true);
     previous_lat = 0;
     previous_long = 0;
-    std::cout << "end MapServer Construcotr\n";
+    std::cout << "end MapServer Constructor\n";
 }
 
 void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
