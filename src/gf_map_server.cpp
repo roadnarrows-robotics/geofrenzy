@@ -389,7 +389,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
             entitlement_message.entitlement = gj_properties.entitlement;
             entitlement_message.dwell = gj_properties.inout;
             entitlement_message.header.stamp = ros::Time::now();
-            dwell_pub.publish(entitlement_message);
+           // dwell_pub.publish(entitlement_message);
         }
         if (gj_properties.inout.compare("o") == 0)
         {
