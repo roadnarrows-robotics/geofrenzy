@@ -186,7 +186,7 @@ int main(int argc, char **argv)
 
     ros::NodeHandle n;
 
-    ros::Subscriber sub = n.subscribe("Blink", 1000, colorCallback);
+    ros::Subscriber sub = n.subscribe("Blink", 2, colorCallback);
 
     ros::spin();
 

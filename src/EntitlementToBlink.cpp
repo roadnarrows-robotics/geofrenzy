@@ -14,9 +14,12 @@
 class EntitlementToBlink
 {
   public:
-    EntitlementToBlink()
+    EntitlementToBlink(std::string class_list)
     {
-
+		
+		std::string topic_prefix =  "geofrenzy/";
+		std::string topic_postfix = "/dwell/json";
+		std::string color_ent_string = "0";
         pub_ = n_.advertise<std_msgs::ColorRGBA>("/Blink", 1);
         sub_ = n_.subscribe("/dwell", 1, &EntitlementToBlink::callback, this);
     }

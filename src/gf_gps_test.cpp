@@ -22,8 +22,8 @@ int main(int argc, char **argv)
  
 
   ros::Rate loop_rate(2);
-	n.param("latitude",latitude,36.168684);
-	n.param("longitude",longitude,-115.139390);
+	n.param("latitude",latitude,36.033019);
+	n.param("longitude",longitude,-115.034786);
 	    ROS_INFO("initial latitude=%lf,longitude=%lf", latitude,longitude);
 
   float count = 0;
@@ -31,12 +31,12 @@ int main(int argc, char **argv)
   {
 
     sensor_msgs::NavSatFix msg;
-	msg.latitude=latitude; //+(count/1000);
+	msg.latitude=latitude +(count/100000);
 	msg.longitude=longitude;
 	msg.header.stamp= ros::Time::now();
 	msg.status.status = 1;
 
-    ROS_INFO("latitude=%lf,longitude=%lf", latitude,longitude);
+    ROS_INFO("latitude=%lf,longitude=%lf", msg.latitude,msg.longitude);
 
     color_pub.publish(msg);
 
