@@ -52,7 +52,7 @@ class FenceServer {
             std::stringstream newentitlement_stream;
             newentitlement_stream << newentitlement;
             std::string ad_string = "geofrenzy/" + fence_class_stream.str() + "/" + newentitlement_stream.str() + "/dwell/json";
-            entitlement_map[newentitlement] = n.advertise<std_msgs::String>(ad_string, 1, false);
+            entitlement_map[newentitlement] = n.advertise<std_msgs::String>(ad_string, 1, true);
         }
 
 

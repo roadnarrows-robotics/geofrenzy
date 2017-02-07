@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import rospy
 import rosservice
 import pprint
@@ -19,7 +20,7 @@ msg_list=[]
 
 def gps_callback(data):
 	global fix
-	if (data.status.status <= 0):
+	if (data.status.status >= 0):
 		fix=True;
 	else:
 		fix=False
@@ -34,52 +35,14 @@ def callback(data):
 	alpha_total = 0
 	count_total = 0
 	json_data = json.loads(data.data)
-	pprint.pprint(json_data)
+#	pprint.pprint(json_data)
+	rospy.loginfo(data.data)
 	dwell_dict[json_data["class_idx"]] = json_data["dwell"]
 	red_dict[json_data["class_idx"]] = json_data["color_red"]
 	green_dict[json_data["class_idx"]] = json_data["color_green"]
 	blue_dict[json_data["class_idx"]] = json_data["color_blue"]
 	alpha_dict[json_data["class_idx"]] = json_data["color_alpha"]
-
-##each time through the callback we build a a full msg_list with the appropriate topics to publish in the main loop 
-	#for dwell in dwell_dict:
-		#dwell_total = dwell_total or dwell_dict[dwell]
-	##	print "*****" + dwell + "****"
-		#if dwell_dict[dwell]:
-				#count_total = count_total + 1
-				#msg = ColorRGBA(float(json_data["color_red"]),float(json_data["color_green"]),float(json_data["color_blue"]),(float(json_data["color_alpha"])/255))
-				#msg_list.append(msg)
-				#print "====================="
-			
-##	if json_data["dwell"]:
-##		msg = ColorRGBA(float(json_data["color_red"]),float(json_data["color_green"]),float(json_data["color_blue"]),(float(json_data["color_alpha"])/255))
-##		pub.publish(msg)
-## if the GPS has a fix but no fences, we put the light on full brightness
-	#if (len(msg_list)<1):
-		#print ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>no fence<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<,"
-		#msg_list=[]
-		#msg = ColorRGBA(255,255,255,1)
-		#msg_list.append(msg)
-		#pub.publish(msg)
-		#interval=1
-## if the GPS has no fix then we just barely put the light on just to show we are alive
-	#if not fix:
-		#print "No Fix"
-		#msg_list=[]
-		#msg = ColorRGBA(10,10,10,1)
-		#msg_list.append(msg)
-		#pub.publish(msg)
-		#interval=1
-	#pprint.pprint(dwell_total);
-	#red_avg = red_total/count_total
-	#green_avg = green_total/count_total
-	#blue_avg = blue_total/count_total
-	#alpha_avg = alpha_total/count_total
-	#print count_total,dwell_total,red_avg,green_avg,blue_avg,alpha_avg
-	#msg = ColorRGBA(float(red_avg),float(green_avg),float(blue_avg),(float(alpha_avg)/255))
-	#pub.publish(msg)
 	
-
 
 rospy.init_node("gf_color_mux");
 services = rosservice.get_service_list()
@@ -103,7 +66,7 @@ while not rospy.is_shutdown():
 	#each time through the callback we build a a full msg_list with the appropriate topics to publish in the main loop 
 	for dwell in dwell_dict:
 		#dwell_total = dwell_total or dwell_dict[dwell]
-	#	print "*****" + dwell + "****"
+		print "*****" + dwell + "****"
 		if dwell_dict[dwell]:
 				#count_total = count_total + 1
 				#msg = ColorRGBA(float(json_data["color_red"]),float(json_data["color_green"]),float(json_data["color_blue"]),(float(json_data["color_alpha"])/255))
