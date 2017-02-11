@@ -774,7 +774,7 @@ ros::init(argc, argv, node_name);
 
         MapServer ms;
         ros::ServiceServer service;
-        std::string gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str + "featureCollection/json";
+        std::string gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str + "/featureCollection/json";
         geojsonsrc = n.subscribe(gf_node_name_topic_str, 1, &MapServer::mapServerCallback, &ms);
         service = n.advertiseService("static_map", &MapServer::mapCallback, &ms);
         printf("static_map service advertised\n");
