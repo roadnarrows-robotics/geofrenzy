@@ -78,7 +78,7 @@ class FenceServer {
             std::cout << "distance=" << distance << "\n";
             std::cout.flush();
 
-            if (distance < 1) {
+            if (distance < .1) {
                 return;
             } else {
                 previous_lat = msg->latitude;
