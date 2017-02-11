@@ -260,7 +260,7 @@ MapServer::MapServer(void)
     ros::NodeHandle private_nh("~");
     private_nh.param("frame_id", frame_id, std::string("map"));
     map_pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
-//    metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
+    metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
 //    dwell_pub = n.advertise<geofrenzy::gf_entitlement>("dwell", 1, true);
     previous_lat = 0;
     previous_long = 0;
