@@ -236,7 +236,7 @@ class MapServer
   public:
     void mapServerCallback(const std_msgs::String::ConstPtr &msg);
     MapServer();
-    bool mapCallback(std)msgs::GetMap::Request &req,
+    bool mapCallback(nav_msgs::GetMap::Request &req,
                      nav_msgs::GetMap::Response &res);
 
   private:
@@ -260,8 +260,8 @@ MapServer::MapServer(void)
     ros::NodeHandle private_nh("~");
     private_nh.param("frame_id", frame_id, std::string("map"));
     map_pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
-    metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
-    dwell_pub = n.advertise<geofrenzy::gf_entitlement>("dwell", 1, true);
+//    metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
+//    dwell_pub = n.advertise<geofrenzy::gf_entitlement>("dwell", 1, true);
     previous_lat = 0;
     previous_long = 0;
     std::cout << "end MapServer Constructor\n";
@@ -269,6 +269,7 @@ MapServer::MapServer(void)
 
 void MapServer::mapServerCallback(const std_msgs::String::ConstPtr &msg)
 {
+    const char *t;
     std::cout << "start MapServer Callback\n";
     xy_feature xy_features;
     Json::Value root; // will contains the root value after parsing.
@@ -332,21 +333,7 @@ void MapServer::mapServerCallback(const std_msgs::String::ConstPtr &msg)
             std::cout.flush();
             return;
         }
-        if (gj_properties.inout.compare("i") == 0)
-        {
-            geofrenzy::gf_entitlement entitlement_message;
-            entitlement_message.entitlement = gj_properties.entitlement;
-            entitlement_message.dwell = gj_properties.inout;
-            entitlement_message.header.stamp = ros::Time::now();
-           // dwell_pub.publish(entitlement_message);
-        }
-        if (gj_properties.inout.compare("o") == 0)
-        {
-            geofrenzy::gf_entitlement entitlement_message;
-            //entitlement_message.entitlement = gj_properties.entitlement;
-            entitlement_message.dwell = gj_properties.inout;
-            dwell_pub.publish(entitlement_message);
-        }
+
         gj_feature.properties = gj_properties;
 
        std::cout << "entitlment=";
@@ -771,6 +758,7 @@ void xyztogeo(double x, double y, double z, double &lat, double &lon)
 };
 
 int main(int argc, char **argv)
+{
 
 std::string myclass_idx_str = argv[1];
 std::string node_name = "gf_map_server_" + myclass_idx_str;
@@ -786,8 +774,8 @@ ros::init(argc, argv, node_name);
 
         MapServer ms;
         ros::ServiceServer service;
-        gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str() + "featureCollection/json"
-        geosjonsrc = n.subscribe(gf_node_name_topic_str, 1, &MapServer::mapServerCallback, &ms);
+        std::string gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str + "featureCollection/json";
+        geojsonsrc = n.subscribe(gf_node_name_topic_str, 1, &MapServer::mapServerCallback, &ms);
         service = n.advertiseService("static_map", &MapServer::mapCallback, &ms);
         printf("static_map service advertised\n");
         ros::spin();
