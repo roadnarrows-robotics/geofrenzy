@@ -13,7 +13,7 @@ green_dict = {}
 red_dict = {}
 blue_dict = {}
 alpha_dict = {}
-fix = False;
+fix = False
 interval=1.0
 msg_list=[]
 
@@ -21,19 +21,19 @@ msg_list=[]
 def gps_callback(data):
 	global fix
 	if (data.status.status >= 0):
-		fix=True;
+		fix=True
 	else:
 		fix=False
 	pprint.pprint(fix)
 
 def callback(data):
 	global msg_list
-	dwell_total = False;
-	red_total = 0
-	green_total = 0
-	blue_total = 0
-	alpha_total = 0
-	count_total = 0
+#	dwell_total = False
+#	red_total = 0
+#	green_total = 0
+#	blue_total = 0
+#	alpha_total = 0
+#	count_total = 0
 	json_data = json.loads(data.data)
 #	pprint.pprint(json_data)
 	rospy.loginfo(data.data)
@@ -44,8 +44,8 @@ def callback(data):
 	alpha_dict[json_data["class_idx"]] = json_data["color_alpha"]
 	
 
-rospy.init_node("gf_color_mux");
-services = rosservice.get_service_list()
+rospy.init_node("gf_color_mux")
+#services = rosservice.get_service_list()
 services = rosservice.rosservice_find("geofrenzy/entitlement_service")
 topics = rospy.get_published_topics('/geofrenzy')
 service_list = []

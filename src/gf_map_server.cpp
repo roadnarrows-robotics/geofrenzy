@@ -46,7 +46,6 @@
 #include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/GetMap.h"
 
-#include "geofrenzy/entitlement.h"
 #include "swri_transform_util/local_xy_util.h"
 #include "swri_transform_util/transform_util.h"
 
@@ -235,7 +234,7 @@ class MapServer
         */
 
   public:
-    void mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg);
+    void mapServerCallback(const std_msgs::String::ConstPtr &msg);
     MapServer();
     bool mapCallback(nav_msgs::GetMap::Request &req,
                      nav_msgs::GetMap::Response &res);
@@ -262,71 +261,22 @@ MapServer::MapServer(void)
     private_nh.param("frame_id", frame_id, std::string("map"));
     map_pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
     metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
-    dwell_pub = n.advertise<geofrenzy::gf_entitlement>("dwell", 1, true);
+//    dwell_pub = n.advertise<geofrenzy::gf_entitlement>("dwell", 1, true);
     previous_lat = 0;
     previous_long = 0;
     std::cout << "end MapServer Constructor\n";
 }
 
-void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
+void MapServer::mapServerCallback(const std_msgs::String::ConstPtr &msg)
 {
+    const char *t;
     std::cout << "start MapServer Callback\n";
     xy_feature xy_features;
     Json::Value root; // will contains the root value after parsing.
     Json::Reader reader;
 
-    std::cout << previous_lat;
-    std::cout << previous_long;
-    std::cout << "*******************************************************************latlong\n";
-    std::cout << msg->latitude;
-    std::cout << msg->longitude;
+    t = msg->data.c_str();
 
-    if (msg->status.status == -1)
-    {
-        std::cout << "no gps acquired\n";
-        // no gps acquired
-        return;
-    }
-
-    double distance;
-
-    distance = swri_transform_util::GreatCircleDistance(msg->latitude, msg->longitude, previous_lat, previous_long);
-    std::cout << "distance=" << distance << "\n";
-
-    //    if ((msg->longitude == previous_long) && (msg->latitude == previous_lat) ) {
-    if (distance < 1)
-    {
-        return;
-    }
-    else
-    {
-        previous_lat = msg->latitude;
-        previous_long = msg->longitude;
-    }
-    std::string filename;
-    char *t;
-    if (n.getParam("geojson_file", filename))
-    {
-        //char *buf;
-        std::cout << "read file \n";
-        std::ifstream in(filename.c_str());
-        std::string message;
-        while (in)
-        {
-            message.push_back(in.get());
-        }
-        char *bt = &message[0u];
-        t = bt;
-        //std::vector<char> buf(message.c_str(), message.c_str() + message.size() + 1);
-        //t = buf;
-        std::cout << "done read file \n";
-        std::cout.flush();
-    }
-    else
-    {
-        char *td = ambient_fences_geojson_zoom(msg->longitude, msg->latitude, 4, 32);
-        t = td;
-    }
     std::cout << "begin *t\n";
     std::cout << t;
     std::cout << "end *t\n";
@@ -336,7 +286,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
     if (!parsingSuccessful)
     {
         // report to the user the failure and their locations in the document.
-        std::cout << "Failed to parse configuration\n"
+        std::cout << "Failed to parse GeoJson input\n"
                   << reader.getFormattedErrorMessages();
         return;
     }
@@ -383,21 +333,7 @@ void MapServer::mapServerCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
             std::cout.flush();
             return;
         }
-        if (gj_properties.inout.compare("i") == 0)
-        {
-            geofrenzy::gf_entitlement entitlement_message;
-            entitlement_message.entitlement = gj_properties.entitlement;
-            entitlement_message.dwell = gj_properties.inout;
-            entitlement_message.header.stamp = ros::Time::now();
-           // dwell_pub.publish(entitlement_message);
-        }
-        if (gj_properties.inout.compare("o") == 0)
-        {
-            geofrenzy::gf_entitlement entitlement_message;
-            //entitlement_message.entitlement = gj_properties.entitlement;
-            entitlement_message.dwell = gj_properties.inout;
-            dwell_pub.publish(entitlement_message);
-        }
+
         gj_feature.properties = gj_properties;
 
        std::cout << "entitlment=";
@@ -823,19 +759,23 @@ void xyztogeo(double x, double y, double z, double &lat, double &lon)
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "gf_map_server", ros::init_options::AnonymousName);
+
+std::string myclass_idx_str = argv[1];
+std::string node_name = "gf_map_server_" + myclass_idx_str;
+ros::init(argc, argv, node_name);
+
 
     //gf_fence_request gpsfix;
     ros::NodeHandle n;
-    ros::Subscriber gps;
+    ros::Subscriber geojsonsrc;
 
     try
     {
 
         MapServer ms;
         ros::ServiceServer service;
-        gps = n.subscribe("fix", 1, &MapServer::mapServerCallback, &ms);
-        printf("gps subscribed\n");
+        std::string gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str + "/featureCollection/json";
+        geojsonsrc = n.subscribe(gf_node_name_topic_str, 1, &MapServer::mapServerCallback, &ms);
         service = n.advertiseService("static_map", &MapServer::mapCallback, &ms);
         printf("static_map service advertised\n");
         ros::spin();
