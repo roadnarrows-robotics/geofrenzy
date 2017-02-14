@@ -26,6 +26,9 @@ extern "C" char *class_entitlements_properties_json(int myclass);
 
 
 class FenceServer {
+	/**
+    * this class implements the GeoJson Fence Server
+    */
 
 private:
     uint64_t fence_class;
@@ -38,7 +41,13 @@ private:
 public:
 
 
+
     FenceServer(uint64_t new_class, ros::NodeHandle newnh) {
+	/**
+    * this metthod instantiates a fence server
+    * \param[in] new_class class index for the node
+    * \param[in] newnh ros node handle for the node
+    */
         fence_class = new_class;
         n = newnh;
         std::cout << "fence_class alloc=" << fence_class << "\n";
@@ -268,6 +277,16 @@ public:
     };
 
 };
+
+/**
+ * This node queries the fence delivery network and produces topics 
+ * of the form /geofrenzy/[class idx]/[entitlement index]/dwell/json
+ * and /geofrenzy/[class index]/featureCollection/json
+ * representing the occupancy of a fence with a class and entitlement value
+ * and the Geojson of given fences within a class repectively
+ * \param class class index for the node
+ */
+
 
 int main(int argc, char **argv) {
 

@@ -235,7 +235,7 @@ class MapServer
 
   public:
     void mapServerCallback(const std_msgs::String::ConstPtr &msg);
-    MapServer();
+    MapServer(std::string);
     bool mapCallback(nav_msgs::GetMap::Request &req,
                      nav_msgs::GetMap::Response &res);
 
@@ -253,15 +253,16 @@ class MapServer
     double_t previous_long;
 };
 
-MapServer::MapServer(void)
+MapServer::MapServer(std::string topic_prefix)
 {
     std::cout << "start MapServer Constuctor\n";
     std::string frame_id;
     ros::NodeHandle private_nh("~");
-    private_nh.param("frame_id", frame_id, std::string("map"));
-    map_pub = n.advertise<nav_msgs::OccupancyGrid>("map", 1, true);
-    metadata_pub = n.advertise<nav_msgs::MapMetaData>("map_metadata", 1, true);
-//    dwell_pub = n.advertise<geofrenzy::gf_entitlement>("dwell", 1, true);
+    std::string topic_string = topic_prefix + "/map";
+    std::string topic_meta_string = topic_prefix + "/map_metadata";
+    private_nh.param("frame_id", frame_id, topic_string);
+    map_pub = n.advertise<nav_msgs::OccupancyGrid>(topic_string, 1, true);
+    metadata_pub = n.advertise<nav_msgs::MapMetaData>(topic_meta_string, 1, true);
     previous_lat = 0;
     previous_long = 0;
     std::cout << "end MapServer Constructor\n";
@@ -762,6 +763,9 @@ int main(int argc, char **argv)
 
 std::string myclass_idx_str = argv[1];
 std::string node_name = "gf_map_server_" + myclass_idx_str;
+std::string service_name = "static_map_" + myclass_idx_str;
+std::string gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str + "/featureCollection/json";
+std::string gf_map_server_topic_prefix = "/geofrenzy/" + myclass_idx_str;
 ros::init(argc, argv, node_name);
 
 
@@ -772,11 +776,11 @@ ros::init(argc, argv, node_name);
     try
     {
 
-        MapServer ms;
+        MapServer ms(gf_map_server_topic_prefix);
         ros::ServiceServer service;
-        std::string gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str + "/featureCollection/json";
+
         geojsonsrc = n.subscribe(gf_node_name_topic_str, 1, &MapServer::mapServerCallback, &ms);
-        service = n.advertiseService("static_map", &MapServer::mapCallback, &ms);
+        service = n.advertiseService(service_name, &MapServer::mapCallback, &ms);
         printf("static_map service advertised\n");
         ros::spin();
     }
