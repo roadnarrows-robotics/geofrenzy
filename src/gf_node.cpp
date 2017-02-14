@@ -105,10 +105,12 @@ public:
             //char *buf;
             std::cout << "read file \n";
             std::cout.flush();
-            std::ifstream in(filename.c_str());
-            std::string message;
-            while (in) {
-                message.push_back(in.get());
+
+            if (distance < .1) {
+                return;
+            } else {
+                previous_lat = msg->latitude;
+                previous_long = msg->longitude;
             }
             char *bt = &message[0u];
             t = bt;
