@@ -1,6 +1,0 @@
-<launch>
-	<node name="GFServer" pkg="geofrenzy" type="gf_map_server" />
-	<node name="entitlement_to_blink_node" pkg="geofrenzy" type="EntitlementToBlink" respawn="true" />
-	<node name="GPS" pkg="geofrenzy" type="gf_gps_test"  respawn="true"/>
-	<node pkg="tf" type="static_transform_publisher" name="gfmap_broadcaster" args="0 0 0 0 0 0  earth map 100" />
-</launch>
