@@ -2,8 +2,8 @@
 Changelog for package geofrenzy
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.3 (2017-02-16)
+------------------
 * 0.0.2
 * working on building ros release added CHANGELOG.rst to repository
 * quick fix of variable definition that was accidentaly deleted during cleanup
