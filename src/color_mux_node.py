@@ -8,14 +8,20 @@ from std_msgs.msg import String
 from std_msgs.msg import ColorRGBA
 from sensor_msgs.msg import NavSatFix
 
+
+gps_service_name="fix"
+fix = False
+interval=1.0
+
 dwell_dict = {}
 green_dict = {}
 red_dict = {}
 blue_dict = {}
 alpha_dict = {}
-fix = False
-interval=1.0
+
 msg_list=[]
+service_list = []
+subscription_list = []
 
 
 def gps_callback(data):
@@ -50,15 +56,16 @@ rospy.init_node("gf_color_mux")
 rospy.sleep(30.0)
 services = rosservice.rosservice_find("geofrenzy/entitlement_service")
 topics = rospy.get_published_topics('/geofrenzy')
-service_list = []
+
 for service in services:
 	entitlement_srv = rospy.ServiceProxy(service,entitlement_service)
 	response = entitlement_srv().ent_base
 	if response == "color":
 		service = service+"/dwell/json"
 		service_list.append(service) 
-		rospy.Subscriber(service, String, callback)
-gps_service_name="fix"
+		new_subscriber = rospy.Subscriber(service, String, callback)
+		subscription_list.append(new_subscriber)
+
 rospy.Subscriber(gps_service_name,NavSatFix,gps_callback)
 pprint.pprint(service_list)
 pub = rospy.Publisher('Blink',ColorRGBA,queue_size=1)
