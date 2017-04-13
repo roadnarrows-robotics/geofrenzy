@@ -44,8 +44,10 @@ def callback(data):
 	alpha_dict[json_data["class_idx"]] = json_data["color_alpha"]
 	
 
+
 rospy.init_node("gf_color_mux")
 #services = rosservice.get_service_list()
+rospy.sleep(30.0)
 services = rosservice.rosservice_find("geofrenzy/entitlement_service")
 topics = rospy.get_published_topics('/geofrenzy')
 service_list = []
@@ -59,7 +61,7 @@ for service in services:
 gps_service_name="fix"
 rospy.Subscriber(gps_service_name,NavSatFix,gps_callback)
 pprint.pprint(service_list)
-pub = rospy.Publisher('Blink',ColorRGBA,queue_size=2)
+pub = rospy.Publisher('Blink',ColorRGBA,queue_size=1)
 
 while not rospy.is_shutdown():
 	msg_list=[]
@@ -102,6 +104,7 @@ while not rospy.is_shutdown():
 		r=rospy.Rate(interval)
 	else:
 		r=rospy.Rate(1)
+		r.sleep()
 	pprint.pprint(msg_list)
 	for each in msg_list:
 		pub.publish(each)
