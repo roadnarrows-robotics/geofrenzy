@@ -64,7 +64,7 @@ class MapToLaser
 	newPose.orientation.w = input.pose.orientation.w;
                 //      sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input.pose.pose,laser,true);
                       sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input.pose,laser,true);
-              rv.response.map,input.pose,laser,true   //              sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input,laser,false);
+              //rv.response.map,input.pose,laser,true   //              sensor_msgs::LaserScan::Ptr scan = occupancy_grid_utils::simulateRangeScan(srv.response.map,input,laser,false);
             scan->header.frame_id = "base_laser";
             scan->header.stamp= ros::Time::now();
             pub_.publish(scan);
