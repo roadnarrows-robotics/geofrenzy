@@ -57,7 +57,7 @@ add_message_files(
 #   Message1.msg
 #   Message2.msg
 	entitlement.msg
-	class.msg
+	gf_class.msg
 )
 
 ## Generate services in the 'srv' folder

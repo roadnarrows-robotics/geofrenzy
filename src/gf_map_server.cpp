@@ -155,6 +155,8 @@ void geotosquare(double lat, double lon, double &x, double &y)
     double latRad = lat * M_PIl / 180;
     double mercN = log(tan((M_PIl / 4) + latRad / 2));
     y = (mapHeight / 2) - (lat * mapHeight) / 180;
+    //x*=10; //trying to up the resolution
+    //y*=10;
 }
 
 void Line(double x1, double y1, double x2, double y2, MapGrid &grid)
@@ -391,7 +393,6 @@ void MapServer::mapServerCallback(const std_msgs::String::ConstPtr &msg)
     std::vector<double> xpoints;
     std::vector<double> ypoints;
     std::vector<double> zpoints;
-
     //  std::vector<geojson_coordinates> coord_vector;
 
     std::vector<double> latvector;
@@ -510,8 +511,7 @@ void MapServer::mapServerCallback(const std_msgs::String::ConstPtr &msg)
     yhigh = *max_element(ypoints.begin(), ypoints.end());
     // try to expand map so that it edges and vertex done touch the edge of the bounding box.
     double width = xhigh - xlow + 20;
-    double length = yhigh - ylow;
-    +20;
+    double length = yhigh - ylow + 20;
 
     printf("\nxlow=%lf\n", xlow);
     printf("\nylow=%lf\n", ylow);
@@ -638,9 +638,9 @@ void MapServer::mapServerCallback(const std_msgs::String::ConstPtr &msg)
     map_resp_.map.info.resolution = 1.0;
     map_resp_.map.info.width = grid.gridwidth;
     map_resp_.map.info.height = grid.gridlength;
-    // map_resp_.map.info.origin.position.x = grid.gridwidth/2;
-    // map_resp_.map.info.origin.position.y = grid.gridlength/2;
-    //  map_resp_.map.info.origin.orientation.z = 0;
+    map_resp_.map.info.origin.position.x = -grid.gridwidth/2 -10; //moving origin over for testing
+    map_resp_.map.info.origin.position.y = -grid.gridlength/2 -10;
+    map_resp_.map.info.origin.orientation.z = 0;
     tf::Quaternion q;
     q.setRPY(0, 0, 0);
     map_resp_.map.info.origin.orientation.x = q.x();

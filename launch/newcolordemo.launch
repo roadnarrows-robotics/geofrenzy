@@ -4,7 +4,7 @@
 	<node name="gf_node_70" pkg="geofrenzy" type="gf_node" args="70" respawn="true" />
 	<node name="gf_node_71" pkg="geofrenzy" type="gf_node" args="71" respawn="true" />
 	<node name="gf_node_72" pkg="geofrenzy" type="gf_node" args="72" respawn="true" />
-	<node name="gf_color_node" pkg="geofrenzy" type="gf_color_node" respawn="true" />
-	<node name="GPS" pkg="nmea_navsat_driver" type="nmea_serial_driver" args="_port:=/dev/nd-105-c _baud:=4800" respawn="true"/>
-	<node name="gf_color_mux" pkg="geofrenzy" type="color_mux_node.py" respawn="true"/>
+  <!--<node name="gf_color_node" pkg="geofrenzy" type="gf_color_node" respawn="true" />
+  <node name="GPS" pkg="nmea_navsat_driver" type="nmea_serial_driver" args="_port:=/dev/nd-105-c _baud:=4800" respawn="true"/>-->
+<!--	<node name="gf_color_mux" pkg="geofrenzy" type="color_mux_node.py" respawn="true"/> -->
 </launch>

@@ -96,7 +96,8 @@ class FenceServer {
             std::cout << "distance=" << distance << "\n";
             std::cout.flush();
 
-            if (distance < 1) {
+            //Ignore this for now, testing
+            if (distance < 0) {
                 return;
             } else {
                 previous_lat = msg->latitude;
@@ -128,8 +129,11 @@ class FenceServer {
                     std::cout << "latitude=" << msg->latitude << "\n";
                     std::cout << "fence_class=" << fence_class << "\n";
                     std::cout.flush();
+                    std::cout << "Calling ambient_fences_geojson_roi() \n";
                     char *td = ambient_fences_geojson_roi(msg->longitude, msg->latitude, 6, fence_class);
+                    std::cout << "Done\n";
                     t = td;
+
                 }
                 std::cout << "begin *t\n";
                 std::cout << t;
