@@ -1,7 +1,0 @@
-<launch>
-	<node name="GFServer" pkg="geofrenzy" type="gf_map_server" />
-	<node name="gf_color_node" pkg="geofrenzy" type="gf_color_node" />
-	<node name="entitlement_to_blink_node" pkg="geofrenzy" type="EntitlementToBlink" respawn="true" />
-	<node name="GPS" pkg="nmea_navsat_driver" type="nmea_serial_driver" args="_port:=/dev/nd-105-c _baud:=4800" respawn="true"/>
-	<node pkg="tf" type="static_transform_publisher" name="gfmap_broadcaster" args="0 0 0 0 0 0  earth map 100" />
-</launch>
