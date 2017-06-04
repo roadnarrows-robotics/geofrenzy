@@ -53,11 +53,21 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## Generate messages in the 'msg' folder
 add_message_files(
+  DIRECTORY msg
 	FILES
-#   Message1.msg
-#   Message2.msg
-	entitlement.msg
-	gf_class.msg
+    GeoPolygon.msg
+    GfDistFeature.msg
+    GfDistFeatureCollection.msg
+    GfDwellBoolset.msg
+    GfDwellColor.msg
+    GfDwellProfile.msg
+    GfDwellThreshold.msg
+    GfEntHeader.msg
+    GfGeoFeature.msg
+    GfGeoFeatureCollection.msg
+    Polygon64.msg
+    entitlement.msg   # RDK should be deprecated
+    gf_class.msg    # RDK should be deprecated
 )
 
 ## Generate services in the 'srv' folder
@@ -79,9 +89,10 @@ add_message_files(
 
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
-   DEPENDENCIES
-#   geographic_msgs#   geometry_msgs#   
-	std_msgs
+  DEPENDENCIES
+    geographic_msgs
+    geometry_msgs  
+	  std_msgs
  )
 
 ################################################
