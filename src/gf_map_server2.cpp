@@ -60,7 +60,64 @@ void transformPoint(geometry_msgs::Point p_in, geometry_msgs::Point &p_out, doub
     p_out.z = p_in.z + dZ;
 }
 
-void Line(double x1, double y1, double x2, double y2, MapGrid &grid)
+/*
+ * Check if two lines intersect. Line1 defined by p1, p2; Line2 defined by p3, p4
+ */
+bool checkIntersection(geometry_msgs::Point p1, geometry_msgs::Point p2, geometry_msgs::Point p3, geometry_msgs::Point p4){
+    double s1_x, s1_y, s2_x, s2_y;
+    s1_x = p2.x - p1.x;
+    s1_y = p2.y - p1.y;
+    s2_x = p4.x - p3.x;
+    s2_y = p4.y - p3.y;
+
+    double s, t;
+    s = (-s1_y * (p1.x - p3.x) + s1_x * (p1.y - p3.y)) / (-s2_x * s1_y + s1_x * s2_y);
+    t = ( s2_x * (p1.y - p3.y) - s2_y * (p1.x - p3.x)) / (-s2_x * s1_y + s1_x * s2_y);
+
+    if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
+    {
+        // Collision detected
+        return 1;
+    }
+
+    return 0; // No collision
+}
+
+bool isWithinMapBounds(geometry_msgs::Point p1, geometry_msgs::Point p2, MapGrid grid){
+    //Define points of occupancy grid corners
+    geometry_msgs::Point pA;
+    geometry_msgs::Point pB;
+    geometry_msgs::Point pC;
+    geometry_msgs::Point pD;
+    pA.x = 0;
+    pA.y = 0;
+    pB.x = grid.gridwidth*grid.grid_resolution;
+    pB.y = 0;
+    pC.x = grid.gridwidth*grid.grid_resolution;
+    pC.y = grid.gridlength*grid.grid_resolution;
+    pD.x = 0;
+    pD.y = grid.gridlength*grid.grid_resolution;
+
+    //Check if either point is within rectangle bounds
+    if(p1.x <= pC.x && p1.x >= pA.x && p1.y <= pC.y && p1.y >= pA.y)
+        return true;
+    if(p2.x <= pC.x && p2.x >= pA.x && p2.y <= pC.y && p2.y >= pA.y)
+        return true;
+    //Check if line intersects any of the rectangle edges
+    if(checkIntersection(p1, p2, pA, pB))
+        return true;
+    if(checkIntersection(p1, p2, pB, pC))
+        return true;
+    if(checkIntersection(p1, p2, pC, pD))
+        return true;
+    if(checkIntersection(p1, p2, pD, pA))
+        return true;
+
+    //Outside of grid bounds
+    return false;
+}
+
+void drawLine(double x1, double y1, double x2, double y2, MapGrid &grid)
 {
     /**
     * This function uses Bresenham's line algorithm to "draw" the edges
@@ -98,22 +155,34 @@ void Line(double x1, double y1, double x2, double y2, MapGrid &grid)
     const int ystep = (y1 < y2) ? 1 : -1;
     int y = (int)y1;
 
-    const int maxX = (int)x2;
+    int maxX;
+    if(steep){
+        maxX = std::min((int)x2, (int)grid.gridlength);
+    }else{
+        maxX = std::min((int)x2, (int)grid.gridwidth);
+    }
+
     for (int x = (int)x1; x < maxX; x++)
     {
         if (steep)
         {
-            if((0 <= x && x < grid.gridlength) && (0 <= y && y < grid.gridlength)){
+            if(x >= 0 && y >= 0 && y<grid.gridwidth && x<grid.gridlength){
+                ROS_INFO("Adding Point x: %d y: %d i: %d", y, x, (x * (int)grid.gridwidth) + (int)y);
                 grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
-                grid.grid[(x * (int)grid.gridwidth) + (int)y + 1] = (int8_t)100;
+            }else{
+                ROS_INFO("Skipping out of bounds point x: %d, y: %d", y, x);
             }
+            //#WGC grid.grid[(x * (int)grid.gridwidth) + (int)y + 1] = (int8_t)100;
         }
         else
         {
-            if((0 <= y && y < grid.gridlength) && (0 <= x && x < grid.gridwidth)){
+            if(x >= 0 && y>=0 && y<grid.gridlength && x<grid.gridwidth){
+                ROS_INFO("Adding Point x: %d y: %d i: %d", x, y, (y * (int)grid.gridwidth) + (int)x);
                 grid.grid[(y * (int)grid.gridwidth) + (int)x] = (int8_t)100;
-                grid.grid[(y * (int)grid.gridwidth) + (int)x + 1] = (int8_t)100;
+            }else{
+                ROS_INFO("Skipping out of bounds point x: %d y: %d", x, y);
             }
+            //#WGC grid.grid[(y * (int)grid.gridwidth) + (int)x + 1] = (int8_t)100;
         }
 
         error -= dy;
@@ -162,7 +231,11 @@ void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeat
                 }
                 transformPoint(p1, p1, dx, dy, 0.0);
                 transformPoint(p2, p2, dx, dy, 0.0);
-                Line(p1.x, p1.y, p2.x, p2.y, map_grid);
+                if(isWithinMapBounds(p1, p2, map_grid)){
+                    drawLine(p1.x, p1.y, p2.x, p2.y, map_grid);
+                }else{
+                    ROS_INFO("Skipping Line outside of map bounds.");
+                }
             }
         }
     }
