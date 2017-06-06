@@ -193,7 +193,7 @@ namespace geofrenzy
         std::string   strSub;
 
         // fix location
-        strSub = "fix";
+        strSub = "/fix";
         m_subscriptions[strSub] = m_nh.subscribe(strSub, 1,
                                           &FenceServer::cbNavSatFix,
                                           &(*this));
@@ -490,7 +490,7 @@ namespace geofrenzy
        */
       void cbNavSatFix(const sensor_msgs::NavSatFix::ConstPtr &msg)
       {
-        const char    *topic = "fix";
+        const char    *topic = "/fix";
 
         ROS_DEBUG_STREAM(m_nh.getNamespace() << "/" << topic);
 

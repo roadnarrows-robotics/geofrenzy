@@ -20,9 +20,9 @@
 
 ros::Publisher map_pub;
 ros::Publisher map_metadata_pub;
-const int default_map_width = 100;
-const int default_map_height = 100;
-const double default_map_resolution = 0.1;
+const int default_map_width = 200;
+const int default_map_height = 200;
+const double default_map_resolution = 1.0;
 
 class MapGrid
 /**
@@ -280,7 +280,7 @@ void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeat
 int main(int argc, char **argv){
     ros::init(argc, argv, "gf_map_server2");
     ros::NodeHandle nh;
-    ros::Subscriber sub = nh.subscribe("/geofrenzy/168/featureCollection/distance", 5, featureCollectionCallback);
+    ros::Subscriber sub = nh.subscribe("/gf_node_168/geofrenzy/168/featureCollection/distance", 5, featureCollectionCallback);
     map_pub = nh.advertise<nav_msgs::OccupancyGrid>("/gf_map", 1);
     map_metadata_pub = nh.advertise<nav_msgs::MapMetaData>("/gf_map_metadata", 1);
     ros::spin();
