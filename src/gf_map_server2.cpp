@@ -125,59 +125,8 @@ void Line(double x1, double y1, double x2, double y2, MapGrid &grid)
     }
 }
 
-void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures){ //TODO: make this polygon array message
-    //ROS_INFO("Feature Collection Callback");
-
-    geofrenzy::Polygon64 polygon;
-    geometry_msgs::PointStamped new_point;
-    geometry_msgs::PointStamped trans_point;
+void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures){
     tf::TransformListener tf_listener;
-
-    /*
-     * Setup test static Polygon64 for testing robot-centric map
-     */
-    new_point.header.frame_id="map";
-    new_point.header.stamp = ros::Time();
-    new_point.point.x = -5.0;
-    new_point.point.y = -5.0;
-    new_point.point.z = 0.0;
-    try{
-      tf_listener.waitForTransform("map", "base_footprint", ros::Time(0), ros::Duration(3.0));
-      tf_listener.transformPoint("base_footprint", new_point, trans_point);
-    }
-    catch(tf::TransformException ex){
-      ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
-    }
-    polygon.points.push_back(trans_point.point);
-
-    new_point.point.x = 0.0;
-    new_point.point.y = 5.0;
-    new_point.point.z = 0.0;
-    try{
-      tf_listener.waitForTransform("map", "base_footprint", ros::Time(0), ros::Duration(3.0));
-      tf_listener.transformPoint("base_footprint", new_point, trans_point);
-    }
-    catch(tf::TransformException ex){
-      ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
-    }
-    polygon.points.push_back(trans_point.point);
-
-    new_point.point.x = 5.0;
-    new_point.point.y = -5.0;
-    new_point.point.z = 0.0;
-    try{
-      tf_listener.waitForTransform("map", "base_footprint", ros::Time(0), ros::Duration(3.0));
-      tf_listener.transformPoint("base_footprint", new_point, trans_point);
-    }
-    catch(tf::TransformException ex){
-      ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
-    }
-    polygon.points.push_back(trans_point.point);
-
-    /*
-     * TODO: Use GfDistFeatureCollection and pull out all Polygon64 messages for this.
-     */
-
     nav_msgs::MapMetaData map_metadata;
     nav_msgs::OccupancyGrid occupancy_grid;
     int map_width;
@@ -193,21 +142,31 @@ void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeat
     //Initialize grid
     MapGrid map_grid(map_width, map_height, map_resolution);
 
-    //Iterate through Polygons - eventually these will come from GfDistFeatureCollection message
+    /*Iterate through GfDistFeatureCollection
+     * Get all geometries and iterate through points, drawing edges on occupancy grid
+     */
     double dx = (map_width/2.0)*map_resolution;
     double dy = (map_height/2.0)*map_resolution;
-    for (std::vector<geometry_msgs::Point>::iterator it = polygon.points.begin(); it != polygon.points.end(); ++it){
-        geometry_msgs::Point p1 = *it;
-        geometry_msgs::Point p2;
-        if((it+1) != polygon.points.end()){
-            p2 = *(it+1);
-        }else{
-            p2 = *(polygon.points.begin());
+    geofrenzy::GfDistFeatureCollection featureCollection = distFeatures;
+    for(std::vector<geofrenzy::GfDistFeature>::iterator feature_it = featureCollection.features.begin(); feature_it != featureCollection.features.end(); feature_it++){
+        geofrenzy::GfDistFeature feature = *(feature_it);
+        for(std::vector<geofrenzy::Polygon64>::iterator geometry_it = feature.geometry.begin(); geometry_it != feature.geometry.end(); ++geometry_it){
+            geofrenzy::Polygon64 geometry = *(geometry_it);
+            for(std::vector<geometry_msgs::Point>::iterator point_it = geometry.points.begin(); point_it != geometry.points.end(); ++point_it){
+                geometry_msgs::Point p1 = *point_it;
+                geometry_msgs::Point p2;
+                if((point_it+1) != geometry.points.end()){
+                    p2 = *(point_it+1);
+                }else{
+                    p2 = *(geometry.points.begin());
+                }
+                transformPoint(p1, p1, dx, dy, 0.0);
+                transformPoint(p2, p2, dx, dy, 0.0);
+                Line(p1.x, p1.y, p2.x, p2.y, map_grid);
+            }
         }
-        transformPoint(p1, p1, dx, dy, 0.0);
-        transformPoint(p2, p2, dx, dy, 0.0);
-        Line(p1.x, p1.y, p2.x, p2.y, map_grid);
     }
+
     occupancy_grid.data = map_grid.grid;
 
     //Get Robot transform
@@ -248,7 +207,7 @@ void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeat
 int main(int argc, char **argv){
     ros::init(argc, argv, "gf_map_server2");
     ros::NodeHandle nh;
-    ros::Subscriber sub = nh.subscribe("poly", 5, featureCollectionCallback);
+    ros::Subscriber sub = nh.subscribe("/geofrenzy/168/featureCollection/distance", 5, featureCollectionCallback);
     map_pub = nh.advertise<nav_msgs::OccupancyGrid>("/gf_map", 1);
     map_metadata_pub = nh.advertise<nav_msgs::MapMetaData>("/gf_map_metadata", 1);
     ros::spin();
