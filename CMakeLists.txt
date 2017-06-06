@@ -65,6 +65,7 @@ add_message_files(
     GfEntHeader.msg
     GfGeoFeature.msg
     GfGeoFeatureCollection.msg
+    GfJsonFeatureCollection.msg
     Polygon64.msg
     entitlement.msg   # RDK should be deprecated
     gf_class.msg    # RDK should be deprecated
