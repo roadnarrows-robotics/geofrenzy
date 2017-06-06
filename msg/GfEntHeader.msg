@@ -10,10 +10,10 @@
 #
 
 # Supported entitlements. Update as needed.
-string GfEntBaseThreshold = "threshold"
-string GfEntBaseProfile   = "profile"
-string GfEntBaseColor     = "color"
-string GfEntBaseProfile   = "boolset"
+#string GfEntBaseThreshold = "threshold"
+#string GfEntBaseProfile   = "profile"
+#string GfEntBaseColor     = "color"
+#string GfEntBaseProfile   = "boolset"
 
 # Message fields
 time    access_time   # The last valid portal access time.

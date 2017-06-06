@@ -7,4 +7,3 @@
 Header              header      # Standard ROS header
 GfEntHeader         ent_header  # Entitlement header
 std_msgs/ColorRGBA  color       # red-green-blue-alpha
-
