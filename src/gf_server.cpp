@@ -66,12 +66,28 @@ extern "C"
 
 namespace geofrenzy
 {
+  //
+  // Types
+  //
   typedef std::map<uint64_t, Json::Value> EntitlementMap;
 
-  const double  NoGeoPos = -1000.0;
+  //
+  // Constants
+  //
+  const double  NoGeoPos    = -1000.0;  ///< no lat/long position
+  const double  MinDistDft  = 0.0;      ///< default min dist threshold (m)
+  const int     RoILevelDft = 6;        ///< default region of interest (km)
 
-  /**
-   * this class implements the GeoJson Fence Server
+  //
+  // Subscribed and published topic names
+  //
+  const char *const TopicNameFix    = "/fix";
+  const char *const TopicNameFcJson = "geofrenzy/featureCollection/json";
+  const char *const TopicNameFcGeo  = "geofrenzy/featureCollection/geo";
+  const char *const TopicNameFcDist = "geofrenzy/featureCollection/distance";
+
+  /*!
+   * \brief Class that implements the GeoJson Fence Server.
    */
   class FenceServer
   {
@@ -89,23 +105,19 @@ namespace geofrenzy
       /*! map of ROS subscriptions type */
       typedef std::map<std::string, ros::Subscriber> MapSubscriptions;
 
-      FenceServer(uint64_t new_class, ros::NodeHandle newnh, double hz) :
-          m_fence_class(new_class), m_nh(newnh), m_hz(hz),
-          m_access_time(0.0)
-      {
         /**
          * this metthod instantiates a fence server
          * \param[in] new_class class index for the node
          * \param[in] newnh ros node handle for the node
          */
-        ROS_DEBUG_STREAM("fence_class alloc = " << m_fence_class);
+      FenceServer(uint64_t new_class, ros::NodeHandle newnh, double hz) :
+          m_fence_class(new_class), m_nh(newnh), m_hz(hz),
+          m_access_time(0.0)
+      {
+        std::stringstream ss;
 
-        //RDK std::stringstream fence_class_stream;
-        //RDK fence_class_stream << m_fence_class;
-        //RDK std::string fc_string = "geofrenzy/" + 
-        //RDK                           fence_class_stream.str() +
-        //RDK                           "/featureCollection/json";
-        //RDK metadata_pub = newnh.advertise<std_msgs::String>(fc_string, 1, true);
+        ROS_DEBUG_STREAM("FenceServer gf_class_idx = " << m_fence_class);
+
         // current and previous positions are unknown
         m_previous_lat  = NoGeoPos;
         m_previous_long = NoGeoPos;
@@ -165,22 +177,16 @@ namespace geofrenzy
        */
       void advertisePublishers(int nQueueDepth=5)
       {
-        std::stringstream ss;
-        std::string       strPub;
+        m_publishers[TopicNameFcJson] =
+          m_nh.advertise<std_msgs::String>(TopicNameFcJson, 1, true);
 
-        ss << "geofrenzy/" << m_fence_class << "/featureCollection/";
+        m_publishers[TopicNameFcGeo] =
+          m_nh.advertise<geofrenzy::GfGeoFeatureCollection>(TopicNameFcGeo,
+                                                            1, true);
 
-        strPub = ss.str() + "json";
-        m_publishers[strPub] =
-          m_nh.advertise<std_msgs::String>(strPub, 1, true);
-
-        strPub = ss.str() + "geo";
-        m_publishers[strPub] =
-          m_nh.advertise<geofrenzy::GfGeoFeatureCollection>(strPub, 1, true);
-
-        strPub = ss.str() + "distance";
-        m_publishers[strPub] =
-          m_nh.advertise<geofrenzy::GfDistFeatureCollection>(strPub, 1, true);
+        m_publishers[TopicNameFcDist] =
+          m_nh.advertise<geofrenzy::GfDistFeatureCollection>(TopicNameFcDist,
+                                                                    1, true);
       }
 
       /*!
@@ -190,11 +196,8 @@ namespace geofrenzy
        */
       void subscribeToTopics(int nQueueDepth=5)
       {
-        std::string   strSub;
-
         // fix location
-        strSub = "/fix";
-        m_subscriptions[strSub] = m_nh.subscribe(strSub, 1,
+        m_subscriptions[TopicNameFix] = m_nh.subscribe(TopicNameFix, 1,
                                           &FenceServer::cbNavSatFix,
                                           &(*this));
       }
@@ -208,19 +211,11 @@ namespace geofrenzy
       {
         if( m_nPubRepeatCnt > 0 )
         {
-          std::stringstream ss;
-          std::string       strPub;
+          m_publishers[TopicNameFcJson].publish(m_msgFcJson);
 
-          ss << "geofrenzy/" << m_fence_class << "/featureCollection/";
+          m_publishers[TopicNameFcGeo].publish(m_msgFcGeo);
 
-          strPub = ss.str() + "json";
-          m_publishers[strPub].publish(m_msgFcJson);
-
-          strPub = ss.str() + "geo";
-          m_publishers[strPub].publish(m_msgFcGeo);
-
-          strPub = ss.str() + "distance";
-          m_publishers[strPub].publish(m_msgFcDist);
+          m_publishers[TopicNameFcDist].publish(m_msgFcDist);
 
           --m_nPubRepeatCnt;
         }
@@ -245,7 +240,6 @@ namespace geofrenzy
             1, true);
       }
   
-
       /*!
        * \brief Retrieve Geofrenzy Portal fence and entitlements.
        *
@@ -262,6 +256,9 @@ namespace geofrenzy
         std::string filename;
         char        *s;
   
+        //
+        // Read from file. Great for testing.
+        //
         if (m_nh.getParam("geojson_file", filename))
         {
           ROS_DEBUG_STREAM("Reading file " << filename);
@@ -279,6 +276,9 @@ namespace geofrenzy
           ROS_DEBUG_STREAM("Done reading file.");
         }
 
+        //
+        // Retrieve from Geofrenzy portal.
+        //
         else
         {
           ROS_DEBUG_STREAM("Checking fence roi for class " << m_fence_class);
@@ -306,18 +306,26 @@ namespace geofrenzy
     protected:
 
       /*!
-       * \brief Process json encoded Geofrenzy fences.
+       * \brief Process json encoded string of Geofrenzy fences.
        *
-       * \param strJson   Json encoded string.
+       * The json string was retrieved from either the portal or from a file.
+       *
+       * Modifies:
+       *  - entitlement data
+       *
+       * \param [in]  strJson   Json encoded string.
+       * \param [out] msgFcGeo  Geocentric feature collection message.
        *
        * \return Returns true on success, false otherwise.
        */
-      bool processJsonFences(const std::string &strJson)
+      bool processJsonFences(const std::string      &strJson,
+                             GfGeoFeatureCollection &msgFcGeo)
       {
         Json::Reader  reader;   // json reader
         Json::Value   root;     // will contains the root value after parsing.
         bool          bSuccess; // [not] successful
 
+        // parse json string
         bSuccess = reader.parse(strJson, root);
 
         if( !bSuccess )
@@ -333,48 +341,60 @@ namespace geofrenzy
 
         Json::Value featureList = root["features"];
 
-        m_msgFcGeo.features.clear();
+        msgFcGeo.features.clear();
 
-        GfGeoFeature  msgGeoFeature;
-        GeoPolygon    msgGeoPolygon;
+        GfGeoFeature  geoFeature;
+        GeoPolygon    geoPolygon;
 
+        //
+        // Loop through json feature list.
+        //
         for(Json::Value::iterator feature = featureList.begin();
             feature != featureList.end();
             ++feature)
         {
-          msgGeoFeature.gf_class_idx = m_fence_class;
-          msgGeoFeature.gf_ent_idx.clear();
-          msgGeoFeature.geometry.clear();
+          geoFeature.gf_class_idx = m_fence_class;
+          geoFeature.gf_ent_idx.clear();
+          geoFeature.geometry.clear();
 
           Json::Value geometry = (*feature)["geometry"]["coordinates"];
 
+          //
+          // Loop through json feature fences.
+          //
           for(Json::Value::iterator polygon_iter = geometry.begin();
               polygon_iter != geometry.end();
               ++polygon_iter)
           {
             Json::Value &polygon = (*polygon_iter);
 
-            msgGeoPolygon.points.clear();
+            geoPolygon.points.clear();
 
+            //
+            // Loop through points outlining a polygonal fence.
+            //
             for(Json::Value::iterator point_iter = polygon.begin();
                 point_iter != polygon.end();
                 ++point_iter)
             {
-              geographic_msgs::GeoPoint msgGeoPoint;
+              geographic_msgs::GeoPoint geoPoint;
 
-              msgGeoPoint.longitude = (*point_iter)[0].asDouble();
-              msgGeoPoint.latitude  = (*point_iter)[1].asDouble();
-              msgGeoPoint.altitude  = 0.0;
+              geoPoint.longitude = (*point_iter)[0].asDouble();
+              geoPoint.latitude  = (*point_iter)[1].asDouble();
+              geoPoint.altitude  = 0.0;
 
-              msgGeoPolygon.points.push_back(msgGeoPoint);
+              geoPolygon.points.push_back(geoPoint);
             }
           }
 
-          msgGeoFeature.geometry.push_back(msgGeoPolygon);
+          geoFeature.geometry.push_back(geoPolygon);
 
           Json::Value entitlements =
                     (*feature)["properties"]["class_metadata"]["entitlements"];
 
+          //
+          // Loop the json feature entitlements.
+          //
           for(Json::Value::iterator entitlement = entitlements.begin();
               entitlement != entitlements.end();
               ++entitlement)
@@ -382,7 +402,7 @@ namespace geofrenzy
             uint64_t          ent_idx = (*entitlement)["ent_idx"].asInt();
             Json::FastWriter  fastWriter;
 
-            msgGeoFeature.gf_ent_idx.push_back(ent_idx);
+            geoFeature.gf_ent_idx.push_back(ent_idx);
 
             entitlement_temp_map[ent_idx] = *entitlement;
 
@@ -408,6 +428,9 @@ namespace geofrenzy
             }
           }
   
+          //
+          // Loop through entitlments and update with new data.
+          //
           for(EntitlementMap::iterator val_it = entitlement_temp_map.begin();
               val_it != entitlement_temp_map.end();
               ++val_it)
@@ -431,68 +454,93 @@ namespace geofrenzy
             // dwell_pub.publish(entitlement_message);
           }
 
-          m_msgFcGeo.features.push_back(msgGeoFeature);
+          msgFcGeo.features.push_back(geoFeature);
         }
 
         return true;
       }
 
-      void convertGeoToDistMsg()
+      /*!
+       * \brief Convert geocentric feature collection message data to fixed
+       * location centric distance feature collection message.
+       *
+       * \param [in]  msgFcGeo  Populated geocentric feature collection message.
+       * \param [out] msgFcDist Location centric distance feature collection
+       *                        message.
+       */
+      void convertGeoToDistMsg(GfGeoFeatureCollection  &msgFcGeo,
+                               GfDistFeatureCollection &msgFcDist)
+
       {
-        m_msgFcDist.features.clear();
+        msgFcDist.features.clear();
 
-        GfDistFeature msgDistFeature;
-        Polygon64     msgDistPolygon;
+        GfDistFeature distFeature;
+        Polygon64     distPolygon;
 
-        for(size_t i = 0; i < m_msgFcGeo.features.size(); ++i)
+        //
+        // Loop through the collection of features.
+        //
+        for(size_t i = 0; i < msgFcGeo.features.size(); ++i)
         {
-          GfGeoFeature &msgGeoFeature = m_msgFcGeo.features[i];
+          GfGeoFeature &geoFeature = msgFcGeo.features[i];
 
-          msgDistFeature.gf_class_idx = msgGeoFeature.gf_class_idx;
-          msgDistFeature.gf_ent_idx.clear();
-          msgDistFeature.geometry.clear();
+          distFeature.gf_class_idx = geoFeature.gf_class_idx;
+          distFeature.gf_ent_idx.clear();
+          distFeature.geometry.clear();
 
-          for(size_t j = 0; j < msgGeoFeature.gf_ent_idx.size(); ++j)
+          //
+          // Loop through the entitlements per feature.
+          //
+          for(size_t j = 0; j < geoFeature.gf_ent_idx.size(); ++j)
           {
-            msgDistFeature.gf_ent_idx.push_back(msgGeoFeature.gf_ent_idx[j]);
+            // add entitlement index
+            distFeature.gf_ent_idx.push_back(geoFeature.gf_ent_idx[j]);
           }
 
-          for(size_t j = 0; j < msgGeoFeature.geometry.size(); ++j)
+          //
+          // Loop through the fences per feature.
+          //
+          for(size_t j = 0; j < geoFeature.geometry.size(); ++j)
           {
-            GeoPolygon &msgGeoPolygon = msgGeoFeature.geometry[j];
+            GeoPolygon &geoPolygon = geoFeature.geometry[j];
 
-            msgDistPolygon.points.clear();
+            distPolygon.points.clear();
 
-            for(size_t k = 0; k < msgGeoPolygon.points.size(); ++k)
+            //
+            // Loop through the points outlining a polygonal fence.
+            //
+            for(size_t k = 0; k < geoPolygon.points.size(); ++k)
             {
-              geographic_msgs::GeoPoint &msgGeoPoint = msgGeoPolygon.points[k];
-              geometry_msgs::Point      msgPoint;
+              geographic_msgs::GeoPoint &geoPoint = geoPolygon.points[k];
+              geometry_msgs::Point      distPoint;
 
+              // convert to distance
               swri_transform_util::LocalXyFromWgs84(
                         m_current_lat, m_current_long,
-                        msgGeoPoint.latitude, msgGeoPoint.longitude,
-                        msgPoint.x, msgPoint.y);
+                        geoPoint.latitude, geoPoint.longitude,
+                        distPoint.x, distPoint.y);
 
-              msgPoint.z  = msgGeoPoint.altitude;
+              distPoint.z  = geoPoint.altitude;
 
-              msgDistPolygon.points.push_back(msgPoint);
+              // add point
+              distPolygon.points.push_back(distPoint);
             }
 
-            msgDistFeature.geometry.push_back(msgDistPolygon);
+            // add polygon fence
+            distFeature.geometry.push_back(distPolygon);
           }
 
-          m_msgFcDist.features.push_back(msgDistFeature);
+          // add feature
+          msgFcDist.features.push_back(distFeature);
         }
       }
 
       /*!
-       * \brief Navigation satellite fix callback.
+       * \brief Navigation satellite fixed location callback.
        */
       void cbNavSatFix(const sensor_msgs::NavSatFix::ConstPtr &msg)
       {
-        const char    *topic = "/fix";
-
-        ROS_DEBUG_STREAM(m_nh.getNamespace() << "/" << topic);
+        ROS_DEBUG_STREAM(TopicNameFix);
 
         std::string   strJson;
 
@@ -503,13 +551,14 @@ namespace geofrenzy
           return;
         }
   
+        // new location
         m_previous_lat  = m_current_lat;
         m_previous_long = m_current_long;
         m_current_lat   = msg->latitude;
         m_current_long  = msg->longitude;
 
         // no previous - set to current
-        if( (m_previous_lat <= NoGeoPos) || (m_previous_long <= NoGeoPos) )
+        if( (m_previous_lat == NoGeoPos) || (m_previous_long == NoGeoPos) )
         {
           m_previous_lat  = m_current_lat;
           m_previous_long = m_current_long;
@@ -527,32 +576,36 @@ namespace geofrenzy
   
         double distance;
   
+        // calculate distance from previous location
         distance = swri_transform_util::GreatCircleDistance(
                               m_current_lat, m_current_long,
                               m_previous_lat, m_previous_long);
 
         ROS_DEBUG_STREAM("Distance = " << distance);
   
-        // ignore this for now, testing
+        // distance threshold - no publishing new data if within
         // RDK future parameter db value
-        if( distance < 0 )
+        if( distance < MinDistDft )
         {
           return;
         }
   
-        // RDK 6 is future parameter db value
-        if( !retrieveGfPortalFences(m_current_lat, m_current_long, 6, strJson) )
+        // RDK 6 is future parameter db value. level == radius in kilometers
+        if( !retrieveGfPortalFences(m_current_lat, m_current_long,
+                                    RoILevelDft, strJson) )
         {
           ROS_ERROR("Failed to retrieve Geofrenzy fences.");
           return;
         }
 
-        if( !processJsonFences(strJson) )
+        // process json fences
+        if( !processJsonFences(strJson, m_msgFcGeo) )
         {
           ROS_ERROR("Failed to process Geofrenzy fences.");
           return;
         }
 
+        // update feature collection published messages
         updateFeatureCollectionMsgs(strJson);
       };
 
@@ -569,7 +622,7 @@ namespace geofrenzy
         m_msgFcGeo.access_time = m_access_time;
         stampHeader(m_msgFcGeo.header, m_msgFcGeo.header.seq+1);
 
-        convertGeoToDistMsg();
+        convertGeoToDistMsg(m_msgFcGeo, m_msgFcDist);
         m_msgFcDist.access_time = m_access_time;
         stampHeader(m_msgFcDist.header, m_msgFcDist.header.seq+1);
 
@@ -717,6 +770,65 @@ namespace geofrenzy
 
 } // namespace geofrenzy
 
+/*!
+ * \brief Parse command line argument to determine Geofrenzy class index.
+ *
+ * \note
+ * This function should be call prior to ros::init() to make node name.
+ *
+ * Format: _gf_class_idx:=<class_idx>
+ *
+ * \param argc  Command line argument count.
+ * \param argv  Command line arguments.
+ * \param dft   Geofrenzy class index default (if no value is specified).
+ *
+ * \return Geofrenzy class index.
+ */
+uint64_t paramGfClassIndex(int argc, char *argv[], uint64_t dft=1)
+{
+  std::string         strArgLval("_gf_class_idx:=");
+  std::string         strArgRval;
+  long long unsigned  class_idx = dft;
+
+  for(int i = 1; i < argc; ++i)
+  {
+    std::string strArg = argv[i];
+    fprintf(stderr, "arg[%d]=%s\n", i, strArg.c_str());
+
+    if( strArg.find(strArgLval) != std::string::npos )
+    {
+      strArgRval = strArg.substr(strArgLval.length());
+
+      if( sscanf(strArgRval.c_str(), "%llu", &class_idx) != 1 )
+      {
+        // no ros logging available yet
+        fprintf(stderr,
+            "Warning: '%s' is not a valid Geofrenzy class index.",
+            strArg.c_str());
+      }
+    }
+  }
+
+  return (uint64_t)class_idx;
+}
+
+/*!
+ * \brief Make an unique Geofrenzy node from the class index.
+ *
+ * \param strRoot       Node root prefix string.
+ * \param gf_class_idx  Geofrenzy class index.
+ *
+ * \return String <root>_<idx>
+ */
+std::string makeGfNodeName(const std::string strRoot, uint64_t gf_class_idx)
+{
+  std::stringstream  ss;
+
+  ss << strRoot << "_" << gf_class_idx;
+
+  return ss.str();
+}
+
 /**
  * This node queries the fence delivery network and produces topics
  * of the form /geofrenzy/[class idx]/[entitlement index]/dwell/json
@@ -729,16 +841,20 @@ int main(int argc, char **argv)
 {
   double hz = 10.0;
 
+  uint64_t myclass_idx = paramGfClassIndex(argc, argv);
+
+  // make unique node name from command line argument
+  std::string node_name = makeGfNodeName("gf_server", myclass_idx);
+
+  // RDK DELETE THESE
   //
   // Geofrenzy specific command-line parsing.
   // RDK integrate with ros command-line parsing
   //
-  std::string myclass_idx_str = argv[1];
-  std::string node_name = "gf_node_" + myclass_idx_str;
-
-  std::stringstream convert(myclass_idx_str);
-  uint64_t myclass_idx;
-  convert >> myclass_idx;
+  std::stringstream convert;
+  convert << myclass_idx;
+  std::string myclass_idx_str = convert.str();
+  // RDK DELETE THESE
 
   // 
   // Initialize the node. Parse the command line arguments and environment to
