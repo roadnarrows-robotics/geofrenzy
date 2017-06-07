@@ -266,13 +266,12 @@ namespace geofrenzy
           std::ifstream in(filename.c_str());
           std::string message;
   
-          while(in)
+          while(!in.eof())
           {
             message.push_back(in.get());
           }
-  
-          s = &message[0u];
-
+          in.close();
+          strJson = message;
           ROS_DEBUG_STREAM("Done reading file.");
         }
 
@@ -287,13 +286,12 @@ namespace geofrenzy
 
           s = ambient_fences_geojson_roi(longitude, latitude, level,
                                          m_fence_class);
-
+          strJson = s;
           ROS_DEBUG_STREAM("Done.");
         }
   
-        if( s != NULL )
+        if( strJson != NULL )
         {
-          strJson = s;
           m_access_time = ros::Time::now();
           return true;
         }
