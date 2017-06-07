@@ -290,7 +290,7 @@ namespace geofrenzy
           ROS_DEBUG_STREAM("Done.");
         }
   
-        if( strJson != NULL )
+        if(!strJson.empty())
         {
           m_access_time = ros::Time::now();
           return true;
