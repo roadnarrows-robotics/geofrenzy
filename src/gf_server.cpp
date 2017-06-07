@@ -87,6 +87,100 @@ namespace geofrenzy
   const char *const TopicNameFcDist = "geofrenzy/featureCollection/distance";
 
   /*!
+   * This class holds the list of entitlements for a fence class
+   */
+  class ListMetadata
+  {
+    private:
+      geofrenzy::entitlement_list_service::Response list_resp_;
+      std::vector <uint64_t> list_vec;
+  
+    public:
+  
+      // ListMetadata();
+      // bool append_entitlement(uint64_t entitlement);
+      //  bool listCallback(geofrenzy::entitlement_list_service::Request &req,
+      //                    geofrenzy::entitlement_list_service::Response &res);
+  
+  
+  
+      bool listCallback(geofrenzy::entitlement_list_service::Request &req,
+                        geofrenzy::entitlement_list_service::Response &res)
+      {
+        ROS_INFO("Requesting entitlement list");
+        // request is empty; we ignore it
+  
+        // = operator is overloaded to make deep copy (tricky!)
+        list_resp_.entitlement = list_vec;
+        res = list_resp_;
+        ROS_INFO("Sending entitlement list");
+  
+        return true;
+      };
+  
+  
+      bool append_entitlement(uint64_t entitlement)
+      {
+        list_vec.push_back(entitlement);
+        return true;
+      };
+  
+      ListMetadata()
+      {
+      };
+  
+      ~ListMetadata()
+      {
+        std::cout << "Destroyed ListMetadata";
+      };
+  }; // class ListMetadata
+  
+  /*!
+   * This class holds the entitlement metadata for a fence class
+   */
+  class EntitlementMetadata
+  {
+    private:
+      geofrenzy::entitlement_service::Response ent_resp_;
+  
+    public:
+  
+      EntitlementMetadata(uint64_t entitlement, std::string ent_base)
+      {
+        //ent_resp_.msg.header.frame_id = "entitlement";
+        //ent_resp_.msg.header.stamp = ros::Time::now();
+        std::cout << entitlement << "\n";
+        std::cout << ent_base << "\n";
+        ent_resp_.entitlement = entitlement;
+        ent_resp_.ent_base = ent_base;
+      };
+  
+      /** Callback invoked when someone requests our service */
+      bool entitlementCallback(geofrenzy::entitlement_service::Request &req,
+                               geofrenzy::entitlement_service::Response &res)
+      {
+        ROS_INFO("Requesting entitlement");
+        std::cout << ent_resp_.entitlement << "\n";
+        //std::cout << ent_resp_.ent_base << "\n";
+        // request is empty; we ignore it
+  
+        // = operator is overloaded to make deep copy (tricky!)
+        //res = ent_resp_;
+        res.entitlement = ent_resp_.entitlement;
+        res.ent_base = ent_resp_.ent_base;
+        ROS_INFO("Sending entitlement");
+  
+        return true;
+      };
+  
+      ~EntitlementMetadata()
+      {
+        std::cout << "destroying entitlementmetadata\n";
+      };
+  
+  }; // class EntitlementMetadata
+
+  /*!
    * \brief Class that implements the GeoJson Fence Server.
    */
   class FenceServer
@@ -127,30 +221,76 @@ namespace geofrenzy
         m_nPubRepeatCnt = 0;
       };
   
+      /*!
+       */
       bool init()
       {
-#if TBD // RDK
-        Json::Value   entitlements_root;
+        Json::Value   root;
         Json::Reader  reader;
+        bool          bSuccess; // [not] successful
 
-        char *t;
         char *td = class_entitlements_properties_json(m_fence_class);
+        char *t;
+
         t = td;
 
         std::string st(t);
         st = "{" + st + "}";
 
-        bool parsingSuccessful = reader.parse(st, entitlements_root);
+        bSuccess = reader.parse(st, root);
 
-        if (!parsingSuccessful)
+        if( !bSuccess )
         {
           // report to the user the failure and their locations in the document.
-          ROS_ERROR_STREAM(m_nh.getNamespace()
-              << ": Failed to parse configuration\n"
+          ROS_ERROR_STREAM("Failed to parse configuration\n"
               << reader.getFormattedErrorMessages());
           return false;
         };
-#endif // TBD RDK
+
+        geofrenzy::ListMetadata ent_list;
+        std::vector < ros::ServiceServer * > service_vec;
+
+        int gf_class_idx = root["class_metadata"]["class_idx"].asInt();
+
+        Json::Value entitlements = root["class_metadata"]["entitlements"];
+
+        for(int i = 0; i < entitlements.size(); ++i)
+        {
+          uint64_t ent_idx_int = entitlements[i]["ent_idx"].asInt();
+
+          std::ostringstream class_idx_ss;
+          class_idx_ss << gf_class_idx;
+          std::string class_idx_str = class_idx_ss.str();
+          std::ostringstream ent_idx_ss;
+          ent_idx_ss << ent_idx_int;
+          std::string ent_idx_str = ent_idx_ss.str();
+          std::string ent_base_str = entitlements[i]["ent_base"].asString();
+
+          std::cout << "for class_idx=";
+          std::cout << gf_class_idx;
+          std::cout << " ent_idx of ";
+          std::cout << ent_idx_int;
+          std::cout << " is of ent_base type ";
+          std::cout << ent_base_str;
+          std::cout << "\n";
+          std::cout.flush();
+
+          geofrenzy::EntitlementMetadata *myentitlement =
+            new geofrenzy::EntitlementMetadata(ent_idx_int, ent_base_str);
+          // *myentitlement = EntitlementMetadata(ent_idx_int,ent_base_str);
+          std::string mypath = "geofrenzy/" + ent_idx_str;
+
+          ros::ServiceServer *eservice = new ros::ServiceServer;
+          *eservice = m_nh.advertiseService(mypath,
+            &geofrenzy::EntitlementMetadata::entitlementCallback, myentitlement);
+          service_vec.push_back(eservice);
+          ent_list.append_entitlement(ent_idx_int);
+          appendEntitlement(ent_idx_int);
+        }
+
+        std::string mycpath = "geofrenzy/list";
+        ros::ServiceServer cservice = m_nh.advertiseService(mycpath,
+          &geofrenzy::ListMetadata::listCallback, &ent_list);
 
         return true;
       }
@@ -221,20 +361,19 @@ namespace geofrenzy
         }
       }
 
-      void AppendEntitlement(uint64_t newentitlement)
-      {
-        /**
+        /*!
          * this metthod adds a new entitlement index to the list of Entitlements
          * for creating node for publication
          * \param[in] newentitlement new entitlement idx
          */
+      void appendEntitlement(uint64_t newentitlement)
+      {
         std::stringstream fence_class_stream;
         fence_class_stream << m_fence_class;
         std::stringstream newentitlement_stream;
         newentitlement_stream << newentitlement;
         std::string ad_string = "geofrenzy/" +
-                                  fence_class_stream.str() +
-                                  "/" + newentitlement_stream.str() +
+                                  newentitlement_stream.str() +
                                   "/dwell/json";
         entitlement_map[newentitlement] = m_nh.advertise<std_msgs::String>(ad_string,
             1, true);
@@ -671,100 +810,6 @@ namespace geofrenzy
       std::map <uint64_t, ros::Publisher> entitlement_map;
   
   }; // class FenceServer
-  
-  /**
-   * This class holds the list of entitlements for a fence class
-   */
-  class ListMetadata
-  {
-    private:
-      geofrenzy::entitlement_list_service::Response list_resp_;
-      std::vector <uint64_t> list_vec;
-  
-    public:
-  
-      // ListMetadata();
-      // bool append_entitlement(uint64_t entitlement);
-      //  bool listCallback(geofrenzy::entitlement_list_service::Request &req,
-      //                    geofrenzy::entitlement_list_service::Response &res);
-  
-  
-  
-      bool listCallback(geofrenzy::entitlement_list_service::Request &req,
-                        geofrenzy::entitlement_list_service::Response &res)
-      {
-        ROS_INFO("Requesting entitlement list");
-        // request is empty; we ignore it
-  
-        // = operator is overloaded to make deep copy (tricky!)
-        list_resp_.entitlement = list_vec;
-        res = list_resp_;
-        ROS_INFO("Sending entitlement list");
-  
-        return true;
-      };
-  
-  
-      bool append_entitlement(uint64_t entitlement)
-      {
-        list_vec.push_back(entitlement);
-        return true;
-      };
-  
-      ListMetadata()
-      {
-      };
-  
-      ~ListMetadata()
-      {
-        std::cout << "Destroyed ListMetadata";
-      };
-  }; // class ListMetadata
-  
-  /**
-   * This class holds the entitlement metadata for a fence class
-   */
-  class EntitlementMetadata
-  {
-    private:
-      geofrenzy::entitlement_service::Response ent_resp_;
-  
-    public:
-  
-      EntitlementMetadata(uint64_t entitlement, std::string ent_base)
-      {
-        //ent_resp_.msg.header.frame_id = "entitlement";
-        //ent_resp_.msg.header.stamp = ros::Time::now();
-        std::cout << entitlement << "\n";
-        std::cout << ent_base << "\n";
-        ent_resp_.entitlement = entitlement;
-        ent_resp_.ent_base = ent_base;
-      };
-  
-      /** Callback invoked when someone requests our service */
-      bool entitlementCallback(geofrenzy::entitlement_service::Request &req,
-                               geofrenzy::entitlement_service::Response &res)
-      {
-        ROS_INFO("Requesting entitlement");
-        std::cout << ent_resp_.entitlement << "\n";
-        //std::cout << ent_resp_.ent_base << "\n";
-        // request is empty; we ignore it
-  
-        // = operator is overloaded to make deep copy (tricky!)
-        //res = ent_resp_;
-        res.entitlement = ent_resp_.entitlement;
-        res.ent_base = ent_resp_.ent_base;
-        ROS_INFO("Sending entitlement");
-  
-        return true;
-      };
-  
-      ~EntitlementMetadata()
-      {
-        std::cout << "destroying entitlementmetadata\n";
-      };
-  
-  }; // class EntitlementMetadata
 
 } // namespace geofrenzy
 
@@ -839,10 +884,10 @@ int main(int argc, char **argv)
 {
   double hz = 10.0;
 
-  uint64_t myclass_idx = paramGfClassIndex(argc, argv);
+  uint64_t gf_class_idx = paramGfClassIndex(argc, argv);
 
   // make unique node name from command line argument
-  std::string node_name = makeGfNodeName("gf_server", myclass_idx);
+  std::string node_name = makeGfNodeName("gf_server", gf_class_idx);
 
   // RDK DELETE THESE
   //
@@ -850,7 +895,7 @@ int main(int argc, char **argv)
   // RDK integrate with ros command-line parsing
   //
   std::stringstream convert;
-  convert << myclass_idx;
+  convert << gf_class_idx;
   std::string myclass_idx_str = convert.str();
   // RDK DELETE THESE
 
@@ -885,7 +930,7 @@ int main(int argc, char **argv)
   //
   // Create fence server node.
   //
-  geofrenzy::FenceServer fs(myclass_idx, nh, hz);
+  geofrenzy::FenceServer fs(gf_class_idx, nh, hz);
 
   //
   // Initialize fence server.
@@ -924,94 +969,6 @@ int main(int argc, char **argv)
 
   ROS_INFO_STREAM(node_name << "Ready.");
 
-  //gf_fence_request gpsfix;
-  //RDKros::NodeHandle nh;
-
-  ros::Subscriber gps;
-
-  Json::Value entitlements_root;
-  Json::Reader reader;
-
-  std::vector < ros::ServiceServer * > service_vec;
-  geofrenzy::ListMetadata ent_list;
-
-  try
-  {
-    char *t;
-    char *td = class_entitlements_properties_json(myclass_idx);
-    t = td;
-    std::string st(t);
-    st = "{" + st + "}";
-
-    bool parsingSuccessful = reader.parse(st, entitlements_root);
-
-    if (!parsingSuccessful)
-    {
-      // report to the user the failure and their locations in the document.
-      std::cout << "Failed to parse configuration\n"
-                              << reader.getFormattedErrorMessages();
-      return 1;
-    };
-
-
-    int class_idx = entitlements_root["class_metadata"]["class_idx"].asInt();
-    Json::Value entitlements = entitlements_root["class_metadata"]["entitlements"];
-
-    for (int i = 0; i < entitlements.size(); i++)
-    {
-      uint64_t ent_idx_int = entitlements[i]["ent_idx"].asInt();
-      std::ostringstream class_idx_ss;
-      class_idx_ss << class_idx;
-      std::string class_idx_str = class_idx_ss.str();
-      std::ostringstream ent_idx_ss;
-      ent_idx_ss << ent_idx_int;
-      std::string ent_idx_str = ent_idx_ss.str();
-      std::string ent_base_str = entitlements[i]["ent_base"].asString();
-
-      std::cout << "for class_idx=";
-      std::cout << class_idx;
-      std::cout << " ent_idx of ";
-      std::cout << ent_idx_int;
-      std::cout << " is of ent_base type ";
-      std::cout << ent_base_str;
-      std::cout << "\n";
-      std::cout.flush();
-
-      geofrenzy::EntitlementMetadata *myentitlement =
-        new geofrenzy::EntitlementMetadata(ent_idx_int, ent_base_str);
-      // *myentitlement = EntitlementMetadata(ent_idx_int,ent_base_str);
-      std::string mypath = "geofrenzy/" + class_idx_str + "/" + ent_idx_str;
-
-      ros::ServiceServer *eservice = new ros::ServiceServer;
-      *eservice = nh.advertiseService(mypath,
-          &geofrenzy::EntitlementMetadata::entitlementCallback, myentitlement);
-      service_vec.push_back(eservice);
-      ent_list.append_entitlement(ent_idx_int);
-      fs.AppendEntitlement(ent_idx_int);
-    }
-
-    std::string mycpath = "geofrenzy/" + myclass_idx_str + "/list";
-    ros::ServiceServer cservice = nh.advertiseService(mycpath,
-        &geofrenzy::ListMetadata::listCallback, &ent_list);
-
-    //RDK gps = nh.subscribe("fix", 1, &geofrenzy::FenceServer::cbNavSatFix, &fs);
-
-    //ros::spin();
-
-    //MapServer ms;
-    //ros::ServiceServer service;
-    //gps = nh.subscribe("fix", 1, &MapServer::mapServerCallback, &ms);
-    //printf("gps subscribed\n");
-    //service = nh.advertiseService("static_map", &MapServer::mapCallback, &ms);
-    //printf("static_map service advertised\n");
-    //ros::spin();
-  }
-
-  catch (std::exception &e)
-  {
-    std::cout << "Error: " << e.what() << "\n";
-  }
-
   //
   // Main loop.
   //
@@ -1020,7 +977,7 @@ int main(int argc, char **argv)
     // make any callbacks on pending ROS events
     ros::spinOnce(); 
 
-    // publish all advertised topics
+    // publish all readied advertised topics
     fs.publish();
 
     // sleep to keep at loop rate
