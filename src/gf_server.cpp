@@ -512,11 +512,12 @@ namespace geofrenzy
               geographic_msgs::GeoPoint &geoPoint = geoPolygon.points[k];
               geometry_msgs::Point      distPoint;
 
-              // convert to distance
+              // convert to distance and transform points to XY:NW coords
               swri_transform_util::LocalXyFromWgs84(
                         m_current_lat, m_current_long,
                         geoPoint.latitude, geoPoint.longitude,
-                        distPoint.x, distPoint.y);
+                        distPoint.y, distPoint.x);
+              distPoint.y = -distPoint.y;
 
               distPoint.z  = geoPoint.altitude;
 
