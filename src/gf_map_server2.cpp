@@ -18,11 +18,6 @@
  * an occupancy grid message to be published to the /map topic
  */
 
-ros::Publisher map_pub;
-ros::Publisher map_metadata_pub;
-const int default_map_width = 200;
-const int default_map_height = 200;
-const double default_map_resolution = 1.0;
 
 class MapGrid
 /**
@@ -52,6 +47,52 @@ MapGrid::MapGrid(int width, int length, double resolution)
     grid_resolution = resolution;
     gridsize = gridwidth * gridlength;
     grid.assign(gridsize, 0);
+}
+
+class MapServer
+
+{
+    /**
+        * This class holds the map server that does most of the work to
+        * convert the Geofrenzy FDN data to ROS messages and services
+        * to be easily used by ROS nodes
+        */
+
+
+  public:
+    void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures);
+    MapServer(std::string);
+
+  private:
+    ros::Publisher map_pub_tf;
+    ros::Publisher map_metadata_pub_tf;
+    ros::Publisher map_pub_no_transform;
+    ros::Publisher map_metadata_pub_no_transform;
+    ros::Publisher map_pub_tf_position;
+    ros::Publisher map_metadata_pub_tf_position;
+    tf::TransformListener tf_listener;
+    int default_map_width;
+    int default_map_height;
+    double default_map_resolution;
+
+    void publishMapTF(MapGrid map_grid, ros::Time transform_time);
+
+};
+
+
+MapServer::MapServer(std::string topic_prefix)
+{
+    default_map_width = 250;
+    default_map_height = 250;
+    default_map_resolution = 0.2;
+    std::string frame_id;
+    ros::NodeHandle private_nh("~");
+    std::string topic_string = topic_prefix + "/map";
+    std::string topic_meta_string = topic_prefix + "/map_metadata";
+    ros::NodeHandle nh;
+
+    map_pub_tf = nh.advertise<nav_msgs::OccupancyGrid>("/map", 1);
+    map_metadata_pub_tf = nh.advertise<nav_msgs::MapMetaData>("/map_metadata", 1);
 }
 
 void transformPoint(geometry_msgs::Point p_in, geometry_msgs::Point &p_out, double dX, double dY, double dZ){
@@ -167,22 +208,14 @@ void drawLine(double x1, double y1, double x2, double y2, MapGrid &grid)
         if (steep)
         {
             if(x >= 0 && y >= 0 && y<grid.gridwidth && x<grid.gridlength){
-                ROS_INFO("Adding Point x: %d y: %d i: %d", y, x, (x * (int)grid.gridwidth) + (int)y);
                 grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
-            }else{
-                ROS_INFO("Skipping out of bounds point x: %d, y: %d", y, x);
             }
-            //#WGC grid.grid[(x * (int)grid.gridwidth) + (int)y + 1] = (int8_t)100;
         }
         else
         {
             if(x >= 0 && y>=0 && y<grid.gridlength && x<grid.gridwidth){
-                ROS_INFO("Adding Point x: %d y: %d i: %d", x, y, (y * (int)grid.gridwidth) + (int)x);
                 grid.grid[(y * (int)grid.gridwidth) + (int)x] = (int8_t)100;
-            }else{
-                ROS_INFO("Skipping out of bounds point x: %d y: %d", x, y);
             }
-            //#WGC grid.grid[(y * (int)grid.gridwidth) + (int)x + 1] = (int8_t)100;
         }
 
         error -= dy;
@@ -194,16 +227,61 @@ void drawLine(double x1, double y1, double x2, double y2, MapGrid &grid)
     }
 }
 
-void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures){
-    tf::TransformListener tf_listener;
-    nav_msgs::MapMetaData map_metadata;
+void MapServer::publishMapTF(MapGrid map_grid, ros::Time transform_time){
+    ROS_DEBUG("Publishing Map TF");
     nav_msgs::OccupancyGrid occupancy_grid;
+    nav_msgs::MapMetaData map_metadata;
+    occupancy_grid.data = map_grid.grid;
+
+    double dx = (map_grid.gridwidth/2.0)*map_grid.grid_resolution;
+    double dy = (map_grid.gridlength/2.0)*map_grid.grid_resolution;
+    //Get Robot transform
+    geometry_msgs::PoseStamped gf_map_pose;
+    gf_map_pose.header.frame_id="base_footprint";
+    gf_map_pose.header.stamp = ros::Time();
+    //Shift gf_map to center on origin of world map
+    tf::StampedTransform transform;
+    try{
+      tf_listener.waitForTransform("map", "base_footprint", transform_time, ros::Duration(3.0));
+      tf_listener.lookupTransform("map", "base_footprint", transform_time, transform);
+    }
+    catch(tf::TransformException ex){
+      ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
+    }
+    ROS_INFO("Publish TF Transform: x: %.2f y: %.2f", transform.getOrigin().getX(), transform.getOrigin().getY());
+    gf_map_pose.pose.position.x = -dx + transform.getOrigin().getX();
+    gf_map_pose.pose.position.y = -dy + transform.getOrigin().getY();
+    gf_map_pose.pose.position.z = 0.0;
+    tf::Quaternion q;
+    q.setRPY(0.0, 0.0, 0.0);
+    gf_map_pose.pose.orientation.x = q.x();
+    gf_map_pose.pose.orientation.y = q.y();
+    gf_map_pose.pose.orientation.z = q.z();
+    gf_map_pose.pose.orientation.w = q.w();
+
+    map_metadata.resolution = map_grid.grid_resolution;
+    map_metadata.width = map_grid.gridwidth;
+    map_metadata.height = map_grid.gridlength;
+    map_metadata.map_load_time = ros::Time::now();
+
+    map_metadata.origin = gf_map_pose.pose;
+
+    occupancy_grid.info = map_metadata;
+
+    map_pub_tf.publish(occupancy_grid);
+    map_metadata_pub_tf.publish(map_metadata);
+}
+
+void MapServer::featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures){
     int map_width;
     int map_height;
     double map_resolution;
 
+    ROS_DEBUG("Feature Collection Callback");
+
     //Fetch values from parameter server
     ros::NodeHandle n;
+    ros::Time now= ros::Time::now();
     n.param("map_width", map_width, default_map_width);
     n.param("map_height", map_height, default_map_height);
     n.param("map_resolution", map_resolution, default_map_resolution);
@@ -217,6 +295,7 @@ void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeat
     double dx = (map_width/2.0)*map_resolution;
     double dy = (map_height/2.0)*map_resolution;
     geofrenzy::GfDistFeatureCollection featureCollection = distFeatures;
+
     for(std::vector<geofrenzy::GfDistFeature>::iterator feature_it = featureCollection.features.begin(); feature_it != featureCollection.features.end(); feature_it++){
         geofrenzy::GfDistFeature feature = *(feature_it);
         for(std::vector<geofrenzy::Polygon64>::iterator geometry_it = feature.geometry.begin(); geometry_it != feature.geometry.end(); ++geometry_it){
@@ -229,59 +308,25 @@ void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeat
                 }else{
                     p2 = *(geometry.points.begin());
                 }
+                p1.x = -p1.x;
+                p1.y = -p1.y;
+                p2.x = -p2.x;
+                p2.y = -p2.y;
                 transformPoint(p1, p1, dx, dy, 0.0);
                 transformPoint(p2, p2, dx, dy, 0.0);
                 if(isWithinMapBounds(p1, p2, map_grid)){
                     drawLine(p1.x, p1.y, p2.x, p2.y, map_grid);
-                }else{
-                    ROS_INFO("Skipping Line outside of map bounds.");
                 }
             }
         }
     }
-
-    occupancy_grid.data = map_grid.grid;
-
-    //Get Robot transform
-    geometry_msgs::PoseStamped gf_map_pose;
-    geometry_msgs::PoseStamped base_footprint_pose;
-    gf_map_pose.header.frame_id="base_footprint";
-    gf_map_pose.header.stamp = ros::Time();
-    //Shift gf_map to center on origin of world map
-    gf_map_pose.pose.position.x = -dx;
-    gf_map_pose.pose.position.y = -dy;
-    gf_map_pose.pose.position.z = 0.0;
-    tf::Quaternion q;
-    q.setRPY(0.0, 0.0, 0.0);
-    gf_map_pose.pose.orientation.x = q.x();
-    gf_map_pose.pose.orientation.y = q.y();
-    gf_map_pose.pose.orientation.z = q.z();
-    gf_map_pose.pose.orientation.w = q.w();
-    try{
-      tf_listener.waitForTransform("map", "base_footprint", ros::Time(0), ros::Duration(3.0));
-      tf_listener.transformPose("map", gf_map_pose, base_footprint_pose);
-    }
-    catch(tf::TransformException ex){
-      ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
-    }
-    
-    map_metadata.resolution = map_resolution;
-    map_metadata.width = map_width;
-    map_metadata.height = map_height;
-    map_metadata.map_load_time = ros::Time::now();
-    map_metadata.origin = base_footprint_pose.pose;
-
-    occupancy_grid.info = map_metadata;
-
-    map_pub.publish(occupancy_grid);
-    map_metadata_pub.publish(map_metadata);
+    publishMapTF(map_grid, now);
 }
 
 int main(int argc, char **argv){
-    ros::init(argc, argv, "gf_map_server2");
+    ros::init(argc, argv, "gf_map_server_168");
+    MapServer map_server("topic_prefix");
     ros::NodeHandle nh;
-    ros::Subscriber sub = nh.subscribe("/gf_node_168/geofrenzy/168/featureCollection/distance", 5, featureCollectionCallback);
-    map_pub = nh.advertise<nav_msgs::OccupancyGrid>("/gf_map", 1);
-    map_metadata_pub = nh.advertise<nav_msgs::MapMetaData>("/gf_map_metadata", 1);
+    ros::Subscriber sub = nh.subscribe("/gf_server_168/geofrenzy/featureCollection/distance", 5, &MapServer::featureCollectionCallback, &map_server);
     ros::spin();
 }
