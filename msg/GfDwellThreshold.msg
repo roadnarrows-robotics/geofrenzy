@@ -1,11 +1,9 @@
 ### Geofrenzy GfDwellThreshold message
 #
-# A dwell message specifies a current entitlement.
+# A dwell message specifies a current entitlement in relation to the tracked
+# location.
 #
 # The threshold dwell ... 
 #
-Header      header          # Standard ROS header
-GfEntHeader ent_header      # Entitlement header
-float64     threshold_lower # ...
-float64     threshold_upper # ...
-float64     threshold_unit  # ...
+Header          header      # Standard ROS header
+GfEntThreshold  entitlement # Dwell entitlement

@@ -1,9 +1,9 @@
 ### Geofrenzy GfDwellColor message
 #
-# A dwell message specifies the current entitlement.
+# A dwell message specifies a current entitlement in relation to the tracked
+# location.
 #
 # The color dwell ... 
 #
-Header              header      # Standard ROS header
-GfEntHeader         ent_header  # Entitlement header
-std_msgs/ColorRGBA  color       # red-green-blue-alpha
+Header      header      # Standard ROS header
+GfEntColor  entitlement # Dwell entitlement

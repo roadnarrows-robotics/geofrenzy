@@ -1,3 +1,5 @@
+// GEOFRENZY FILE HEADER HERE
+
 //
 // System
 //
@@ -5,6 +7,18 @@
 #include <sstream>
 #include <iostream>
 #include <fstream>
+#include <map>
+#include <vector>
+
+//
+// Add-on SDKs
+//
+#include "jsoncpp/json/json.h"
+#include "jsoncpp/json/writer.h"
+#include "jsoncpp/json/reader.h"
+#include "geodesy/wgs84.h"
+#include "swri_transform_util/transform_util.h"
+#include "boost/assign.hpp"
 
 //
 // ROS
@@ -25,30 +39,22 @@
 #include "geofrenzy/GfGeoFeatureCollection.h"
 #include "geofrenzy/GfDwellBoolset.h"
 #include "geofrenzy/GfDwellColor.h"
+#include "geofrenzy/GfDwellJson.h"
 #include "geofrenzy/GfDwellProfile.h"
 #include "geofrenzy/GfDwellThreshold.h"
-
-#include "geofrenzy/entitlement.h" // RDK deprecated
-
+#include "geofrenzy/StringStamped.h"
 
 //
 // ROS generated Geofrenzy services
 //
-
-#include "jsoncpp/json/json.h"
-#include "jsoncpp/json/writer.h"
-#include "jsoncpp/json/reader.h"
+#include "geofrenzy/GetEntitlement.h"
+#include "geofrenzy/GetEntitlementList.h"
 
 //
 // Geofrenzy
 //
-#include "geodesy/wgs84.h"
 
-#include "geofrenzy/entitlement_service.h"
-#include "geofrenzy/entitlement_list_service.h"
-
-#include "swri_transform_util/transform_util.h"
-
+// Note: should be in a geofrenzy header file
 extern "C" 
 {
   char *ambient_fences_geojson_zoom(double lng,
@@ -64,121 +70,468 @@ extern "C"
   char *class_entitlements_properties_json(int myclass);
 }
 
+#include "gf_ros.h"
+
+
+using namespace boost::assign;
+using namespace geofrenzy::gf_ros;
+
 namespace geofrenzy
 {
   //
   // Types
   //
-  typedef std::map<uint64_t, Json::Value> EntitlementMap;
+
+  /*! map of ROS server services type */
+  typedef std::map<std::string, ros::ServiceServer> MapServices;
+
+  /*! map of ROS client services type */
+  typedef std::map<std::string, ros::ServiceClient> MapClientServices;
+    
+  /*! map of ROS publishers type */
+  typedef std::map<std::string, ros::Publisher> MapPublishers;
+
+  /*! map of ROS subscriptions type */
+  typedef std::map<std::string, ros::Subscriber> MapSubscriptions;
 
   //
   // Constants
   //
-  const double  NoGeoPos    = -1000.0;  ///< no lat/long position
-  const double  MinDistDft  = 0.0;      ///< default min dist threshold (m)
-  const int     RoILevelDft = 6;        ///< default region of interest (km)
-
-  //
-  // Subscribed and published topic names
-  //
-  const char *const TopicNameFix    = "/fix";
-  const char *const TopicNameFcJson = "geofrenzy/featureCollection/json";
-  const char *const TopicNameFcGeo  = "geofrenzy/featureCollection/geo";
-  const char *const TopicNameFcDist = "geofrenzy/featureCollection/distance";
 
   /*!
-   * This class holds the list of entitlements for a fence class
+   * \breif Entitlement data type enumeration.
    */
-  class ListMetadata
+  enum EntDataType
   {
-    private:
-      geofrenzy::entitlement_list_service::Response list_resp_;
-      std::vector <uint64_t> list_vec;
-  
-    public:
-  
-      // ListMetadata();
-      // bool append_entitlement(uint64_t entitlement);
-      //  bool listCallback(geofrenzy::entitlement_list_service::Request &req,
-      //                    geofrenzy::entitlement_list_service::Response &res);
-  
-  
-  
-      bool listCallback(geofrenzy::entitlement_list_service::Request &req,
-                        geofrenzy::entitlement_list_service::Response &res)
-      {
-        ROS_INFO("Requesting entitlement list");
-        // request is empty; we ignore it
-  
-        // = operator is overloaded to make deep copy (tricky!)
-        list_resp_.entitlement = list_vec;
-        res = list_resp_;
-        ROS_INFO("Sending entitlement list");
-  
-        return true;
-      };
-  
-  
-      bool append_entitlement(uint64_t entitlement)
-      {
-        list_vec.push_back(entitlement);
-        return true;
-      };
-  
-      ListMetadata()
-      {
-      };
-  
-      ~ListMetadata()
-      {
-        std::cout << "Destroyed ListMetadata";
-      };
-  }; // class ListMetadata
+    EntDataTypeUndef,     // undefined or unknown
+    EntDataTypeBoolset,   // boolean bit set
+    EntDataTypeColor,     // red-green-blue-alpha
+    EntDataTypeProfile,   // profile number
+    EntDataTypeThreshold  // threshold fpn triple
+  };
+
+  /*!
+   * \breif Entitlement data type enumeration base on the entitlement base
+   * string.
+   */
+  std::map<std::string, EntDataType> EntBaseToType = map_list_of
+    ("?",         EntDataTypeUndef)
+    ("boolset",   EntDataTypeBoolset)
+    ("color",     EntDataTypeColor)
+    ("profile",   EntDataTypeProfile)
+    ("threshold", EntDataTypeThreshold);
+
+
+  //----------------------------------------------------------------------------
+  // Geofrenzy Entitlement
+  //----------------------------------------------------------------------------
   
   /*!
-   * This class holds the entitlement metadata for a fence class
+   * This class holds an entitlement for a Geofrenzy fence class.
    */
-  class EntitlementMetadata
+  class Entitlement
   {
-    private:
-      geofrenzy::entitlement_service::Response ent_resp_;
-  
     public:
   
-      EntitlementMetadata(uint64_t entitlement, std::string ent_base)
+      /*!
+       * \brief Default initialization constructor.
+       *
+       * \param gf_class_idx  Geofrenzy class index for this entitlement.
+       * \param gf_ent_idx    Geofrenzy entitlement index.
+       * \param gf_ent_base   Geofrenzy entitlement base.
+       */
+      Entitlement(uint64_t          gf_class_idx,
+                  uint64_t          gf_ent_idx,
+                  const std::string gf_ent_base) :
+          m_class_idx(gf_class_idx),
+          m_ent_idx(gf_ent_idx),
+          m_ent_base(gf_ent_base),
+          m_atime(0.0)
       {
-        //ent_resp_.msg.header.frame_id = "entitlement";
-        //ent_resp_.msg.header.stamp = ros::Time::now();
-        std::cout << entitlement << "\n";
-        std::cout << ent_base << "\n";
-        ent_resp_.entitlement = entitlement;
-        ent_resp_.ent_base = ent_base;
+        //
+        // Map entitlement base type to data type.
+        //
+        if( EntBaseToType.find(gf_ent_base) != EntBaseToType.end() )
+        {
+          m_eEntDataType = EntBaseToType[gf_ent_base];
+        }
+        else
+        {
+          m_eEntDataType = EntDataTypeUndef;
+        }
+
+        m_bDwell = false;
+
+        // nothing to publish yet
+        m_nPublishCnt = 0;
+
+        ROS_DEBUG_STREAM("Constructed Entitlement " << m_ent_idx);
       };
   
-      /** Callback invoked when someone requests our service */
-      bool entitlementCallback(geofrenzy::entitlement_service::Request &req,
-                               geofrenzy::entitlement_service::Response &res)
+      /*!
+       * \brief Destructor.
+       */
+      ~Entitlement()
       {
-        ROS_INFO("Requesting entitlement");
-        std::cout << ent_resp_.entitlement << "\n";
-        //std::cout << ent_resp_.ent_base << "\n";
-        // request is empty; we ignore it
+        ROS_DEBUG_STREAM("Destroyed Entitlement " << m_ent_idx);
+      };
   
-        // = operator is overloaded to make deep copy (tricky!)
-        //res = ent_resp_;
-        res.entitlement = ent_resp_.entitlement;
-        res.ent_base = ent_resp_.ent_base;
-        ROS_INFO("Sending entitlement");
-  
+      /*!
+       * \brief Advertise all entitlment services.
+       *
+       * \param nh    Associated ROS node handle.
+       */
+      void advertiseServices(ros::NodeHandle &nh)
+      {
+      }
+
+      /*!
+       * \brief Advertise all publishers.
+       *
+       * \param nh            Associated ROS node handle.
+       * \param nQueueDepth   Maximum queue depth.
+       */
+      void advertisePublishers(ros::NodeHandle &nh, int nQueueDepth=2)
+      {
+        //
+        // Data-specific dwell topic.
+        //
+        m_strTopicDwellX =
+                        makeDwellTopicName(m_class_idx, m_ent_idx, m_ent_base);
+
+        switch( m_eEntDataType )
+        {
+          case EntDataTypeBoolset:
+            m_publishers[m_strTopicDwellX] =
+              nh.advertise<GfDwellBoolset>(m_strTopicDwellX, 1, true);
+            break;
+          case EntDataTypeColor:
+            m_publishers[m_strTopicDwellX] =
+              nh.advertise<GfDwellColor>(m_strTopicDwellX, 1, true);
+            break;
+          case EntDataTypeProfile:
+            m_publishers[m_strTopicDwellX] =
+              nh.advertise<GfDwellProfile>(m_strTopicDwellX, 1, true);
+            break;
+          case EntDataTypeThreshold:
+            m_publishers[m_strTopicDwellX] =
+              nh.advertise<GfDwellThreshold>(m_strTopicDwellX, 1, true);
+            break;
+          case EntDataTypeUndef:
+          default:
+            ROS_WARN_STREAM("Unknown entitlement base data type = "
+              << m_ent_base);
+            break;
+        }
+
+        //
+        // Json encoded string dwell topic.
+        //
+        m_strTopicDwellJson =
+                            makeDwellTopicName(m_class_idx, m_ent_idx, "json");
+
+        m_publishers[m_strTopicDwellJson] =
+          nh.advertise<GfDwellJson>(m_strTopicDwellJson, 1, true);
+      }
+
+      /*!
+       * \brief Update entitlement with new information.
+       *
+       * \param jvEntitlement   Json value of a parsed entitlement.
+       * \param bDwell          Current location is [not] within a fence.
+       * \param atime           Last Geofrenzy portal access time.
+       */
+      void update(const Json::Value &jvEntitlement,
+                  bool              bDwell,
+                  const ros::Time   &atime)
+      {
+        std::string gf_ent_base = jvEntitlement["ent_base"].asString();
+
+        if( gf_ent_base != m_ent_base )
+        {
+          ROS_WARN_STREAM("Entitlement base "
+              << "'" << gf_ent_base << "'"
+              << " not equal expected "
+              << "'" << m_ent_base << "'"
+              << " - ignoring update.");
+          return;
+        }
+
+        m_bDwell  = bDwell;
+        m_atime   = atime;
+
+        //
+        // Populate entitlement specific data.
+        //
+        switch( m_eEntDataType )
+        {
+          case EntDataTypeBoolset:
+            updateDwellBoolsetMsg(jvEntitlement, m_msgDwellBoolset);
+            break;
+          case EntDataTypeColor:
+            updateDwellColorMsg(jvEntitlement, m_msgDwellColor);
+            break;
+          case EntDataTypeProfile:
+            updateDwellProfileMsg(jvEntitlement, m_msgDwellProfile);
+            break;
+          case EntDataTypeThreshold:
+            updateDwellThresholdMsg(jvEntitlement, m_msgDwellThreshold);
+            break;
+          case EntDataTypeUndef:
+          default:
+            //ROS_WARN_STREAM("Unknown entitlement base data type = "
+            //  << m_ent_base);
+            break;
+        }
+
+        //
+        // Populate json data.
+        //
+        updateDwellJsonMsg(jvEntitlement, m_msgDwellJson);
+
+        ++m_nPublishCnt;
+      }
+
+      /*!
+       * \brief Get the Geofrenzy class index.
+       *
+       * \return Index.
+       */
+      uint64_t classIndex() const
+      {
+        return m_class_idx;
+      }
+
+      /*!
+       * \brief Get the Geofrenzy entitlement index.
+       *
+       * \return Index.
+       */
+      uint64_t entitlementIndex() const
+      {
+        return m_ent_idx;
+      }
+
+      /*!
+       * \brief Get the Geofrenzy entitlement base.
+       *
+       * \return String.
+       */
+      const std::string &entitlementBase() const
+      {
+        return m_ent_base;
+      }
+
+      /*!
+       * \brief Test if there are publishable messages.
+       *
+       * \return Returns true or false.
+       */
+      bool shouldPublish() const
+      {
+        return m_nPublishCnt > 0;
+      }
+
+      /*!
+       * \brief Publish all publishable messages.
+       */
+      void publish()
+      {
+        if( m_nPublishCnt > 0 )
+        {
+          //
+          // Publish entitlement specific data.
+          //
+          switch( m_eEntDataType )
+          {
+            case EntDataTypeBoolset:
+              m_publishers[m_strTopicDwellX].publish(m_msgDwellBoolset);
+              break;
+            case EntDataTypeColor:
+              break;
+            case EntDataTypeProfile:
+              break;
+            case EntDataTypeThreshold:
+              break;
+            case EntDataTypeUndef:
+            default:
+              //ROS_WARN_STREAM("Unknown entitlement base data type = "
+              //  << m_ent_base);
+              break;
+          }
+
+          //
+          // Publish json encoded string data.
+          //
+          m_publishers[m_strTopicDwellJson].publish(m_msgDwellJson);
+
+          --m_nPublishCnt;
+        }
+      }
+
+      /*!
+       * \brief Fill the response message with the relevant entitlement data.
+       *
+       * \param [out] rsp Response message.
+       */
+      void fill(geofrenzy::GetEntitlement::Response &rsp)
+      {
+        rsp.ent_header  = m_msgDwellJson.entitlement.ent_header;
+        rsp.entitlement = m_msgDwellJson.entitlement.json;
+      }
+
+    protected:
+      // Geofrenzy entitlement metadata
+      uint64_t    m_class_idx;    ///< class index
+      uint64_t    m_ent_idx;      ///< entitlement index
+      std::string m_ent_base;     ///< entitlement base data type
+
+      // ROS entitlement services and publishers
+      MapServices     m_services;       ///< Geofrenzy entitlement services
+      MapPublishers   m_publishers;     ///< Geofrenzy entitlement publishers
+
+      // Messaging processing overhead
+      EntDataType m_eEntDataType;       ///< derived entitlement data type
+      std::string m_strTopicDwellX;     ///< data-specific dwell topic name
+      std::string m_strTopicDwellJson;  ///< json dwell topic name
+      ros::Time   m_atime;              ///< last portal access time
+      bool        m_bDwell;             ///< [not] within a fence
+      int         m_nPublishCnt;        ///< publish counter
+
+      // publishing messages
+      GfDwellBoolset    m_msgDwellBoolset;    ///< boolset dwell message
+      GfDwellColor      m_msgDwellColor;      ///< color dwell message
+      GfDwellProfile    m_msgDwellProfile;    ///< profile dwell message
+      GfDwellThreshold  m_msgDwellThreshold;  ///< threshold dwell message
+      GfDwellJson       m_msgDwellJson;         ///< json entitlement message
+
+      /*!
+       * \brief Update ROS boolset dwell message from Json entitlement value.
+       *
+       * \param [in]  jv  Json value of parsed entitlement.
+       * \param [out] msg ROS data-specific dwell message.
+       *
+       * \return Returns true on success, false otherwise.
+       */
+      bool updateDwellBoolsetMsg(const Json::Value &jv,
+                                 GfDwellBoolset    &msg)
+      {
+        updateEntitlementHeader(msg.entitlement.ent_header);
+
+        msg.entitlement.bitset_num = jv["bitset_num"].asUInt();
+
+        stampHeader(msg.header, msg.header.seq+1);
+
         return true;
-      };
-  
-      ~EntitlementMetadata()
+      }
+
+      /*!
+       * \brief Update ROS color dwell message from Json entitlement value.
+       *
+       * \param [in]  jv  Json value of parsed entitlement.
+       * \param [out] msg ROS data-specific dwell message.
+       *
+       * \return Returns true on success, false otherwise.
+       */
+      bool updateDwellColorMsg(const Json::Value &jv,
+                               GfDwellColor    &msg)
       {
-        std::cout << "destroying entitlementmetadata\n";
-      };
-  
-  }; // class EntitlementMetadata
+        updateEntitlementHeader(msg.entitlement.ent_header);
+
+        msg.entitlement.color.r = (float)jv["color_red"].asUInt();
+        msg.entitlement.color.g = (float)jv["color_green"].asUInt();
+        msg.entitlement.color.b = (float)jv["color_blue"].asUInt();
+        msg.entitlement.color.a = (float)jv["color_alpha"].asUInt();
+
+        stampHeader(msg.header, msg.header.seq+1);
+
+        return true;
+      }
+
+      /*!
+       * \brief Update ROS profile dwell message from Json entitlement value.
+       *
+       * \param [in]  jv  Json value of parsed entitlement.
+       * \param [out] msg ROS data-specific dwell message.
+       *
+       * \return Returns true on success, false otherwise.
+       */
+      bool updateDwellProfileMsg(const Json::Value &jv,
+                                 GfDwellProfile    &msg)
+      {
+        updateEntitlementHeader(msg.entitlement.ent_header);
+
+        msg.entitlement.gf_profile_num = jv["profile_num"].asUInt64();
+
+        stampHeader(msg.header, msg.header.seq+1);
+
+        return true;
+      }
+
+      /*!
+       * \brief Update ROS threshold dwell message from Json entitlement value.
+       *
+       * \param [in]  jv  Json value of parsed entitlement.
+       * \param [out] msg ROS data-specific dwell message.
+       *
+       * \return Returns true on success, false otherwise.
+       */
+      bool updateDwellThresholdMsg(const Json::Value &jv,
+                                   GfDwellThreshold  &msg)
+      {
+        updateEntitlementHeader(msg.entitlement.ent_header);
+
+        msg.entitlement.threshold_lower = jv["theshold_lower"].asDouble();
+        msg.entitlement.threshold_upper = jv["theshold_upper"].asDouble();
+        msg.entitlement.threshold_unit  = jv["theshold_unit"].asDouble();
+
+        stampHeader(msg.header, msg.header.seq+1);
+
+        return true;
+      }
+
+      /*!
+       * \brief Update ROS Json dwell message from Json entitlement value.
+       *
+       * \param [in]  jv  Json value of parsed entitlement.
+       * \param [out] msg ROS data-specific dwell message.
+       *
+       * \return Returns true on success, false otherwise.
+       */
+      bool updateDwellJsonMsg(const Json::Value &jv,
+                              GfDwellJson       &msg)
+      {
+        Json::FastWriter  fastWriter;
+
+        updateEntitlementHeader(msg.entitlement.ent_header);
+
+        msg.entitlement.json = fastWriter.write(jv);
+
+        stampHeader(msg.header, msg.header.seq+1);
+
+        return true;
+      }
+
+      /*!
+       * \brief Update entitlement metadata header.
+       *
+       * \param [in,out] header   Metadata header.
+       */
+      void updateEntitlementHeader(geofrenzy::GfEntHeader &header)
+      {
+        header.access_time  = m_atime;
+        header.gf_class_idx = m_class_idx;
+        header.gf_ent_idx   = m_ent_idx;
+        header.gf_ent_base  = m_ent_base;
+        header.dwell        = m_bDwell;
+      }
+
+  }; // class Entitlement
+
+
+  //----------------------------------------------------------------------------
+  // FenceServer Class
+  //----------------------------------------------------------------------------
 
   /*!
    * \brief Class that implements the GeoJson Fence Server.
@@ -186,27 +539,22 @@ namespace geofrenzy
   class FenceServer
   {
     public:
+      /*!
+       * Entitlement map type and its iteraters.
+       */
+      typedef std::map<uint64_t, geofrenzy::Entitlement*> EntitlementMap;
+      typedef EntitlementMap::iterator        EntitlementMapIter;
+      typedef EntitlementMap::const_iterator  EntitlementMapCIter;
 
-      /*! map of ROS server services type */
-      typedef std::map<std::string, ros::ServiceServer> MapServices;
-
-      /*! map of ROS client services type */
-      typedef std::map<std::string, ros::ServiceClient> MapClientServices;
-    
-      /*! map of ROS publishers type */
-      typedef std::map<std::string, ros::Publisher> MapPublishers;
-
-      /*! map of ROS subscriptions type */
-      typedef std::map<std::string, ros::Subscriber> MapSubscriptions;
-
-        /**
-         * this metthod instantiates a fence server
-         * \param[in] new_class class index for the node
-         * \param[in] newnh ros node handle for the node
-         */
-      FenceServer(uint64_t new_class, ros::NodeHandle newnh, double hz) :
-          m_fence_class(new_class), m_nh(newnh), m_hz(hz),
-          m_access_time(0.0)
+      /*!
+       * \brief Default initialization constructor.
+       *
+       * \param gf_class_idx  Associated geofrenzy class index for this node.
+       * \param nh            ROS node handle.
+       * \param hz            Node hertz rate.
+       */
+      FenceServer(uint64_t gf_class_idx, ros::NodeHandle nh, double hz) :
+          m_fence_class(gf_class_idx), m_nh(nh), m_hz(hz), m_atime(0.0)
       {
         std::stringstream ss;
 
@@ -218,79 +566,90 @@ namespace geofrenzy
         m_current_lat   = NoGeoPos;
         m_current_long  = NoGeoPos;
 
-        m_nPubRepeatCnt = 0;
+        m_nPublishCnt = 0;
       };
   
       /*!
+       * \brief Destructor.
        */
-      bool init()
+      ~FenceServer()
       {
-        Json::Value   root;
-        Json::Reader  reader;
+        EntitlementMapIter  iter;
+
+        for(iter = m_entitlements.begin(); iter != m_entitlements.end(); ++iter)
+        {
+          if( iter->second != NULL )
+          {
+            delete iter->second;
+            iter->second = NULL;
+          }
+        }
+      }
+
+      /*!
+       * \brief Intiialize the class properties for this node's associated
+       * Geofrenzy class index.
+       *
+       * The initialization makes use of the Geofrenzy portal to retrieve the
+       * relevant properties.
+       *
+       * \return Returns true on success, false otherwise.
+       */
+      bool initGfClassProperties()
+      {
+        Json::Reader  reader;   // json reader
+        Json::Value   root;     // json parsed string root
         bool          bSuccess; // [not] successful
 
+        // retrieve the class properties
         char *td = class_entitlements_properties_json(m_fence_class);
-        char *t;
 
-        t = td;
+        if( td == NULL )
+        {
+          ROS_ERROR_STREAM(
+              "Failed to retrieve class properties for class index "
+              << m_fence_class);
+          return false;
+        }
 
-        std::string st(t);
-        st = "{" + st + "}";
+        std::string strJson("{");
+        strJson += td;
+        strJson += "}";
 
-        bSuccess = reader.parse(st, root);
+        bSuccess = reader.parse(strJson, root);
 
+        // report to the user the failure and their locations in the document.
         if( !bSuccess )
         {
-          // report to the user the failure and their locations in the document.
           ROS_ERROR_STREAM("Failed to parse configuration\n"
               << reader.getFormattedErrorMessages());
           return false;
         };
 
-        geofrenzy::ListMetadata ent_list;
-        std::vector < ros::ServiceServer * > service_vec;
+        // property class index.
+        // RDK. Should this always equal the node's class index?
+        int gf_class_idx = root["class_metadata"]["class_idx"].asUInt64();
 
-        int gf_class_idx = root["class_metadata"]["class_idx"].asInt();
-
+        // list of entitlements
         Json::Value entitlements = root["class_metadata"]["entitlements"];
 
+        //
+        // Add entitlements to fence server.
+        //
         for(int i = 0; i < entitlements.size(); ++i)
         {
-          uint64_t ent_idx_int = entitlements[i]["ent_idx"].asInt();
+          uint64_t    gf_ent_idx  = entitlements[i]["ent_idx"].asUInt64();
+          std::string gf_ent_base = entitlements[i]["ent_base"].asString();
 
-          std::ostringstream class_idx_ss;
-          class_idx_ss << gf_class_idx;
-          std::string class_idx_str = class_idx_ss.str();
-          std::ostringstream ent_idx_ss;
-          ent_idx_ss << ent_idx_int;
-          std::string ent_idx_str = ent_idx_ss.str();
-          std::string ent_base_str = entitlements[i]["ent_base"].asString();
-
-          std::cout << "for class_idx=";
-          std::cout << gf_class_idx;
-          std::cout << " ent_idx of ";
-          std::cout << ent_idx_int;
-          std::cout << " is of ent_base type ";
-          std::cout << ent_base_str;
-          std::cout << "\n";
-          std::cout.flush();
-
-          geofrenzy::EntitlementMetadata *myentitlement =
-            new geofrenzy::EntitlementMetadata(ent_idx_int, ent_base_str);
-          // *myentitlement = EntitlementMetadata(ent_idx_int,ent_base_str);
-          std::string mypath = "geofrenzy/" + ent_idx_str;
-
-          ros::ServiceServer *eservice = new ros::ServiceServer;
-          *eservice = m_nh.advertiseService(mypath,
-            &geofrenzy::EntitlementMetadata::entitlementCallback, myentitlement);
-          service_vec.push_back(eservice);
-          ent_list.append_entitlement(ent_idx_int);
-          appendEntitlement(ent_idx_int);
+          // new
+          if( m_entitlements.find(gf_ent_idx) == m_entitlements.end() )
+          {
+            m_entitlements[gf_ent_idx] = new geofrenzy::Entitlement(
+                                                                m_fence_class,
+                                                                gf_ent_idx,
+                                                                gf_ent_base);
+          }
         }
-
-        std::string mycpath = "geofrenzy/list";
-        ros::ServiceServer cservice = m_nh.advertiseService(mycpath,
-          &geofrenzy::ListMetadata::listCallback, &ent_list);
 
         return true;
       }
@@ -300,6 +659,22 @@ namespace geofrenzy
        */
       void advertiseServices()
       {
+        m_services[ServiceNameGetEntitlement] =
+          m_nh.advertiseService(ServiceNameGetEntitlement,
+                                &FenceServer::getEntitlement,
+                                &(*this));
+
+        m_services[ServiceNameGetEntitlementList] =
+          m_nh.advertiseService(ServiceNameGetEntitlementList,
+                                &FenceServer::getEntitlementList,
+                                &(*this));
+
+        EntitlementMapIter  iter;
+
+        for(iter = m_entitlements.begin(); iter != m_entitlements.end(); ++iter)
+        {
+          iter->second->advertiseServices(m_nh);
+        }
       }
 
       /*!
@@ -315,8 +690,10 @@ namespace geofrenzy
        *
        * \param nQueueDepth   Maximum queue depth.
        */
-      void advertisePublishers(int nQueueDepth=5)
+      void advertisePublishers(int nQueueDepth=2)
       {
+        EntitlementMapIter  iter;
+
         m_publishers[TopicNameFcJson] =
           m_nh.advertise<std_msgs::String>(TopicNameFcJson, 1, true);
 
@@ -327,6 +704,10 @@ namespace geofrenzy
         m_publishers[TopicNameFcDist] =
           m_nh.advertise<geofrenzy::GfDistFeatureCollection>(TopicNameFcDist,
                                                                     1, true);
+        for(iter = m_entitlements.begin(); iter != m_entitlements.end(); ++iter)
+        {
+          iter->second->advertisePublishers(m_nh);
+        }
       }
 
       /*!
@@ -337,9 +718,10 @@ namespace geofrenzy
       void subscribeToTopics(int nQueueDepth=5)
       {
         // fix location
-        m_subscriptions[TopicNameFix] = m_nh.subscribe(TopicNameFix, 1,
-                                          &FenceServer::cbNavSatFix,
-                                          &(*this));
+        m_subscriptions[TopicNameFix] =
+                    m_nh.subscribe(TopicNameFix, 1,
+                                   &FenceServer::cbNavSatFix,
+                                   &(*this));
       }
 
       /*!
@@ -347,9 +729,9 @@ namespace geofrenzy
        *
        * Call in main loop.
        */
-      virtual void publish()
+      void publish()
       {
-        if( m_nPubRepeatCnt > 0 )
+        if( m_nPublishCnt > 0 )
         {
           m_publishers[TopicNameFcJson].publish(m_msgFcJson);
 
@@ -357,34 +739,24 @@ namespace geofrenzy
 
           m_publishers[TopicNameFcDist].publish(m_msgFcDist);
 
-          --m_nPubRepeatCnt;
+          --m_nPublishCnt;
+        }
+
+        EntitlementMapIter  iter;
+
+        for(iter = m_entitlements.begin(); iter != m_entitlements.end(); ++iter)
+        {
+          iter->second->shouldPublish();
+          iter->second->publish();
         }
       }
 
-        /*!
-         * this metthod adds a new entitlement index to the list of Entitlements
-         * for creating node for publication
-         * \param[in] newentitlement new entitlement idx
-         */
-      void appendEntitlement(uint64_t newentitlement)
-      {
-        std::stringstream fence_class_stream;
-        fence_class_stream << m_fence_class;
-        std::stringstream newentitlement_stream;
-        newentitlement_stream << newentitlement;
-        std::string ad_string = "geofrenzy/" +
-                                  newentitlement_stream.str() +
-                                  "/dwell/json";
-        entitlement_map[newentitlement] = m_nh.advertise<std_msgs::String>(ad_string,
-            1, true);
-      }
-  
       /*!
        * \brief Retrieve Geofrenzy Portal fence and entitlements.
        *
        * \param [in] latitude   Geographic latitude.
        * \param [in] longitude  Geographic longitude.
-       * \param [in] level      ??
+       * \param [in] level      RoI. RDK Units are kilometers?
        * \param [out] strJson   Json formatted result string.
        *
        * \return Returns true on success, false otherwise.
@@ -398,7 +770,8 @@ namespace geofrenzy
         //
         // Read from file. Great for testing.
         //
-        if (m_nh.getParam("geojson_file", filename))
+        if( m_nh.getParam("geojson_file", filename) )
+        // RDK final: if( m_nh.getParam(ParamNameFenceFilename, filename) )
         {
           ROS_DEBUG_STREAM("Reading file " << filename);
 
@@ -429,9 +802,9 @@ namespace geofrenzy
           ROS_DEBUG_STREAM("Done.");
         }
   
-        if(!strJson.empty())
+        if( !strJson.empty() )
         {
-          m_access_time = ros::Time::now();
+          m_atime = ros::Time::now();
           return true;
         }
         else
@@ -459,29 +832,28 @@ namespace geofrenzy
                              GfGeoFeatureCollection &msgFcGeo)
       {
         Json::Reader  reader;   // json reader
-        Json::Value   root;     // will contains the root value after parsing.
+        Json::Value   root;     // root value after parsing
         bool          bSuccess; // [not] successful
 
         // parse json string
         bSuccess = reader.parse(strJson, root);
 
+        // report to the user the failure and their locations in the document.
         if( !bSuccess )
         {
-          // report to the user the failure and their locations in the document.
           ROS_ERROR_STREAM("Failed to parse fences.\n"
                                 << reader.getFormattedErrorMessages());
           return false;
         }
   
-        EntitlementMap            entitlement_temp_map;
-        std::map<uint64_t, bool>  inorout;
-
-        Json::Value featureList = root["features"];
-
+        // clear ros message fetures
         msgFcGeo.features.clear();
 
-        GfGeoFeature  geoFeature;
-        GeoPolygon    geoPolygon;
+        GfGeoFeature  geoFeature;   // ros geographic feature
+        GeoPolygon    geoPolygon;   // ros geographic polygon
+
+        // json feature list
+        Json::Value featureList = root["features"];
 
         //
         // Loop through json feature list.
@@ -490,11 +862,20 @@ namespace geofrenzy
             feature != featureList.end();
             ++feature)
         {
-          geoFeature.gf_class_idx = m_fence_class;
+          // feature data
+          Json::Value &metadata = (*feature)["properties"]["class_metadata"];
+          Json::Value &geometry = (*feature)["geometry"]["coordinates"];
+          Json::Value inout     = (*feature)["properties"]["inout"];
+
+          Json::Value &entitlements  = metadata["entitlements"];
+
+          bool bDwell = inout.asString().compare("i") == 0;
+
+          // clear ros feature entitlements and geometries
           geoFeature.gf_ent_idx.clear();
           geoFeature.geometry.clear();
 
-          Json::Value geometry = (*feature)["geometry"]["coordinates"];
+          geoFeature.gf_class_idx   = metadata["class_idx"].asUInt64();
 
           //
           // Loop through json feature fences.
@@ -505,6 +886,7 @@ namespace geofrenzy
           {
             Json::Value &polygon = (*polygon_iter);
 
+            // clear polygon
             geoPolygon.points.clear();
 
             //
@@ -520,14 +902,13 @@ namespace geofrenzy
               geoPoint.latitude  = (*point_iter)[1].asDouble();
               geoPoint.altitude  = 0.0;
 
+              // add point
               geoPolygon.points.push_back(geoPoint);
             }
           }
 
+          // add polygon fence
           geoFeature.geometry.push_back(geoPolygon);
-
-          Json::Value entitlements =
-                    (*feature)["properties"]["class_metadata"]["entitlements"];
 
           //
           // Loop the json feature entitlements.
@@ -536,61 +917,18 @@ namespace geofrenzy
               entitlement != entitlements.end();
               ++entitlement)
           {
-            uint64_t          ent_idx = (*entitlement)["ent_idx"].asInt();
-            Json::FastWriter  fastWriter;
+            uint64_t gf_ent_idx  = (*entitlement)["ent_idx"].asUInt64();
 
-            geoFeature.gf_ent_idx.push_back(ent_idx);
-
-            entitlement_temp_map[ent_idx] = *entitlement;
-
-            std::string entitlement_string = fastWriter.write(*entitlement);
-
-            Json::Value inout = (*feature)["properties"]["inout"];
-
-            ROS_DEBUG_STREAM("entitlement start\n"
-                << entitlement_string << "\n"
-                << ent_idx << "\n"
-                << "entitlement end");
-
-            ROS_DEBUG_STREAM("inout = " << inout);
-  
-            // RDK bit-or bool??
-            if( inout.asString().compare("i") == 0 )
+            if( m_entitlements.find(gf_ent_idx) != m_entitlements.end() )
             {
-              inorout[ent_idx] = inorout[ent_idx] | true;
+              m_entitlements[gf_ent_idx]->update(*entitlement, bDwell, m_atime);
             }
-            else
-            {
-              inorout[ent_idx] = inorout[ent_idx] | false;
-            }
+
+            // add entitlement index
+            geoFeature.gf_ent_idx.push_back(gf_ent_idx);
           }
   
-          //
-          // Loop through entitlments and update with new data.
-          //
-          for(EntitlementMap::iterator val_it = entitlement_temp_map.begin();
-              val_it != entitlement_temp_map.end();
-              ++val_it)
-          {
-            uint64_t          tempidx = val_it->first;
-            Json::FastWriter  fastWriter;
-
-            val_it->second["dwell"] = inorout[tempidx];
-
-            std::stringstream fence_class_str;
-            fence_class_str << m_fence_class;
-            val_it->second["class_idx"] = fence_class_str.str();
-
-            std::string entitlement_temp_string =
-                                              fastWriter.write(val_it->second);
-
-            std_msgs::String entitlement_message;
-            entitlement_message.data = entitlement_temp_string;
-            //entitlement_message.header.stamp = ros::Time::now();
-            entitlement_map[tempidx].publish(entitlement_message);
-            // dwell_pub.publish(entitlement_message);
-          }
-
+          // add feature
           msgFcGeo.features.push_back(geoFeature);
         }
 
@@ -674,7 +1012,7 @@ namespace geofrenzy
       }
 
       /*!
-       * \brief Navigation satellite fixed location callback.
+       * \brief Navigation satellite fixed location subscribed callback.
        */
       void cbNavSatFix(const sensor_msgs::NavSatFix::ConstPtr &msg)
       {
@@ -754,124 +1092,106 @@ namespace geofrenzy
       {
         m_msgFcJson.data        = strJson;
         //m_msgFcJson.features.data  = strJson;
-        //m_msgFcJson.access_time  = m_access_time;
+        //m_msgFcJson.access_time  = m_atime;
         //stampHeader(m_msgFcJson.header, m_msgFcJson.header.seq+1);
 
-        m_msgFcGeo.access_time = m_access_time;
+        m_msgFcGeo.access_time = m_atime;
         stampHeader(m_msgFcGeo.header, m_msgFcGeo.header.seq+1);
 
         convertGeoToDistMsg(m_msgFcGeo, m_msgFcDist);
-        m_msgFcDist.access_time = m_access_time;
+        m_msgFcDist.access_time = m_atime;
         stampHeader(m_msgFcDist.header, m_msgFcDist.header.seq+1);
 
-        ++m_nPubRepeatCnt;
+        ++m_nPublishCnt;
       }
 
       /*!
-       * \brief Fill in ROS standard message header.
+       * \brief Get the Goefrenzy entitlement callback.
        *
-       * \param [out] header    Message header.
-       * \param nSeqNum         Sequence number.
-       * \param strFrameId      Frame id. No frame = "0", global frame = "1".
+       * \param req   Service request.
+       * \param rsp   Service response.
+       *
+       * \return Returns true on success, false on failure.
        */
-      void stampHeader(std_msgs::Header  &header,
-                       int32_t            nSeqNum = 0,
-                       const std::string &strFrameId = "geofrenzy")
+      bool getEntitlement(geofrenzy::GetEntitlement::Request  &req,
+                          geofrenzy::GetEntitlement::Response &rsp)
       {
-        header.seq      = nSeqNum;
-        header.stamp    = ros::Time::now();
-        header.frame_id = strFrameId;
-      }
+        ROS_DEBUG_STREAM(ServiceNameGetEntitlement);
 
+        if( m_entitlements.find(req.gf_ent_idx) == m_entitlements.end() )
+        {
+          ROS_ERROR_STREAM("Service " << ServiceNameGetEntitlement << ": "
+              << "Requesting entitlement "
+              << req.gf_ent_idx
+              << " not found.");
+          return false;
+        }
+
+        m_entitlements[req.gf_ent_idx]->fill(rsp);
+
+        return true;
+      };
+
+      /*!
+       * \brief Get the Goefrenzy entitlement list callback.
+       *
+       * \param req   Service request.
+       * \param rsp   Service response.
+       *
+       * \return Returns true on success, false on failure.
+       */
+      bool getEntitlementList(geofrenzy::GetEntitlementList::Request  &req,
+                              geofrenzy::GetEntitlementList::Response &rsp)
+      {
+        ROS_DEBUG_STREAM(ServiceNameGetEntitlementList);
+      
+        EntitlementMapCIter iter;
+
+        rsp.gf_ent_idx.clear();
+        rsp.gf_ent_base.clear();
+
+        for(iter = m_entitlements.begin(); iter != m_entitlements.end(); ++iter)
+        {
+          rsp.gf_ent_idx.push_back(iter->second->entitlementIndex());
+          rsp.gf_ent_base.push_back(iter->second->entitlementBase());
+        }
+
+        return true;
+      };
+  
     private:
-      ros::NodeHandle m_nh;
-      double          m_hz;
-      uint64_t        m_fence_class;
+      ros::NodeHandle &m_nh;            ///< node handle
+      double          m_hz;             ///< cycle hertz
+      uint64_t        m_fence_class;    ///< geofrenzy class index
 
       // ROS services, publishers, subscriptions.
-      MapServices       m_services;       ///< Laelaps control server services
-      MapClientServices m_clientServices; ///< Laelaps control client services
-      MapPublishers     m_publishers;     ///< Laelaps control publishers
-      MapSubscriptions  m_subscriptions;  ///< Laelaps control subscriptions
+      MapServices       m_services;       ///< Geofrenzy server services
+      MapClientServices m_clientServices; ///< Geofrenzy server client services
+      MapPublishers     m_publishers;     ///< Geofrenzy server publishers
+      MapSubscriptions  m_subscriptions;  ///< Geofrenzy server subscriptions
 
-      ros::Time m_access_time;
-      double    m_previous_lat;
-      double    m_previous_long;
-      double    m_current_lat;
-      double    m_current_long;
+      // Satellite navigation fix
+      double    m_previous_lat;     ///< previous latitude
+      double    m_previous_long;    ///< previous longitude
+      double    m_current_lat;      ///< current latitude
+      double    m_current_long;     ///< current longitude
+
+      // Messaging processing overhead
+      ros::Time m_atime;        ///< last portal access time
+      int       m_nPublishCnt;  ///< publish counter
 
       // Message for publishing
       GfGeoFeatureCollection  m_msgFcGeo;
       GfDistFeatureCollection m_msgFcDist;
       std_msgs::String        m_msgFcJson;    // RDK deprecate
       //GfJsonFeatureCollection m_msgFcJson;  // RDK and replace with this
-      int                     m_nPubRepeatCnt;
 
-      //RDK ros::Publisher metadata_pub;
-      std::map <uint64_t, ros::Publisher> entitlement_map;
+      // Geofrenzy class entitlements
+      EntitlementMap          m_entitlements;
   
   }; // class FenceServer
 
 } // namespace geofrenzy
-
-/*!
- * \brief Parse command line argument to determine Geofrenzy class index.
- *
- * \note
- * This function should be call prior to ros::init() to make node name.
- *
- * Format: _gf_class_idx:=<class_idx>
- *
- * \param argc  Command line argument count.
- * \param argv  Command line arguments.
- * \param dft   Geofrenzy class index default (if no value is specified).
- *
- * \return Geofrenzy class index.
- */
-uint64_t paramGfClassIndex(int argc, char *argv[], uint64_t dft=1)
-{
-  std::string         strArgLval("_gf_class_idx:=");
-  std::string         strArgRval;
-  long long unsigned  class_idx = dft;
-
-  for(int i = 1; i < argc; ++i)
-  {
-    std::string strArg = argv[i];
-    fprintf(stderr, "arg[%d]=%s\n", i, strArg.c_str());
-
-    if( strArg.find(strArgLval) != std::string::npos )
-    {
-      strArgRval = strArg.substr(strArgLval.length());
-
-      if( sscanf(strArgRval.c_str(), "%llu", &class_idx) != 1 )
-      {
-        // no ros logging available yet
-        fprintf(stderr,
-            "Warning: '%s' is not a valid Geofrenzy class index.",
-            strArg.c_str());
-      }
-    }
-  }
-
-  return (uint64_t)class_idx;
-}
-
-/*!
- * \brief Make an unique Geofrenzy node from the class index.
- *
- * \param strRoot       Node root prefix string.
- * \param gf_class_idx  Geofrenzy class index.
- *
- * \return String <root>_<idx>
- */
-std::string makeGfNodeName(const std::string strRoot, uint64_t gf_class_idx)
-{
-  std::stringstream  ss;
-
-  ss << strRoot << "_" << gf_class_idx;
-
-  return ss.str();
-}
 
 /**
  * This node queries the fence delivery network and produces topics
@@ -883,22 +1203,13 @@ std::string makeGfNodeName(const std::string strRoot, uint64_t gf_class_idx)
  */
 int main(int argc, char **argv)
 {
-  double hz = 10.0;
+  double hz;
 
-  uint64_t gf_class_idx = paramGfClassIndex(argc, argv);
+  // get command-line Geofrenzy class index
+  uint64_t gf_class_idx = paramClassIndex(argc, argv);
 
-  // make unique node name from command line argument
-  std::string node_name = makeGfNodeName("gf_server", gf_class_idx);
-
-  // RDK DELETE THESE
-  //
-  // Geofrenzy specific command-line parsing.
-  // RDK integrate with ros command-line parsing
-  //
-  std::stringstream convert;
-  convert << gf_class_idx;
-  std::string myclass_idx_str = convert.str();
-  // RDK DELETE THESE
+  // make a unique node name from the command line class index argument
+  std::string node_name = makeNodeName(NodeRootFenceServer, gf_class_idx);
 
   // 
   // Initialize the node. Parse the command line arguments and environment to
@@ -916,6 +1227,11 @@ int main(int argc, char **argv)
   // A ctrl-c interrupt will stop attempts to connect to the ROS core.
   //
   ros::NodeHandle nh(node_name);
+
+  //
+  // Parse node command-line arguments.
+  //
+  nh.param("hz", hz, 10.0);   // node hertz rate
 
   //
   // Failed to connect.
@@ -936,7 +1252,7 @@ int main(int argc, char **argv)
   //
   // Initialize fence server.
   //
-  if( !fs.init() )
+  if( !fs.initGfClassProperties() )
   {
     ROS_FATAL_STREAM(node_name << ": Failed to initialize.");
     return 2;

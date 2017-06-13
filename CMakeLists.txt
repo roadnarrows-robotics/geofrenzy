@@ -60,25 +60,34 @@ add_message_files(
     GfDistFeatureCollection.msg
     GfDwellBoolset.msg
     GfDwellColor.msg
+    GfDwellJson.msg
     GfDwellProfile.msg
     GfDwellThreshold.msg
+    GfEntBoolset.msg
+    GfEntColor.msg
     GfEntHeader.msg
+    GfEntJson.msg
+    GfEntProfile.msg
+    GfEntThreshold.msg
+    GfEntTVP.msg
     GfGeoFeature.msg
     GfGeoFeatureCollection.msg
     GfJsonFeatureCollection.msg
     Polygon64.msg
-    entitlement.msg   # RDK should be deprecated
-    gf_class.msg    # RDK should be deprecated
+    StringStamped.msg
+    entitlement.msg   # RDK deprecated
+    gf_class.msg      # RDK deprecated
 )
 
 ## Generate services in the 'srv' folder
  add_service_files(
-   FILES
-#   Service1.srv
-#   Service2.srv
-	entitlement_service.srv
-	entitlement_list_service.srv
-	class_service.srv
+  DIRECTORY srv
+	FILES
+    GetEntitlement.srv
+    GetEntitlementList.srv
+    entitlement_service.srv         # RDK deprecated
+    entitlement_list_service.srv    # RDK deprecated
+    class_service.srv               # RDK deprecated
  )
 
 ## Generate actions in the 'action' folder
@@ -219,18 +228,24 @@ find_library(FALIB faresolv HINTS /usr/local/lib)
 if(NOT FALIB)
 	message(FATAL_ERROR "fa library not found")
 endif()
-include_directories(include $(catkin_INCLUDE_DIRS))
-add_executable(gf_map_server src/gf_map_server.cpp)
-add_executable(gf_map_server2 src/gf_map_server2.cpp)
-add_executable(gf_server src/gf_server.cpp)
-target_include_directories(gf_map_server PUBLIC src/geofrenzy)
-target_link_libraries(gf_map_server  ${catkin_LIBRARIES})
+#message( STATUS ${FALIB})
+include_directories(src include $(catkin_INCLUDE_DIRS))
+
+# Geofrenzy old map server node - DEPRECATED
+#add_executable(gf_map_server src/gf_map_server.cpp)
+#target_link_libraries(gf_map_server  ${catkin_LIBRARIES})
+#target_link_libraries(gf_map_server jsoncpp)
+
+# Geofrenzy new map server node
+add_executable(gf_map_server2
+  src/gf_ros.cpp
+  src/gf_map_server2.cpp)
 target_link_libraries(gf_map_server2  ${catkin_LIBRARIES})
+
+# geofrenzy portal server
+add_executable(gf_server
+  src/gf_ros.cpp
+  src/gf_server.cpp)
 target_link_libraries(gf_server ${catkin_LIBRARIES})
-target_link_libraries(gf_map_server jsoncpp)
 target_link_libraries(gf_server jsoncpp)
-message( STATUS ${FALIB})
 target_link_libraries(gf_server ${FALIB} agent)
-
-
-

@@ -1,0 +1,9 @@
+### Geofrenzy gf_server_<class_idx>/geofrenzy/get_entitlement_list service
+#
+# Get the list of entitlements from the given Geofrenzy server.
+#
+#
+
+---
+uint64[]  gf_ent_idx    # Geofrenzy unique entitlement index.
+string[]  gf_ent_base   # Entitlement base name (and data type).

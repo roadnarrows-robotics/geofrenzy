@@ -1,0 +1,13 @@
+### Geofrenzy gf_server_<class_idx>/geofrenzy/get_entitlement service.
+#
+# Get the specified entitlement from the given Geofrenzy server.
+#
+# The Json encoded entitlement is contains some entitlement metadata, plus
+# entitlement-specific data.
+#
+# The entitlement header contains all of metadata as parsed fields.
+#
+uint64          gf_ent_idx    # Entitlement index
+---
+GfEntHeader     ent_header    # Entitlement header
+string          entitlement   # Json encoded entitlement string

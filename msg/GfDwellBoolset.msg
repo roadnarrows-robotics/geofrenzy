@@ -1,10 +1,10 @@
 ### Geofrenzy GfDwellBoolset message
 #
-# A dwell message specifies the current entitlement.
+# A dwell message specifies a current entitlement in relation to the tracked
+# location.
 #
 # The boolean set dwell ... 
 #
-Header      header      # Standard ROS header
-GfEntHeader ent_header  # Entitlement header
-int32       bitset_num  # Boolean bit set
+Header        header      # Standard ROS header
+GfEntBoolset  entitlement # Dwell entitlement
 

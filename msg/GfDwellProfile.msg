@@ -1,9 +1,9 @@
 ### Geofrenzy GfDwellProfile message
 #
-# A dwell message specifies the current entitlement.
+# A dwell message specifies a current entitlement in relation to the tracked
+# location.
 #
 # The profile dwell ... 
 #
-Header      header          # Standard ROS header
-GfEntHeader ent_header      # Entitlement header
-int64       gf_profile_num  # geofrenzy profile number
+Header        header      # Standard ROS header
+GfEntProfile  entitlement # Dwell entitlement
