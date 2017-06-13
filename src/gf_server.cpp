@@ -19,6 +19,7 @@
 #include "geodesy/wgs84.h"
 #include "swri_transform_util/transform_util.h"
 #include "boost/assign.hpp"
+#include "boost/bind.hpp"
 
 //
 // ROS
@@ -37,6 +38,7 @@
 //
 #include "geofrenzy/GfDistFeatureCollection.h"
 #include "geofrenzy/GfGeoFeatureCollection.h"
+#include "geofrenzy/GfJsonFeatureCollection.h"
 #include "geofrenzy/GfDwellBoolset.h"
 #include "geofrenzy/GfDwellColor.h"
 #include "geofrenzy/GfDwellJson.h"
@@ -348,10 +350,13 @@ namespace geofrenzy
               m_publishers[m_strTopicDwellX].publish(m_msgDwellBoolset);
               break;
             case EntDataTypeColor:
+              m_publishers[m_strTopicDwellX].publish(m_msgDwellColor);
               break;
             case EntDataTypeProfile:
+              m_publishers[m_strTopicDwellX].publish(m_msgDwellProfile);
               break;
             case EntDataTypeThreshold:
+              m_publishers[m_strTopicDwellX].publish(m_msgDwellThreshold);
               break;
             case EntDataTypeUndef:
             default:
@@ -481,9 +486,9 @@ namespace geofrenzy
       {
         updateEntitlementHeader(msg.entitlement.ent_header);
 
-        msg.entitlement.threshold_lower = jv["theshold_lower"].asDouble();
-        msg.entitlement.threshold_upper = jv["theshold_upper"].asDouble();
-        msg.entitlement.threshold_unit  = jv["theshold_unit"].asDouble();
+        msg.entitlement.threshold_lower = jv["threshold_lower"].asDouble();
+        msg.entitlement.threshold_upper = jv["threshold_upper"].asDouble();
+        msg.entitlement.threshold_unit  = jv["threshold_unit"].asDouble();
 
         stampHeader(msg.header, msg.header.seq+1);
 
@@ -553,11 +558,9 @@ namespace geofrenzy
        * \param nh            ROS node handle.
        * \param hz            Node hertz rate.
        */
-      FenceServer(uint64_t gf_class_idx, ros::NodeHandle nh, double hz) :
+      FenceServer(ros::NodeHandle &nh, double hz, uint64_t gf_class_idx) :
           m_fence_class(gf_class_idx), m_nh(nh), m_hz(hz), m_atime(0.0)
       {
-        std::stringstream ss;
-
         ROS_DEBUG_STREAM("FenceServer gf_class_idx = " << m_fence_class);
 
         // current and previous positions are unknown
@@ -601,6 +604,11 @@ namespace geofrenzy
         Json::Value   root;     // json parsed string root
         bool          bSuccess; // [not] successful
 
+        ROS_INFO_STREAM(ros::this_node::getName()
+            << ": Retrieving Geofrenzy properties for fence class "
+            << m_fence_class
+            << ".");
+
         // retrieve the class properties
         char *td = class_entitlements_properties_json(m_fence_class);
 
@@ -611,6 +619,9 @@ namespace geofrenzy
               << m_fence_class);
           return false;
         }
+
+        ROS_INFO_STREAM(ros::this_node::getName()
+            << ": Initializing Geofrenzy properties.");
 
         std::string strJson("{");
         strJson += td;
@@ -644,10 +655,10 @@ namespace geofrenzy
           // new
           if( m_entitlements.find(gf_ent_idx) == m_entitlements.end() )
           {
-            m_entitlements[gf_ent_idx] = new geofrenzy::Entitlement(
-                                                                m_fence_class,
-                                                                gf_ent_idx,
-                                                                gf_ent_base);
+            m_entitlements[gf_ent_idx] =
+                  new geofrenzy::Entitlement(m_fence_class,
+                                             gf_ent_idx,
+                                             gf_ent_base);
           }
         }
 
@@ -659,17 +670,20 @@ namespace geofrenzy
        */
       void advertiseServices()
       {
-        m_services[ServiceNameGetEntitlement] =
-          m_nh.advertiseService(ServiceNameGetEntitlement,
-                                &FenceServer::getEntitlement,
-                                &(*this));
+        std::string strSvc;
 
-        m_services[ServiceNameGetEntitlementList] =
-          m_nh.advertiseService(ServiceNameGetEntitlementList,
-                                &FenceServer::getEntitlementList,
-                                &(*this));
+        strSvc = ServiceNameGetEntitlement;
+        m_services[strSvc] = m_nh.advertiseService(strSvc,
+                                                  &FenceServer::getEntitlement,
+                                                  &(*this));
+
+        strSvc = ServiceNameGetEntitlementList;
+        m_services[strSvc] = m_nh.advertiseService(strSvc,
+                                              &FenceServer::getEntitlementList,
+                                              &(*this));
 
         EntitlementMapIter  iter;
+
 
         for(iter = m_entitlements.begin(); iter != m_entitlements.end(); ++iter)
         {
@@ -695,7 +709,8 @@ namespace geofrenzy
         EntitlementMapIter  iter;
 
         m_publishers[TopicNameFcJson] =
-          m_nh.advertise<std_msgs::String>(TopicNameFcJson, 1, true);
+          m_nh.advertise<geofrenzy::GfJsonFeatureCollection>(TopicNameFcJson,
+                                                             1, true);
 
         m_publishers[TopicNameFcGeo] =
           m_nh.advertise<geofrenzy::GfGeoFeatureCollection>(TopicNameFcGeo,
@@ -734,9 +749,7 @@ namespace geofrenzy
         if( m_nPublishCnt > 0 )
         {
           m_publishers[TopicNameFcJson].publish(m_msgFcJson);
-
           m_publishers[TopicNameFcGeo].publish(m_msgFcGeo);
-
           m_publishers[TopicNameFcDist].publish(m_msgFcDist);
 
           --m_nPublishCnt;
@@ -1019,6 +1032,9 @@ namespace geofrenzy
         ROS_DEBUG_STREAM(TopicNameFix);
 
         std::string   strJson;
+        double        deltaDist;
+        double        paramMinDist;
+        double        paramRoILevel;
 
         // no gps acquired
         if( msg->status.status == -1 )
@@ -1050,38 +1066,67 @@ namespace geofrenzy
             << ", "
             << m_current_long);
   
-        double distance;
   
-        // calculate distance from previous location
-        distance = swri_transform_util::GreatCircleDistance(
+        //
+        // Calculate the delta distance from previous location.
+        //
+        deltaDist = swri_transform_util::GreatCircleDistance(
                               m_current_lat, m_current_long,
                               m_previous_lat, m_previous_long);
 
-        ROS_DEBUG_STREAM("Distance = " << distance);
+        ROS_DEBUG_STREAM("Delta distance = " << deltaDist);
+
+        //
+        // Get the minimum distance (meters) from Parameter Server.
+        //
+        // Note: This parameter can change underneath this node's execution.
+        //
+        m_nh.param(ParamNameMinDist, paramMinDist, MinDistDft);
   
-        // distance threshold - no publishing new data if within
-        // RDK future parameter db value
-        if( distance < MinDistDft )
+        //
+        // Distance threshold - no publishing new data if within.
+        //
+        if( deltaDist < paramMinDist )
         {
+          ROS_DEBUG_STREAM("Delta distance "
+              << deltaDist
+              << " < minimum "
+              << paramMinDist);
           return;
         }
   
-        // RDK 6 is future parameter db value. level == radius in kilometers
+        //
+        // Get the region of interest (meters) from Parameter Server.
+        //
+        // Note: This parameter can change underneath this node's execution.
+        //
+        m_nh.param(ParamNameRoILevel, paramRoILevel, RoILevelDft);
+  
+        //
+        // Retrieve all fences (geometry and entitlements) within the RoI
+        // from the Geofrenzy portal.
+        //
+        // Note: Geofrenzy RoI is in kilometers.
+        //
         if( !retrieveGfPortalFences(m_current_lat, m_current_long,
-                                    RoILevelDft, strJson) )
+                                    (int)(paramRoILevel/1000.0), strJson) )
         {
           ROS_ERROR("Failed to retrieve Geofrenzy fences.");
           return;
         }
 
-        // process json fences
+        //
+        // Process json fences, including updating entitlemnt data.
+        //
         if( !processJsonFences(strJson, m_msgFcGeo) )
         {
           ROS_ERROR("Failed to process Geofrenzy fences.");
           return;
         }
 
-        // update feature collection published messages
+        //
+        // Update all feature collection published messages.
+        //
         updateFeatureCollectionMsgs(strJson);
       };
 
@@ -1090,14 +1135,16 @@ namespace geofrenzy
        */
       void updateFeatureCollectionMsgs(const std::string &strJson)
       {
-        m_msgFcJson.data        = strJson;
-        //m_msgFcJson.features.data  = strJson;
-        //m_msgFcJson.access_time  = m_atime;
-        //stampHeader(m_msgFcJson.header, m_msgFcJson.header.seq+1);
+        // Json feature collection
+        m_msgFcJson.features.data = strJson;
+        m_msgFcJson.access_time   = m_atime;
+        stampHeader(m_msgFcJson.header, m_msgFcJson.header.seq+1);
 
+        // geographic centric feature collection (data filled on update)
         m_msgFcGeo.access_time = m_atime;
         stampHeader(m_msgFcGeo.header, m_msgFcGeo.header.seq+1);
 
+        // distance centric feature collection
         convertGeoToDistMsg(m_msgFcGeo, m_msgFcDist);
         m_msgFcDist.access_time = m_atime;
         stampHeader(m_msgFcDist.header, m_msgFcDist.header.seq+1);
@@ -1181,13 +1228,12 @@ namespace geofrenzy
       int       m_nPublishCnt;  ///< publish counter
 
       // Message for publishing
-      GfGeoFeatureCollection  m_msgFcGeo;
-      GfDistFeatureCollection m_msgFcDist;
-      std_msgs::String        m_msgFcJson;    // RDK deprecate
-      //GfJsonFeatureCollection m_msgFcJson;  // RDK and replace with this
+      GfGeoFeatureCollection  m_msgFcGeo;   ///< geographical feature collection
+      GfDistFeatureCollection m_msgFcDist;  ///< distance feature collection
+      GfJsonFeatureCollection m_msgFcJson;  ///< Json encode feature collection
 
-      // Geofrenzy class entitlements
-      EntitlementMap          m_entitlements;
+      // Geofrenzy entitlements
+      EntitlementMap  m_entitlements; ///< class entitlements
   
   }; // class FenceServer
 
@@ -1203,7 +1249,8 @@ namespace geofrenzy
  */
 int main(int argc, char **argv)
 {
-  double hz;
+  double  hz;
+  double  paramMinDist;
 
   // get command-line Geofrenzy class index
   uint64_t gf_class_idx = paramClassIndex(argc, argv);
@@ -1229,7 +1276,7 @@ int main(int argc, char **argv)
   ros::NodeHandle nh(node_name);
 
   //
-  // Parse node command-line arguments.
+  // Parse node command-line private (and static) arguments.
   //
   nh.param("hz", hz, 10.0);   // node hertz rate
 
@@ -1242,12 +1289,12 @@ int main(int argc, char **argv)
     return 0;
   }
 
-  ROS_INFO_STREAM(node_name << ": Node started.");
+  ROS_INFO_STREAM(node_name << ": ROS master running.");
 
   //
   // Create fence server node.
   //
-  geofrenzy::FenceServer fs(gf_class_idx, nh, hz);
+  geofrenzy::FenceServer fs(nh, hz, gf_class_idx);
 
   //
   // Initialize fence server.
@@ -1284,7 +1331,7 @@ int main(int argc, char **argv)
   // set loop rate in Hertz
   ros::Rate loop_rate(hz);
 
-  ROS_INFO_STREAM(node_name << "Ready.");
+  ROS_INFO_STREAM(node_name << ": Ready.");
 
   //
   // Main loop.

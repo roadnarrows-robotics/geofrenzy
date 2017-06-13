@@ -34,9 +34,12 @@ namespace geofrenzy
      *
      * The Geofrenzy portal will only report features within the radius.
      *
-     * Units: kilometers
+     * Note:  ROS uses only SI units. The "natural" units for the Geofrenzy
+     *        RoI are kilometers, so don't forget to convert.
+     *
+     * Units: meters
      */
-    const int     RoILevelDft = 6;        ///< default region of interest (km)
+    const double RoILevelDft = 6000.0;  ///< default region of interest (m)
   
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
