@@ -27,7 +27,7 @@ namespace geofrenzy
      *
      * Units: meters
      */
-    const double  MinDistDft  = 0.0;      ///< default min dist threshold (m)
+    const double  MinDistDft = 0.0;      ///< default min dist threshold (m)
 
     /*!
      * \brief Default region of interest radius.
@@ -49,21 +49,21 @@ namespace geofrenzy
     /*!
      * \brief Minimum distance parameter name.
      *
-     * If the value is not ses, MinDistDft is used.
+     * If the value is not set, MinDistDft is used.
      */
     const char *const ParamNameMinDist        = "geofrenzy_min_distance";
 
     /*!
      * \brief Region of interest parameter name.
      *
-     * If the value is not ses, RoILevelDft is used.
+     * If the value is not set, RoILevelDft is used.
      */
     const char *const ParamNameRoILevel       = "geofrenzy_roi_level";
 
     /*!
      * \brief Default fence file name.
      *
-     * If the value is not ses, then no file access is tried.
+     * If the value is not set, then no file access is tried.
      */
     const char *const ParamNameFenceFilename  = "geofrenzy_fence_filename";
 
