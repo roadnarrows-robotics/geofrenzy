@@ -1,792 +1,458 @@
-// ----------------------------------------------------------------------------
-// Copyright (C) 2002-2006 Marcin Kalicinski
 //
-// Distributed under the Boost Software License, Version 1.0.
-// (See accompanying file LICENSE_1_0.txt or copy at
-// http://www.boost.org/LICENSE_1_0.txt)
+// Add-on SDKs
 //
-// For more information, see www.boost.org
-// ----------------------------------------------------------------------------
-#include <stdio.h>
-#include <stdlib.h>
-#include <libgen.h>
-#include <fstream>
+#include "boost/assign.hpp"
 
-#include <cmath>
-#include <iostream>
-#include <string>
-// using namespace std;
-#include <ctime>
-#include <cstdlib>
-#include <algorithm>
-
-#include <vector>
-
-#include <set>
-#include <exception>
-#include <iostream>
-#include <limits>
-#include <iterator>
-
-#include <string>
-#include <fstream>
-#include <streambuf>
-#include "jsoncpp/json/json.h"
-#include "jsoncpp/json/writer.h"
-#include <iostream>
-
+//
+// ROS
+//
 #include "ros/ros.h"
-#include "ros/console.h"
-#include "nav_msgs/MapMetaData.h"
-#include <tf/tf.h>
-#include "std_msgs/String.h"
-#include "geodesy/wgs84.h"
-#include "geodesy/utm.h"
-#include "geometry_msgs/Point.h"
+#include "tf/tf.h"
+#include "tf/transform_listener.h"
+
+//
+// ROS generated Geofrenzy messages
+//
+#include "geofrenzy/GfDistFeatureCollection.h"
+#include "geofrenzy/GfDistFeature.h"
+#include "geofrenzy/Polygon64.h"
+
+//
+// ROS generated core messages
+//
+#include "std_msgs/Float32.h"
+#include "std_msgs/Float64.h"
+#include "geometry_msgs/PoseStamped.h"
+#include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/OccupancyGrid.h"
-#include "nav_msgs/GetMap.h"
+#include "nav_msgs/MapMetaData.h"
 
-#include "swri_transform_util/local_xy_util.h"
-#include "swri_transform_util/transform_util.h"
+//
+// Geofrenzy
+//
+#include "gf_ros.h"
+using namespace boost::assign;
+using namespace geofrenzy::gf_ros;
 
-#include "include/geofrenzy/gf_geojson.h"
-
-#define noop
-
-/**
- * This node subscribes to a GPS signal on topic "fix".  It then uses that information to call the GeoFrenzy fencing agent to receive a series of
- * fences and entitlements based on the GPS location and a "zoom" level.  It then publishes the geofences as a occupancy grid map on topic "map",
- * the metadata as MapMetaData messages on topic "map_metadata", fence dwell information via topic "dwell" which is of locally defines type "geofrenzy/gf_entitlement"
- * It also exposes the service "static_map" which returns a occupancy grid map.
- * @todo Make the zoom level dynamic
- * @todo Allow for selection of specific entitlements for advertisement
- */
-
-extern "C" char *ambient_fences_geojson_zoom(double lng, double lat, int lvl, int myclass);
-
-
-class gf_fence_request
+namespace geofrenzy
 {
-  public:
-    double longitude; ///<longitude for GeoFrenzy Fence Request
-    double latitude;  ///<latitude for GeoFrenzy Fence Request
-    int zoom;         ///<Zoom level around longitude and latitude
-};
-
-class MapGrid
-/**
- * This class holds the data used to create the occupancy map
- */
-
-{
-  public:
-    int gridwidth;
-    int gridlength;
-    int gridsize;
-    std::vector<signed char> grid;
-    //int8_t  *grid;
-    geojson_point origin;
-
-    MapGrid(int width, int length);
-};
-
-MapGrid::MapGrid(int width, int length)
-/**
- * This is the constructor for the MapGrid
- * \param width width in meters of the occupancy map
- * \param length length in meters of the occupancy map
- */
-{
-    gridwidth = (int)(width);
-    gridlength = (int)(length);
-    gridsize = gridwidth * gridlength;
-    grid.assign(gridsize, 0);
-}
-
-class xy_coordinates
-{
-    /**
-        * This class holds the Geojson point data once it's converted to a XY grid with an lat long anchor
-        */
-
-  public:
-    double x;
-    double y;
-};
-
-class xy_data
-{
-    /**
-        * This class holds the geojson polygon data once it's converted to a XY grid with an lat long anchor
-        */
-  public:
-    std::vector<xy_coordinates> coordinates;
-    std::vector<geojson_point> original_ll;
-};
-
-class xy_feature
-{
-    /**
-        * This class holds the Geojson feature data once it's converted to a XY grid with an lat long anchor
-        */
-  public:
-    std::vector<xy_data> polygon;
-    xy_coordinates xyanchor;
-    geojson_point llanchor;
-};
-
-void geotosquare(double lat, double lon, double &x, double &y)
-{
-
-    /**
-    * This function converts a lat long to a global XY frame
-    * \param lat input global latitude
-    * \param long input global longitude
-    * \param x result global x location
-    * \param y result global y location
-    * @todo double check and look for better algorithms for this
-    */
-    double earth_cir = 40.057 * 1000000;
-
-    double mapHeight = earth_cir;
-    double mapWidth = earth_cir;
-
-    x = (lon + 180) * (mapWidth / 360);
-    double latRad = lat * M_PIl / 180;
-    double mercN = log(tan((M_PIl / 4) + latRad / 2));
-    y = (mapHeight / 2) - (lat * mapHeight) / 180;
-    //x*=10; //trying to up the resolution
-    //y*=10;
-}
-
-void Line(double x1, double y1, double x2, double y2, MapGrid &grid)
-{
-    /**
-    * This function uses Bresenham's line algorithm to "draw" the edges
-    * in the grid between the points listed in the polygon definition
-    * \param x1 x location of first point
-    * \param y1 y location of first point
-    * \param x2 x location of second point
-    * \param y2 y location of the second point
-    * \param grid - output grid to "draw" line in
-    */
-    // Bresenham's line algorithm
-    const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
-    if (steep)
+    /*!
+     * This class holds the data used to create the occupancy map
+     */
+    class MapGrid
     {
-        std::swap(x1, y1);
-        std::swap(x2, y2);
+      public:
+        int m_gridWidth;
+        int m_gridLength;
+        int m_gridSize;
+        double m_gridResolution;
+        std::vector<signed char> m_grid;
+
+        MapGrid(int width, int length, double resolution);
+    };
+
+    MapGrid::MapGrid(int width, int length, double resolution)
+        /*!
+         * \brief Constructor for the MapGrid
+         * \param width width in meters of the occupancy map
+         * \param length length in meters of the occupancy map
+         * \param resolution resolution in meters per pixel of occupancuy map
+         */
+    {
+        m_gridWidth = (int)(width);
+        m_gridLength = (int)(length);
+        m_gridResolution = resolution;
+        m_gridSize = m_gridWidth * m_gridLength;
+        m_grid.assign(m_gridSize, 0);
     }
 
-    if (x1 > x2)
+    class MapServer
     {
-        std::swap(x1, x2);
-        std::swap(y1, y2);
-    }
-
-    const double dx = x2 - x1;
-    const double dy = fabs(y2 - y1);
-
-    float error = dx / 2.0f;
-    const int ystep = (y1 < y2) ? 1 : -1;
-    int y = (int)y1;
-
-    const int maxX = (int)x2;
-
-    for (int x = (int)x1; x < maxX; x++)
-    {
-       std::cout << x;
-        if (steep)
-        {
-            grid.grid[(x * (int)grid.gridwidth) + (int)y] = (int8_t)100;
-            grid.grid[(x * (int)grid.gridwidth) + (int)y + 1] = (int8_t)100;
-        }
-        else
-        {
-            grid.grid[(y * (int)grid.gridwidth) + (int)x] = (int8_t)100;
-            grid.grid[(y * (int)grid.gridwidth) + (int)x + 1] = (int8_t)100;
-        }
-
-        error -= dy;
-        if (error < 0)
-        {
-            y += ystep;
-            error += dx;
-        }
-    }
-}
-
-// output contents of array to screen
-void printArray(int8_t arr[], int size)
-{
-    for (int i = 0; i < size; i++)
-    {
-       std::cout << arr[i] << ' ';
-    }
-   std::cout << std::endl;
-}
-
-class MapServer
-
-{
-    /**
+        /*!
         * This class holds the map server that does most of the work to
         * convert the Geofrenzy FDN data to ROS messages and services
         * to be easily used by ROS nodes
         */
+      public:
+        void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures);
+        void advertisePublishers(int nQueueDepth=1);
+        void subscribeToTopics(int nQueueDepth=5);
+        void publishMap();
+        MapServer(ros::NodeHandle &nh, double hz, uint64_t gf_class_idx);
 
-  public:
-    void mapServerCallback(const std_msgs::String::ConstPtr &msg);
-    MapServer(std::string);
-    bool mapCallback(nav_msgs::GetMap::Request &req,
-                     nav_msgs::GetMap::Response &res);
+      private:
+        ros::NodeHandle &m_nh;            ///< node handle
+        double          m_hz;             ///< cycle hertz
+        uint64_t        m_fenceClass;    ///< geofrenzy class index
 
-  private:
-    ros::Publisher pub;
-    ros::NodeHandle n;
-    ros::Publisher map_pub;
-    ros::Publisher metadata_pub;
-    ros::Publisher dwell_pub;
-    bool deprecated;
-    /** The map data is cached here, to be sent out to service callers*/
-    nav_msgs::MapMetaData meta_data_message_;
-    nav_msgs::GetMap::Response map_resp_;
-    double_t previous_lat;
-    double_t previous_long;
-};
+        // ROS services, publishers, subscriptions.
+        MapServices       m_services;       ///< Geofrenzy map server services
+        MapClientServices m_clientServices; ///< Geofrenzy map server client services
+        MapPublishers     m_publishers;     ///< Geofrenzy map server publishers
+        MapSubscriptions  m_subscriptions;  ///< Geofrenzy map server subscriptions
 
-MapServer::MapServer(std::string topic_prefix)
-{
-    std::cout << "start MapServer Constuctor\n";
-    std::string frame_id;
-    ros::NodeHandle private_nh("~");
-    std::string topic_string = topic_prefix + "/map";
-    std::string topic_meta_string = topic_prefix + "/map_metadata";
-    private_nh.param("frame_id", frame_id, topic_string);
-    map_pub = n.advertise<nav_msgs::OccupancyGrid>(topic_string, 1, true);
-    metadata_pub = n.advertise<nav_msgs::MapMetaData>(topic_meta_string, 1, true);
-    previous_lat = 0;
-    previous_long = 0;
-    std::cout << "end MapServer Constructor\n";
-}
+        //ROS Transform Listener
+        tf::TransformListener m_tfListener;
 
-void MapServer::mapServerCallback(const std_msgs::String::ConstPtr &msg)
-{
-    const char *t;
-    std::cout << "start MapServer Callback\n";
-    xy_feature xy_features;
-    Json::Value root; // will contains the root value after parsing.
-    Json::Reader reader;
+        // Messaging processing overhead
+        ros::Time m_atime;        ///< last callback time
+        int       m_nPublishCnt;  ///< publish counter
 
-    t = msg->data.c_str();
+        //Messages for publishing
+        nav_msgs::OccupancyGrid m_occupancyGrid;
+        nav_msgs::MapMetaData m_mapMetadata;
 
-    std::cout << "begin *t\n";
-    std::cout << t;
-    std::cout << "end *t\n";
-    std::cout.flush();
+        void drawLine(double x1, double y1, double x2, double y2, MapGrid &grid);
+        void transformPoint(geometry_msgs::Point pIn, geometry_msgs::Point &pOut, double dX, double dY, double dZ);
+        bool isWithinMapBounds(geometry_msgs::Point p1, geometry_msgs::Point p2, MapGrid grid);
+        bool checkIntersection(geometry_msgs::Point p1, geometry_msgs::Point p2, geometry_msgs::Point p3, geometry_msgs::Point p4);
+    };
 
-    bool parsingSuccessful = reader.parse(t, root);
-    if (!parsingSuccessful)
+
+    MapServer::MapServer(ros::NodeHandle &nh, double hz, uint64_t gf_class_idx) :
+        m_fenceClass(gf_class_idx), m_nh(nh), m_hz(hz), m_atime(0.0), m_nPublishCnt(0)
     {
-        // report to the user the failure and their locations in the document.
-        std::cout << "Failed to parse GeoJson input\n"
-                  << reader.getFormattedErrorMessages();
-        return;
+        /*!
+         * \brief Constructor for MapServer
+         */
+        ROS_DEBUG_STREAM("MapServer gf_class_idx = " << m_fenceClass);
     }
 
-    geojson_root_fc gj_root;
-    printf("gj_root\n");
-    //Json::StyledWriter writer;
-    std::cout << root;
-    std::cout << "\n";
-    gj_root.type = root["type"].asString();
-    Json::Value features = root["features"];
-    geojson_feature_collection gj_fc;
-    printf("features\n");
-    std::cout << "feature.len=";
-    std::cout << features.size();
-    std::cout << "\n";
-    std::cout.flush();
-    if (features.size() == 0)
+    /*!
+     * \brief Advertise all publishers.
+     *
+     * \param nQueueDepth   Maximum queue depth.
+     */
+    void MapServer::advertisePublishers(int nQueueDepth)
     {
-        std::cout << "no features!\n";
-        return;
+      m_publishers[TopicNameMap] = m_nh.advertise<nav_msgs::OccupancyGrid>(TopicNameMap, nQueueDepth, true);
+      m_publishers[TopicNameMapMD] = m_nh.advertise<nav_msgs::MapMetaData>(TopicNameMapMD, nQueueDepth, true);
     }
-    for (int findex = 0; findex < features.size(); findex++)
+
+    /*!
+     * \brief Subscribe to all topics.
+     *
+     * \param nQueueDepth   Maximum queue depth.
+     */
+    void MapServer::subscribeToTopics(int nQueueDepth)
     {
-        std::cout << "findex=";
-        std::cout << findex;
-        std::cout << "\n";
-        std::cout.flush();
-        geojson_feature gj_feature;
-        gj_feature.type = features[findex]["type"].asString();
-        std::cout << "gj_feature.type=";
-        std::cout << gj_feature.type;
-        std::cout << "\n";
-        std::cout.flush();
-        geojson_gfproperties gj_properties;
-        try
+        // TODO: resolve subscription topic name
+        //m_subscriptions[TopicNameFcDist] = m_nh.subscribe(TopicNameFcDist, nQueueDepth, &MapServer::featureCollectionCallback, &(*this));
+        m_subscriptions["/gf_server_168/geofrenzy/featureCollection/distance"] = m_nh.subscribe("/gf_server_168/geofrenzy/featureCollection/distance", 5, &MapServer::featureCollectionCallback, &(*this));
+
+    }
+
+    void MapServer::transformPoint(geometry_msgs::Point pIn, geometry_msgs::Point &pOut, double dX, double dY, double dZ){
+        pOut.x = pIn.x + dX;
+        pOut.y = pIn.y + dY;
+        pOut.z = pIn.z + dZ;
+    }
+
+    /*
+     * Check if two lines intersect. Line1 defined by p1, p2; Line2 defined by p3, p4
+     */
+    bool MapServer::checkIntersection(geometry_msgs::Point p1, geometry_msgs::Point p2, geometry_msgs::Point p3, geometry_msgs::Point p4){
+        double s1_x, s1_y, s2_x, s2_y;
+        s1_x = p2.x - p1.x;
+        s1_y = p2.y - p1.y;
+        s2_x = p4.x - p3.x;
+        s2_y = p4.y - p3.y;
+
+        double s, t;
+        s = (-s1_y * (p1.x - p3.x) + s1_x * (p1.y - p3.y)) / (-s2_x * s1_y + s1_x * s2_y);
+        t = ( s2_x * (p1.y - p3.y) - s2_y * (p1.x - p3.x)) / (-s2_x * s1_y + s1_x * s2_y);
+
+        if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
         {
-            gj_properties.entitlement = features[findex]["properties"]["entitlement"].asString();
-            gj_properties.inout = features[findex]["properties"]["inout"].asString();
+            // Collision detected
+            return 1;
         }
-        catch (int e)
+
+        return 0; // No collision
+    }
+
+    bool MapServer::isWithinMapBounds(geometry_msgs::Point p1, geometry_msgs::Point p2, MapGrid grid){
+        //Define points of occupancy grid corners
+        geometry_msgs::Point pA;
+        geometry_msgs::Point pB;
+        geometry_msgs::Point pC;
+        geometry_msgs::Point pD;
+        pA.x = 0;
+        pA.y = 0;
+        pB.x = grid.m_gridWidth*grid.m_gridResolution;
+        pB.y = 0;
+        pC.x = grid.m_gridWidth*grid.m_gridResolution;
+        pC.y = grid.m_gridLength*grid.m_gridResolution;
+        pD.x = 0;
+        pD.y = grid.m_gridLength*grid.m_gridResolution;
+
+        //Check if either point is within rectangle bounds
+        if(p1.x <= pC.x && p1.x >= pA.x && p1.y <= pC.y && p1.y >= pA.y)
+            return true;
+        if(p2.x <= pC.x && p2.x >= pA.x && p2.y <= pC.y && p2.y >= pA.y)
+            return true;
+        //Check if line intersects any of the rectangle edges
+        if(checkIntersection(p1, p2, pA, pB))
+            return true;
+        if(checkIntersection(p1, p2, pB, pC))
+            return true;
+        if(checkIntersection(p1, p2, pC, pD))
+            return true;
+        if(checkIntersection(p1, p2, pD, pA))
+            return true;
+
+        //Outside of grid bounds
+        return false;
+    }
+
+    void MapServer::drawLine(double x1, double y1, double x2, double y2, MapGrid &grid)
+    {
+        /**
+        * This function uses Bresenham's line algorithm to "draw" the edges
+        * in the grid between the points listed in the polygon definition
+        * \param x1 x location of first point
+        * \param y1 y location of first point
+        * \param x2 x location of second point
+        * \param y2 y location of the second point
+        * \param grid - output grid to "draw" line in
+        */
+        //Scale distances based on map resolution
+        x1/=grid.m_gridResolution;
+        y1/=grid.m_gridResolution;
+        x2/=grid.m_gridResolution;
+        y2/=grid.m_gridResolution;
+
+        // Bresenham's line algorithm
+        const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
+        if (steep)
         {
-           std::cout << "no properties \n";
-            std::cout.flush();
-            return;
+            std::swap(x1, y1);
+            std::swap(x2, y2);
         }
 
-        gj_feature.properties = gj_properties;
-
-       std::cout << "entitlment=";
-       std::cout << gj_feature.properties.entitlement;
-       std::cout << "\ninout=";
-       std::cout << gj_feature.properties.inout;
-       std::cout << "\n";
-        std::cout.flush();
-
-        Json::Value geometry = features[findex]["geometry"];
-        //   printf("geometry\n");
-        geojson_geometry gj_geom;
-        gj_geom.type = geometry["type"].asString();
-        Json::Value coordinates = geometry["coordinates"];
-        // printf("coordinates\n");
-        for (int cindex = 0; cindex < coordinates.size(); ++cindex)
+        if (x1 > x2)
         {
-            Json::Value rings = coordinates[cindex];
-            printf("rings\n");
-            geojson_linear_rings gj_ring_list;
-            for (int rindex = 0; rindex < rings.size(); ++rindex)
+            std::swap(x1, x2);
+            std::swap(y1, y2);
+        }
+
+        const double dx = x2 - x1;
+        const double dy = fabs(y2 - y1);
+
+        float error = dx / 2.0f;
+        const int ystep = (y1 < y2) ? 1 : -1;
+        int y = (int)y1;
+
+        int maxX;
+        if(steep){
+            maxX = std::min((int)x2, (int)grid.m_gridLength);
+        }else{
+            maxX = std::min((int)x2, (int)grid.m_gridWidth);
+        }
+
+        for (int x = (int)x1; x < maxX; x++)
+        {
+            if (steep)
             {
-                Json::Value points = rings[rindex];
-                // printf("points\n");
-                //cout << points;
-                geojson_points gj_point_list;
-                geojson_point point;
-                point.longitude = points[0].asDouble();
-                point.latitude = points[1].asDouble();
-                gj_point_list.point.push_back(point);
-
-                gj_ring_list.ring.push_back(gj_point_list);
-            }
-            gj_geom.rings.push_back(gj_ring_list);
-        }
-        gj_feature.geometry = gj_geom;
-        gj_fc.feature.push_back(gj_feature);
-    }
-    std::cout << "done walking features\n";
-    std::cout.flush();
-    gj_root.features = gj_fc;
-
-    //   int j = 0;
-    double xlow;
-    double ylow;
-    double xhigh;
-    double yhigh;
-    double zhigh;
-    double zlow;
-    double latlow;
-    double longlow;
-    double lathigh;
-    double longhigh;
-    std::vector<double> xpoints;
-    std::vector<double> ypoints;
-    std::vector<double> zpoints;
-    //  std::vector<geojson_coordinates> coord_vector;
-
-    std::vector<double> latvector;
-    std::vector<double> longvector;
-
-    // OK first iterator feature_collection
-    for (std::vector<geojson_feature>::iterator it = gj_root.features.feature.begin();
-         it != gj_root.features.feature.end();
-         ++it)
-    {
-        xy_data xy_vector;
-        geojson_feature feature = *it;
-        geojson_geometry geometry = feature.geometry;
-        // OK iterate rings
-
-        for (std::vector<geojson_linear_rings>::iterator rit = geometry.rings.begin();
-             rit != geometry.rings.end();
-             ++rit)
-        {
-            geojson_linear_rings rings = *rit;
-           std::cout << "rings";
-            //std::cout << geometry;
-           std::cout << "\n";
-           std::cout.flush();
-
-            std::vector<geojson_points> ring = rings.ring;
-            // OK let's do two passes through
-            // one to get the max/min lat long so we can define the frame anchor
-            // two to adjust the data before sticking it in the grid
-            // here we go with finding the frame anchor
-            for (std::vector<geojson_points>::iterator gpit = ring.begin(); gpit != ring.end(); ++gpit)
-            {
-                //    geojson_points anchor = *gpit;
-                geojson_points points = *gpit;
-                for (std::vector<geojson_point>::iterator pit = points.point.begin();
-                     pit != points.point.end(); ++pit)
-                {
-                    //  double latanchor = anchor.latitude;
-                    //  double longanchor = anchor.longitude;
-                    double x;
-                    double y;
-                    geojson_point location = *pit;
-                    latvector.push_back(location.latitude);
-                    longvector.push_back(location.longitude);
-                    xy_coordinates xylocation;
-                    geotosquare(location.latitude, location.longitude, xylocation.x, xylocation.y);
-                    xy_vector.coordinates.push_back(xylocation);
-                    xy_vector.original_ll.push_back(location);
+                if(x >= 0 && y >= 0 && y<grid.m_gridWidth && x<grid.m_gridLength){
+                    grid.m_grid[(x * (int)grid.m_gridWidth) + (int)y] = (int8_t)100;
                 }
-            }
-        }
-        xy_features.polygon.push_back(xy_vector);
-    }
-   std::cout << "end xy feature conversion";
-    //std::cout << geometry;
-   std::cout << "\n";
-   std::cout.flush();
-    latlow = *min_element(latvector.begin(), latvector.end());
-    longlow = *min_element(longvector.begin(), longvector.end());
-    //    latlow = msg->latitude;
-    //    longlow = msg->longitude;
-    lathigh = *max_element(latvector.begin(), latvector.end());
-    longhigh = *max_element(longvector.begin(), longvector.end());
-    double anchorx;
-    double anchory;
-    xy_features.llanchor.latitude = lathigh;
-    xy_features.llanchor.longitude = longlow;
-    geotosquare(lathigh, longlow, xy_features.xyanchor.x, xy_features.xyanchor.y);
-    printf("\nanchorx=%lf\n", xy_features.xyanchor.x);
-    printf("\nanchory=%lf\n", xy_features.xyanchor.y);
-
-    // OK now we have the upper left corner of the frame
-
-   std::cout << "start data adjustment";
-    //std::cout << geometry;
-   std::cout << "\n";
-   std::cout.flush();
-
-    // now to adjust the data
-    for (std::vector<xy_data>::iterator fit = xy_features.polygon.begin();
-         fit != xy_features.polygon.end(); ++fit)
-    {
-        xy_data points = *fit;
-        for (std::vector<xy_coordinates>::iterator pit = points.coordinates.begin();
-             pit != points.coordinates.end(); ++pit)
-        {
-            xy_coordinates location = *pit;
-            xy_coordinates newlocation;
-
-            // ok let's shift everything from a global frame to a local frame
-            // TODO: double check the shift by ten
-            newlocation.x = location.x - xy_features.xyanchor.x;
-            +10;
-            newlocation.y = location.y - xy_features.xyanchor.y;
-            +10;
-
-            xpoints.push_back(location.x);
-            ypoints.push_back(location.y);
-            printf("x=%lf,newx=%lf\n", location.x, newlocation.x);
-            printf("y=%lf,newy=%lf\n", location.y, newlocation.y);
-            *pit = newlocation;
-        }
-        *fit = points;
-    }
-
-   std::cout << "end data adjustment";
-    //std::cout << geometry;
-   std::cout << "\n";
-   std::cout.flush();
-
-    // OK we are done with the overall calculations now we need to  use them to build the map
-
-    xlow = *min_element(xpoints.begin(), xpoints.end());
-    ylow = *min_element(ypoints.begin(), ypoints.end());
-    xhigh = *max_element(xpoints.begin(), xpoints.end());
-    yhigh = *max_element(ypoints.begin(), ypoints.end());
-    // try to expand map so that it edges and vertex done touch the edge of the bounding box.
-    double width = xhigh - xlow + 20;
-    double length = yhigh - ylow + 20;
-
-    printf("\nxlow=%lf\n", xlow);
-    printf("\nylow=%lf\n", ylow);
-    printf("\nxhigh=%lf\n", xhigh);
-    printf("\nyhigh=%lf\n", yhigh);
-    printf("\nwidth=%lf\n", width);
-    printf("\nlength=%lf\n", length);
-    printf("\nlatlow=%lf\n", latlow);
-    printf("\nlonglow=%lf\n", longlow);
-    printf("\nlathigh=%lf\n", lathigh);
-    printf("\nlonghigh=%lf\n", longhigh);
-
-    // OK now that all of the data is together need to put it all in one place
-    // latlow and longlow = 0,0
-    // lat ~ Y
-    // long ~ X
-    // lat++ => north
-    // long++ => east
-    // lat = 90 ; long = 180  ===  x = 0 ; y = 0
-
-   std::cout << "start building grid";
-    //std::cout << geometry;
-   std::cout << "\n";
-   std::cout.flush();
-
-    /////
-    //swri_transform_util::LocalXyWgs84Util localtest = swri_transform_util::LocalXyWgs84Util(lathigh,longlow,0,0);
-
-    ////
-
-    MapGrid grid((int)width, (int)length);
-    grid.origin.latitude = lathigh;
-    grid.origin.longitude = longlow;
-
-    for (std::vector<xy_data>::iterator oit = xy_features.polygon.begin();
-         oit != xy_features.polygon.end(); ++oit)
-    {
-        xy_data xy_line_vector = *oit;
-        printf("xy_line_vector length = %ld\n", xy_line_vector.coordinates.size());
-        /////////////////////////////////////
-
-        for (std::vector<geojson_point>::iterator lt = xy_line_vector.original_ll.begin();
-             lt != xy_line_vector.original_ll.end(); ++lt)
-        {
-            geojson_point ll = *lt;
-            std::vector<geojson_point>::iterator dupe = lt;
-            ++dupe;
-            geojson_point b = *dupe;
-            if ((ll.latitude == b.latitude) and (ll.longitude == b.longitude))
-            {
-                printf("zero\n");
-                // 0 length segment no point in drawing it
-                noop;
-            }
-            else if (dupe == xy_line_vector.original_ll.end())
-            {
-                // at end of vector, b has no meaning
-                printf("end\n");
-                noop;
             }
             else
             {
-                std::cout << "ll.latitude=" << ll.latitude << "\n";
-                std::cout << "ll.longitude=" << ll.longitude << "\n";
-                double tempx;
-                double tempy;
-                double btempx;
-                double btempy;
-                swri_transform_util::LocalXyFromWgs84(ll.latitude, ll.longitude, latlow, longlow, tempx, tempy);
-                swri_transform_util::LocalXyFromWgs84(b.latitude, b.longitude, latlow, longlow, btempx, btempy);
-                std::cout << "tempx=" << tempx << " tempy=" << tempy << "\n";
-                std::cout << "btempx=" << btempx << " btempy=" << btempy << "\n";
-                std::cout.flush();
-                //std::cout << grid.grid;
-                Line(tempx, tempy, btempx, btempy, grid);
+                if(x >= 0 && y>=0 && y<grid.m_gridLength && x<grid.m_gridWidth){
+                    grid.m_grid[(y * (int)grid.m_gridWidth) + (int)x] = (int8_t)100;
+                }
+            }
+
+            error -= dy;
+            if (error < 0)
+            {
+                y += ystep;
+                error += dx;
             }
         }
-        ///////////////////////////////////
-        //   for (std::vector<xy_coordinates>::iterator it = xy_line_vector.coordinates.begin();
-        //         it != xy_line_vector.coordinates.end(); ++it) {
-        //   xy_coordinates a = *it;
-        //    std::vector<xy_coordinates>::iterator dupe = it;
-        //   ++dupe;
-        //  std::cout << "The distance is: " << std::distance(it,dupe) << '\n';
-        //  xy_coordinates b = *dupe;
-        //  if ((a.x == b.x) and (a.y == b.y))
-        //  {
-        //      printf("zero\n");
-        //      // 0 length segment no point in drawing it
-        //      noop;
-        //  }
-        //   else if (dupe == xy_line_vector.coordinates.end())
-        //   {
-        //       // at end of vector, b has no meaning
-        //       printf("end\n");
-        //       noop;
-        //   }
-        //~ else {
-        //~ //std::cout << grid.grid;
-        //~ Line(a.x, a.y, b.x, b.y, grid);
-        //~ printf("a.x=%lf,", a.x);
-        //~ printf("a.y=%lf\n", a.y);
-        //~ printf("b.x=%lf,", b.x);
-        //~ printf("b.y=%lf\n\n", b.y);
-        //~ }
-        //  }
-
-        printf("polygon end\n");
     }
-    std::cout << "start bulding ros messages";
-    //std::cout << geometry;
-    std::cout << "\n";
-    std::cout.flush();
-    // let's define the occ
-    ros::Time current_time;
-    nav_msgs::OccupancyGrid ogrid;
-    map_resp_.map.info.map_load_time = ros::Time::now();
-    map_resp_.map.header.frame_id = "map";
-    map_resp_.map.header.stamp = ros::Time::now();
-   std::cout << "header done";
-    //std::cout << geome
-   std::cout << "\n";
-   std::cout.flush();
-    map_resp_.map.info.resolution = 1.0;
-    map_resp_.map.info.width = grid.gridwidth;
-    map_resp_.map.info.height = grid.gridlength;
-    map_resp_.map.info.origin.position.x = -grid.gridwidth/2 -10; //moving origin over for testing
-    map_resp_.map.info.origin.position.y = -grid.gridlength/2 -10;
-    map_resp_.map.info.origin.orientation.z = 0;
-    tf::Quaternion q;
-    q.setRPY(0, 0, 0);
-    map_resp_.map.info.origin.orientation.x = q.x();
-    map_resp_.map.info.origin.orientation.y = q.y();
-    map_resp_.map.info.origin.orientation.z = q.z();
-    map_resp_.map.info.origin.orientation.w = q.w();
-   std::cout << "pose done";
-    //std::cout << geometry;
-   std::cout << "\n";
-
-   std::cout << grid.grid.size();
-   std::cout.flush();
-    meta_data_message_ = map_resp_.map.info;
-   std::cout << "meta_data_messages";
-   std::cout << "\n";
-   std::cout.flush();
-    //std::vector<signed char> g(grid.grid, grid.grid + (grid.gridsize));
-    //std::vector<signed char> g(std::begin(grid.grid), std::end(grid.grid));
-    //int8_t* tempgrid = &grid.grid[0];
-
-    //signed char j , tempgrid[grid.grid.size()];
-    //j=0;
-    std::cout << "max_size:" << map_resp_.map.data.max_size() << "\n";
-    std::cout << "max_size:" << map_resp_.map.data.max_size() << "\n";
-    std::cout.flush();
-    //map_resp_.map.data.resize(grid.grid.size());
-    //for  (std::vector<signed char>::const_iterator i = grid.grid.begin(); i != grid.grid.end(); ++i)
-    //{
-
-    //std::cout << "capacity:" << map_resp_.map.data.capacity() << "\n";
-    //std::cout << "size:" << map_resp_.map.data.size() << "\n";
-    //std::cout.flush();
-    //map_resp_.map.data.push_back(*i);
-    //}
-    //map_resp_.map.data = tempgrid;
-    //std::copy(tempgrid.begin(), tempgrid.end(), map_resp_.map.data);
-    //std::memcpy(tempgrid,grid.grid,sizeof tempgrid);
-    //map_resp_.map.data = &tempgrid[0];
-    //map_resp_.map.data = &tempgrid;
-    //std::memcpy(map_resp_.map.data,grid.grid,sizeof map_resp_.map.data);
-    map_resp_.map.data = grid.grid;
-    // map_resp_.map.data.swap(grid.grid);
-   std::cout << "grid.grid";
-   std::cout << "\n";
-   std::cout.flush();
-    metadata_pub.publish(meta_data_message_);
-   std::cout << "metadata published";
-    //std::cout << geometry;
-   std::cout << "\n";
-   std::cout.flush();
-    map_pub.publish(map_resp_.map);
-   std::cout << "done";
-    //std::cout << geometry;
-   std::cout << "\n";
-   std::cout.flush();
-};
-
-/** Callback invoked when someone requests our service */
-bool MapServer::mapCallback(nav_msgs::GetMap::Request &req,
-                            nav_msgs::GetMap::Response &res)
-{
-    ROS_INFO("Requesting Map");
-    // request is empty; we ignore it
-
-    // = operator is overloaded to make deep copy (tricky!)
-    res = map_resp_;
-    ROS_INFO("Sending map");
-
-    return true;
-};
-
-/*
-void metadataSubscriptionCallback(const ros::SingleSubscriberPublisher& pub)
-{
-  pub.publish( meta_data_message_ );
-}
-*/
-
-void geotoxyz(double lat, double lon, double &x, double &y, double &z)
-{
-    double rad = 6378137.0;
-    ;
-    double f = 1.0 / 298.257224;
-    double h = 0.0;
-    double cosLat = cos(lat * M_PI / 180.0);
-    double sinLat = sin(lat * M_PI / 180.0);
-    double cosLon = cos(lon * M_PI / 180.0);
-    double sinLon = sin(lon * M_PI / 180.0);
-    double C = 1.0 / sqrt(cosLat * cosLat + (1 - f) * (1 - f) * sinLat * sinLat);
-    double S = (1.0 - f) * (1.0 - f) * C;
-    x = (rad * C + h) * cosLat * cosLon;
-    y = (rad * C + h) * cosLat * sinLon;
-    z = (rad * S + h) * sinLat;
-}
-
-void xyztogeo(double x, double y, double z, double &lat, double &lon)
-{
-    double a = 6378137.0;
-    double e = 8.1819190842622e-2;
-    double asq = pow(a, 2);
-    double esq = pow(e, 2);
-
-    double b = sqrt(asq * (1 - esq));
-    double bsq = pow(b, 2);
-    double ep = sqrt((asq - bsq) / bsq);
-    double p = sqrt(pow(x, 2) + pow(y, 2));
-    double th = atan2(a * z, b * p);
-
-    lon = atan2(y, x);
-    lat = atan2((z + pow(ep, 2) * b * pow(sin(th), 3)),
-                (p - esq * a * pow(cos(th), 3)));
-    double N = a / (sqrt(1 - esq * pow(sin(lat), 2)));
-    double alt = p / cos(lat) - N;
-    // mod lat to 0-2pi
-    lon = fmod(lon, (2 * M_PI));
-};
-
-int main(int argc, char **argv)
-{
-
-std::string myclass_idx_str = argv[1];
-std::string node_name = "gf_map_server_" + myclass_idx_str;
-std::string service_name = "static_map_" + myclass_idx_str;
-std::string gf_node_name_topic_str = "/geofrenzy/" + myclass_idx_str + "/featureCollection/json";
-std::string gf_map_server_topic_prefix = "/geofrenzy/" + myclass_idx_str;
-ros::init(argc, argv, node_name);
 
 
-    //gf_fence_request gpsfix;
-    ros::NodeHandle n;
-    ros::Subscriber geojsonsrc;
+    /*!
+     * \brief Publish.
+     *
+     * Call in main loop.
+     */
+    void MapServer::publishMap(){
+        if(m_nPublishCnt > 0){
+            m_publishers[TopicNameMap].publish(m_occupancyGrid);
+            m_publishers[TopicNameMapMD].publish(m_mapMetadata);
+            --m_nPublishCnt;
+        }
+    }
 
-    try
+    /**
+     * FeatureCollection callback. The geofrenzy node publishes a feature collection,
+     * this callback extracts the polygons from that message and transforms it into
+     * an occupancy grid message to be published to the /map topic
+     */
+    void MapServer::featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures){
+        int mapWidth;
+        int mapHeight;
+        double mapResolution;
+
+        ROS_DEBUG("Feature Collection Callback");
+
+        //Fetch values from parameter server
+        m_atime = ros::Time::now();
+        m_nh.param("map_width", mapWidth, MapWidth);
+        m_nh.param("map_height", mapHeight, MapHeight);
+        m_nh.param("map_resolution", mapResolution, MapResolution);
+
+        //Initialize grid
+        MapGrid mapGrid(mapWidth, mapHeight, mapResolution);
+
+        /*Iterate through GfDistFeatureCollection
+         * Get all geometries and iterate through points, drawing edges on occupancy grid
+         */
+        double dx = (mapGrid.m_gridWidth/2.0)*mapGrid.m_gridResolution;
+        double dy = (mapGrid.m_gridLength/2.0)*mapGrid.m_gridResolution;
+        geofrenzy::GfDistFeatureCollection featureCollection = distFeatures;
+        for(std::vector<geofrenzy::GfDistFeature>::iterator feature_it = featureCollection.features.begin(); feature_it != featureCollection.features.end(); feature_it++){
+            geofrenzy::GfDistFeature feature = *(feature_it);
+            for(std::vector<geofrenzy::Polygon64>::iterator geometry_it = feature.geometry.begin(); geometry_it != feature.geometry.end(); ++geometry_it){
+                geofrenzy::Polygon64 geometry = *(geometry_it);
+                for(std::vector<geometry_msgs::Point>::iterator point_it = geometry.points.begin(); point_it != geometry.points.end(); ++point_it){
+                    geometry_msgs::Point p1 = *point_it;
+                    geometry_msgs::Point p2;
+                    if((point_it+1) != geometry.points.end()){
+                        p2 = *(point_it+1);
+                    }else{
+                        p2 = *(geometry.points.begin());
+                    }
+                    transformPoint(p1, p1, dx, dy, 0.0);
+                    transformPoint(p2, p2, dx, dy, 0.0);
+                    if(isWithinMapBounds(p1, p2, mapGrid)){
+                        drawLine(p1.x, p1.y, p2.x, p2.y, mapGrid);
+                    }
+                }
+            }
+        }
+
+        m_occupancyGrid.data = mapGrid.m_grid;
+
+        //Get Robot transform
+        geometry_msgs::PoseStamped gfMapPose;
+        gfMapPose.header.frame_id="base_footprint";
+        gfMapPose.header.stamp = m_atime;
+        //Shift gf_map to center on origin of world map
+        tf::StampedTransform transform;
+        try{
+          m_tfListener.waitForTransform("map", "base_footprint", m_atime, ros::Duration(3.0));
+          m_tfListener.lookupTransform("map", "base_footprint", m_atime, transform);
+        }
+        catch(tf::TransformException ex){
+          ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
+        }
+
+        gfMapPose.pose.position.x = -dx + transform.getOrigin().getX();
+        gfMapPose.pose.position.y = -dy + transform.getOrigin().getY();
+        gfMapPose.pose.position.z = 0.0;
+        tf::Quaternion q;
+        q.setRPY(0.0, 0.0, 0.0);
+        gfMapPose.pose.orientation.x = q.x();
+        gfMapPose.pose.orientation.y = q.y();
+        gfMapPose.pose.orientation.z = q.z();
+        gfMapPose.pose.orientation.w = q.w();
+
+        m_mapMetadata.resolution = mapGrid.m_gridResolution;
+        m_mapMetadata.width = mapGrid.m_gridWidth;
+        m_mapMetadata.height = mapGrid.m_gridLength;
+        m_mapMetadata.map_load_time = m_atime;
+        m_mapMetadata.origin = gfMapPose.pose;
+        m_occupancyGrid.info = m_mapMetadata;
+        ++m_nPublishCnt;
+
+    }
+} //namespace geofrenzy
+
+int main(int argc, char **argv){
+
+    double  hz;
+
+    // get command-line Geofrenzy class index
+    uint64_t gfClassIdx = paramClassIndex(argc, argv);
+
+    // make a unique node name from the command line class index argument
+    std::string nodeName = makeNodeName(NodeRootMapServer, gfClassIdx);
+
+    //
+    // Initialize the node. Parse the command line arguments and environment to
+    // determine ROS options such as node name, namespace and remappings.
+    // This call does not contact the master. This lets you use
+    // ros::master::check() and other ROS functions after calling ros::init()
+    // to check on the status of the master.
+    ros::init(argc, argv, nodeName);
+
+    // actual ROS-given node name
+    nodeName = ros::this_node::getName();
+
+    //
+    // A ctrl-c interrupt will stop attempts to connect to the ROS core.
+    //
+    ros::NodeHandle nh(nodeName);
+
+    //
+    // Parse node command-line private (and static) arguments.
+    //
+    nh.param("hz", hz, 10.0);   // node hertz rate
+
+    //
+    // Failed to connect.
+    //
+    if( !ros::master::check() )
     {
-
-        MapServer ms(gf_map_server_topic_prefix);
-        ros::ServiceServer service;
-
-        geojsonsrc = n.subscribe(gf_node_name_topic_str, 1, &MapServer::mapServerCallback, &ms);
-        service = n.advertiseService(service_name, &MapServer::mapCallback, &ms);
-        printf("static_map service advertised\n");
-        ros::spin();
+      // add optional non-ROS unit tests here, then simply exit.
+      ROS_INFO_STREAM(nodeName << ": ROS master not running.");
+      return 0;
     }
-    catch (std::exception &e)
+
+    ROS_INFO_STREAM(nodeName << ": ROS master running.");
+
+    //
+    //Create map server node
+    geofrenzy::MapServer map_server(nh, hz, gfClassIdx);
+
+    //
+    // Advertise publishers.
+    //
+    map_server.advertisePublishers();
+
+    ROS_INFO_STREAM(nodeName << ": Advertised publishers registered.");
+
+    //
+    // Subscribed to topics.
+    //
+    map_server.subscribeToTopics();
+
+    ROS_INFO_STREAM(nodeName << ": Subscribed topics registered.");
+
+    // set loop rate in Hertz
+    ros::Rate loop_rate(hz);
+
+    ROS_INFO_STREAM(nodeName << ": Ready.");
+
+    //
+    // Main loop.
+    //
+    while( ros::ok() )
     {
-        std::cout << "Error: " << e.what() << "\n";
+      // make any callbacks on pending ROS events
+      ros::spinOnce();
+
+      // publish all readied advertised topics
+      map_server.publishMap();
+
+      // sleep to keep at loop rate
+      loop_rate.sleep();
     }
+
     return 0;
 }

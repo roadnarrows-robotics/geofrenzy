@@ -231,16 +231,11 @@ endif()
 #message( STATUS ${FALIB})
 include_directories(src include $(catkin_INCLUDE_DIRS))
 
-# Geofrenzy old map server node - DEPRECATED
-#add_executable(gf_map_server src/gf_map_server.cpp)
-#target_link_libraries(gf_map_server  ${catkin_LIBRARIES})
-#target_link_libraries(gf_map_server jsoncpp)
-
-# Geofrenzy new map server node
-add_executable(gf_map_server2
+# Geofrenzy map server node
+add_executable(gf_map_server
   src/gf_ros.cpp
-  src/gf_map_server2.cpp)
-target_link_libraries(gf_map_server2  ${catkin_LIBRARIES})
+  src/gf_map_server.cpp)
+target_link_libraries(gf_map_server  ${catkin_LIBRARIES})
 
 # geofrenzy portal server
 add_executable(gf_server

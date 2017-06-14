@@ -4,6 +4,7 @@
 #define _GF_ROS_H
 
 #include <string>
+#include "ros/ros.h"
 
 namespace geofrenzy
 {
@@ -40,7 +41,27 @@ namespace geofrenzy
      * Units: meters
      */
     const double RoILevelDft = 6000.0;  ///< default region of interest (m)
-  
+
+    /*!
+     * \brief Default map width for occupancy grid published by map server.
+     *
+     * Units: pixels
+     */
+    const int MapWidth = 250; ///< default occupancy grid width
+
+    /*!
+     * \brief Default map width for occupancy grid published by map server.
+     *
+     * Units: pixels
+     */
+    const int MapHeight = 250; ///< default occupancy grid height
+
+    /*!
+     * \brief Default map resolution for occupancy grid published by map server.
+     *
+     * Units: meters per pixel
+     */
+    const double MapResolution = 0.2; ///< default occupancy grid height
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // ROS Parameter Server interface
@@ -92,7 +113,7 @@ namespace geofrenzy
      * <root>_<gf_class_idx>
      * ~~~
      */
-    const char *const NodeRootMapperServer  = "gf_map_server2";
+    const char *const NodeRootMapServer  = "gf_map_server";
   
   
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -102,6 +123,8 @@ namespace geofrenzy
     const char *const TopicNameFcJson = "geofrenzy/featureCollection/json";
     const char *const TopicNameFcGeo  = "geofrenzy/featureCollection/geo";
     const char *const TopicNameFcDist = "geofrenzy/featureCollection/distance";
+    const char *const TopicNameMap    = "geofrenzy/map";
+    const char *const TopicNameMapMD  = "geofrenzy/map_metadata";
   
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // ROS services
@@ -110,6 +133,21 @@ namespace geofrenzy
     const char *const ServiceNameGetEntitlementList =
                                               "geofrenzy/get_entitlement_list";
   
+    //
+    // Types
+    //
+
+    /*! map of ROS server services type */
+    typedef std::map<std::string, ros::ServiceServer> MapServices;
+
+    /*! map of ROS client services type */
+    typedef std::map<std::string, ros::ServiceClient> MapClientServices;
+
+    /*! map of ROS publishers type */
+    typedef std::map<std::string, ros::Publisher> MapPublishers;
+
+    /*! map of ROS subscriptions type */
+    typedef std::map<std::string, ros::Subscriber> MapSubscriptions;
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // ROS utilities

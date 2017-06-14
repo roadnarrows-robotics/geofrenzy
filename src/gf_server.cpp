@@ -80,21 +80,6 @@ using namespace geofrenzy::gf_ros;
 
 namespace geofrenzy
 {
-  //
-  // Types
-  //
-
-  /*! map of ROS server services type */
-  typedef std::map<std::string, ros::ServiceServer> MapServices;
-
-  /*! map of ROS client services type */
-  typedef std::map<std::string, ros::ServiceClient> MapClientServices;
-    
-  /*! map of ROS publishers type */
-  typedef std::map<std::string, ros::Publisher> MapPublishers;
-
-  /*! map of ROS subscriptions type */
-  typedef std::map<std::string, ros::Subscriber> MapSubscriptions;
 
   //
   // Constants
@@ -559,15 +544,15 @@ namespace geofrenzy
        * \param hz            Node hertz rate.
        */
       FenceServer(ros::NodeHandle &nh, double hz, uint64_t gf_class_idx) :
-          m_fence_class(gf_class_idx), m_nh(nh), m_hz(hz), m_atime(0.0)
+          m_fenceClass(gf_class_idx), m_nh(nh), m_hz(hz), m_atime(0.0)
       {
-        ROS_DEBUG_STREAM("FenceServer gf_class_idx = " << m_fence_class);
+        ROS_DEBUG_STREAM("FenceServer gf_class_idx = " << m_fenceClass);
 
         // current and previous positions are unknown
-        m_previous_lat  = NoGeoPos;
-        m_previous_long = NoGeoPos;
-        m_current_lat   = NoGeoPos;
-        m_current_long  = NoGeoPos;
+        m_previousLat  = NoGeoPos;
+        m_previousLong = NoGeoPos;
+        m_currentLat   = NoGeoPos;
+        m_currentLong  = NoGeoPos;
 
         m_nPublishCnt = 0;
       };
@@ -606,17 +591,17 @@ namespace geofrenzy
 
         ROS_INFO_STREAM(ros::this_node::getName()
             << ": Retrieving Geofrenzy properties for fence class "
-            << m_fence_class
+            << m_fenceClass
             << ".");
 
         // retrieve the class properties
-        char *td = class_entitlements_properties_json(m_fence_class);
+        char *td = class_entitlements_properties_json(m_fenceClass);
 
         if( td == NULL )
         {
           ROS_ERROR_STREAM(
               "Failed to retrieve class properties for class index "
-              << m_fence_class);
+              << m_fenceClass);
           return false;
         }
 
@@ -656,7 +641,7 @@ namespace geofrenzy
           if( m_entitlements.find(gf_ent_idx) == m_entitlements.end() )
           {
             m_entitlements[gf_ent_idx] =
-                  new geofrenzy::Entitlement(m_fence_class,
+                  new geofrenzy::Entitlement(m_fenceClass,
                                              gf_ent_idx,
                                              gf_ent_base);
           }
@@ -805,12 +790,12 @@ namespace geofrenzy
         //
         else
         {
-          ROS_DEBUG_STREAM("Checking fence roi for class " << m_fence_class);
+          ROS_DEBUG_STREAM("Checking fence roi for class " << m_fenceClass);
 
           ROS_DEBUG_STREAM("Calling ambient_fences_geojson_roi()");
 
           s = ambient_fences_geojson_roi(longitude, latitude, level,
-                                         m_fence_class);
+                                         m_fenceClass);
           strJson = s;
           ROS_DEBUG_STREAM("Done.");
         }
@@ -1004,11 +989,11 @@ namespace geofrenzy
 
               // convert to distance and transform points to XY:NW coords
               swri_transform_util::LocalXyFromWgs84(
-                        m_current_lat, m_current_long,
+                        m_currentLat, m_currentLong,
                         geoPoint.latitude, geoPoint.longitude,
                         distPoint.y, distPoint.x);
-              distPoint.y = -distPoint.y;
-
+              distPoint.y = distPoint.y;
+              distPoint.x = -distPoint.x;
               distPoint.z  = geoPoint.altitude;
 
               // add point
@@ -1044,35 +1029,35 @@ namespace geofrenzy
         }
   
         // new location
-        m_previous_lat  = m_current_lat;
-        m_previous_long = m_current_long;
-        m_current_lat   = msg->latitude;
-        m_current_long  = msg->longitude;
+        m_previousLat  = m_currentLat;
+        m_previousLong = m_currentLong;
+        m_currentLat   = msg->latitude;
+        m_currentLong  = msg->longitude;
 
         // no previous - set to current
-        if( (m_previous_lat == NoGeoPos) || (m_previous_long == NoGeoPos) )
+        if( (m_previousLat == NoGeoPos) || (m_previousLong == NoGeoPos) )
         {
-          m_previous_lat  = m_current_lat;
-          m_previous_long = m_current_long;
+          m_previousLat  = m_currentLat;
+          m_previousLong = m_currentLong;
         }
 
         ROS_INFO_STREAM("Previous lat,long: "
-            << m_previous_lat
+            << m_previousLat
             << ", "
-            << m_previous_long);
+            << m_previousLong);
 
         ROS_INFO_STREAM("     New lat,long: "
-            << m_current_lat
+            << m_currentLat
             << ", "
-            << m_current_long);
+            << m_currentLong);
   
   
         //
         // Calculate the delta distance from previous location.
         //
         deltaDist = swri_transform_util::GreatCircleDistance(
-                              m_current_lat, m_current_long,
-                              m_previous_lat, m_previous_long);
+                              m_currentLat, m_currentLong,
+                              m_previousLat, m_previousLong);
 
         ROS_DEBUG_STREAM("Delta distance = " << deltaDist);
 
@@ -1108,7 +1093,7 @@ namespace geofrenzy
         //
         // Note: Geofrenzy RoI is in kilometers.
         //
-        if( !retrieveGfPortalFences(m_current_lat, m_current_long,
+        if( !retrieveGfPortalFences(m_currentLat, m_currentLong,
                                     (int)(paramRoILevel/1000.0), strJson) )
         {
           ROS_ERROR("Failed to retrieve Geofrenzy fences.");
@@ -1204,12 +1189,12 @@ namespace geofrenzy
         }
 
         return true;
-      };
+      }
   
     private:
       ros::NodeHandle &m_nh;            ///< node handle
       double          m_hz;             ///< cycle hertz
-      uint64_t        m_fence_class;    ///< geofrenzy class index
+      uint64_t        m_fenceClass;    ///< geofrenzy class index
 
       // ROS services, publishers, subscriptions.
       MapServices       m_services;       ///< Geofrenzy server services
@@ -1218,10 +1203,10 @@ namespace geofrenzy
       MapSubscriptions  m_subscriptions;  ///< Geofrenzy server subscriptions
 
       // Satellite navigation fix
-      double    m_previous_lat;     ///< previous latitude
-      double    m_previous_long;    ///< previous longitude
-      double    m_current_lat;      ///< current latitude
-      double    m_current_long;     ///< current longitude
+      double    m_previousLat;     ///< previous latitude
+      double    m_previousLong;    ///< previous longitude
+      double    m_currentLat;      ///< current latitude
+      double    m_currentLong;     ///< current longitude
 
       // Messaging processing overhead
       ros::Time m_atime;        ///< last portal access time
@@ -1253,10 +1238,10 @@ int main(int argc, char **argv)
   double  paramMinDist;
 
   // get command-line Geofrenzy class index
-  uint64_t gf_class_idx = paramClassIndex(argc, argv);
+  uint64_t gfClassIdx = paramClassIndex(argc, argv);
 
   // make a unique node name from the command line class index argument
-  std::string node_name = makeNodeName(NodeRootFenceServer, gf_class_idx);
+  std::string nodeName = makeNodeName(NodeRootFenceServer, gfClassIdx);
 
   // 
   // Initialize the node. Parse the command line arguments and environment to
@@ -1265,15 +1250,15 @@ int main(int argc, char **argv)
   // ros::master::check() and other ROS functions after calling ros::init()
   // to check on the status of the master.
   //
-  ros::init(argc, argv, node_name);
+  ros::init(argc, argv, nodeName);
 
   // actual ROS-given node name
-  node_name = ros::this_node::getName();
+  nodeName = ros::this_node::getName();
 
   //
   // A ctrl-c interrupt will stop attempts to connect to the ROS core.
   //
-  ros::NodeHandle nh(node_name);
+  ros::NodeHandle nh(nodeName);
 
   //
   // Parse node command-line private (and static) arguments.
@@ -1289,49 +1274,49 @@ int main(int argc, char **argv)
     return 0;
   }
 
-  ROS_INFO_STREAM(node_name << ": ROS master running.");
+  ROS_INFO_STREAM(nodeName << ": ROS master running.");
 
   //
   // Create fence server node.
   //
-  geofrenzy::FenceServer fs(nh, hz, gf_class_idx);
+  geofrenzy::FenceServer fs(nh, hz, gfClassIdx);
 
   //
   // Initialize fence server.
   //
   if( !fs.initGfClassProperties() )
   {
-    ROS_FATAL_STREAM(node_name << ": Failed to initialize.");
+    ROS_FATAL_STREAM(nodeName << ": Failed to initialize.");
     return 2;
   }
 
-  ROS_INFO_STREAM(node_name << ": Node initialized.");
+  ROS_INFO_STREAM(nodeName << ": Node initialized.");
 
   //
   // Advertise services.
   //
   fs.advertiseServices();
 
-  ROS_INFO_STREAM(node_name << ": Advertised services registered.");
+  ROS_INFO_STREAM(nodeName << ": Advertised services registered.");
 
   //
   // Advertise publishers.
   //
   fs.advertisePublishers();
   
-  ROS_INFO_STREAM(node_name << ": Advertised publishers registered.");
+  ROS_INFO_STREAM(nodeName << ": Advertised publishers registered.");
   
   //
   // Subscribed to topics.
   //
   fs.subscribeToTopics();
   
-  ROS_INFO_STREAM(node_name << ": Subscribed topics registered.");
+  ROS_INFO_STREAM(nodeName << ": Subscribed topics registered.");
 
   // set loop rate in Hertz
   ros::Rate loop_rate(hz);
 
-  ROS_INFO_STREAM(node_name << ": Ready.");
+  ROS_INFO_STREAM(nodeName << ": Ready.");
 
   //
   // Main loop.
