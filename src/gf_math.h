@@ -5,14 +5,18 @@
 
 #include <string>
 
+#include  <Eigen/Eigen>
+#include  <Eigen/Geometry> //
+
 namespace geofrenzy
 {
   namespace gf_math
   {
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Special values
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
  
+    extern void f();
+
   } // namespace gf_math
 } // namespace geofrenzy
 
