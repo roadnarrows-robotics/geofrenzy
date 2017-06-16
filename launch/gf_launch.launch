@@ -8,4 +8,10 @@
     <remap from="gf_map_server_168/geofrenzy/map" to="/map"/>
     <remap from="gf_map_server_168/geofrenzy/map_metadata" to="/map_metadata"/>
   </node>
+
+  <!-- Start Pointcloud to Laser node -->
+  <node name="pointcloud_to_laserscan_node" pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node">
+    <remap from="scan" to="scan_from_pointcloud"/>
+  </node>
+
 </launch>
