@@ -301,10 +301,24 @@ namespace geofrenzy
         ROS_DEBUG("Feature Collection Callback");
 
         //Fetch values from parameter server
-        m_atime = ros::Time::now();
         m_nh.param("map_width", mapWidth, MapWidth);
         m_nh.param("map_height", mapHeight, MapHeight);
         m_nh.param("map_resolution", mapResolution, MapResolution);
+
+        //Get Robot transform
+        m_atime = ros::Time::now();
+        geometry_msgs::PoseStamped gfMapPose;
+        gfMapPose.header.frame_id="base_footprint";
+        gfMapPose.header.stamp = m_atime;
+
+        tf::StampedTransform transform;
+        try{
+          m_tfListener.waitForTransform("map", "base_footprint", m_atime, ros::Duration(3.0));
+          m_tfListener.lookupTransform("map", "base_footprint", m_atime, transform);
+        }
+        catch(tf::TransformException ex){
+          ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
+        }
 
         //Initialize grid
         MapGrid mapGrid(mapWidth, mapHeight, mapResolution);
@@ -338,20 +352,6 @@ namespace geofrenzy
 
         m_occupancyGrid.data = mapGrid.m_grid;
 
-        //Get Robot transform
-        geometry_msgs::PoseStamped gfMapPose;
-        gfMapPose.header.frame_id="base_footprint";
-        gfMapPose.header.stamp = m_atime;
-        //Shift gf_map to center on origin of world map
-        tf::StampedTransform transform;
-        try{
-          m_tfListener.waitForTransform("map", "base_footprint", m_atime, ros::Duration(3.0));
-          m_tfListener.lookupTransform("map", "base_footprint", m_atime, transform);
-        }
-        catch(tf::TransformException ex){
-          ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
-        }
-
         gfMapPose.pose.position.x = -dx + transform.getOrigin().getX();
         gfMapPose.pose.position.y = -dy + transform.getOrigin().getY();
         gfMapPose.pose.position.z = 0.0;
@@ -368,6 +368,8 @@ namespace geofrenzy
         m_mapMetadata.map_load_time = m_atime;
         m_mapMetadata.origin = gfMapPose.pose;
         m_occupancyGrid.info = m_mapMetadata;
+        m_occupancyGrid.header.frame_id="map";
+        m_occupancyGrid.header.stamp = m_atime;
         ++m_nPublishCnt;
 
     }
@@ -383,6 +385,7 @@ int main(int argc, char **argv){
     // make a unique node name from the command line class index argument
     std::string nodeName = makeNodeName(NodeRootMapServer, gfClassIdx);
 
+    ROS_INFO_STREAM("Starting node with name: " << nodeName);
     //
     // Initialize the node. Parse the command line arguments and environment to
     // determine ROS options such as node name, namespace and remappings.
