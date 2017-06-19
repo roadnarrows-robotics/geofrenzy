@@ -132,6 +132,7 @@ namespace geofrenzy
     const char *const ServiceNameGetEntitlement = "geofrenzy/get_entitlement";
     const char *const ServiceNameGetEntitlementList =
                                               "geofrenzy/get_entitlement_list";
+    const char *const ServiceNameGetMap = "geofrenzy/get_map";
   
     //
     // Types

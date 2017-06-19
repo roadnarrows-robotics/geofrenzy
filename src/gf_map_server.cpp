@@ -26,6 +26,7 @@
 #include "geometry_msgs/PointStamped.h"
 #include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/MapMetaData.h"
+#include "nav_msgs/GetMap.h"
 
 //
 // Geofrenzy
@@ -77,7 +78,10 @@ namespace geofrenzy
         void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures);
         void advertisePublishers(int nQueueDepth=1);
         void subscribeToTopics(int nQueueDepth=5);
+        void advertiseServices();
         void publishMap();
+        bool getMap(nav_msgs::GetMap::Request &req, nav_msgs::GetMap::Response &res);
+
         MapServer(ros::NodeHandle &nh, double hz, uint64_t gf_class_idx);
 
       private:
@@ -140,6 +144,15 @@ namespace geofrenzy
         //m_subscriptions[TopicNameFcDist] = m_nh.subscribe(TopicNameFcDist, nQueueDepth, &MapServer::featureCollectionCallback, &(*this));
         m_subscriptions["/gf_server_168/geofrenzy/featureCollection/distance"] = m_nh.subscribe("/gf_server_168/geofrenzy/featureCollection/distance", 5, &MapServer::featureCollectionCallback, &(*this));
 
+    }
+
+    /*!
+     * \brief Advertise all map server services.
+     *
+     */
+    void MapServer::advertiseServices()
+    {
+        m_services[ServiceNameGetMap] = m_nh.advertiseService(ServiceNameGetMap, &MapServer::getMap, &(*this));
     }
 
     void MapServer::transformPoint(geometry_msgs::Point pIn, geometry_msgs::Point &pOut, double dX, double dY, double dZ){
@@ -373,6 +386,24 @@ namespace geofrenzy
         ++m_nPublishCnt;
 
     }
+
+    /*!
+     * \brief GetMap Service
+     *
+     * \param req   unused
+     * \param res   Map Response
+     */
+    bool MapServer::getMap(nav_msgs::GetMap::Request &req, nav_msgs::GetMap::Response &res)
+    {
+        ROS_INFO("Requesting Map");
+        // request is empty; we ignore it
+
+        nav_msgs::GetMap::Response mapResponse;
+        mapResponse.map = m_occupancyGrid;
+        res = mapResponse;
+        ROS_INFO("Sending map");
+        return true;
+    }
 } //namespace geofrenzy
 
 int main(int argc, char **argv){
@@ -421,21 +452,28 @@ int main(int argc, char **argv){
 
     //
     //Create map server node
-    geofrenzy::MapServer map_server(nh, hz, gfClassIdx);
+    geofrenzy::MapServer mapServer(nh, hz, gfClassIdx);
 
     //
     // Advertise publishers.
     //
-    map_server.advertisePublishers();
+    mapServer.advertisePublishers();
 
     ROS_INFO_STREAM(nodeName << ": Advertised publishers registered.");
 
     //
     // Subscribed to topics.
     //
-    map_server.subscribeToTopics();
+    mapServer.subscribeToTopics();
 
     ROS_INFO_STREAM(nodeName << ": Subscribed topics registered.");
+
+    //
+    // Advertise services.
+    //
+    mapServer.advertiseServices();
+
+    ROS_INFO_STREAM(nodeName << ": Advertised services registered.");
 
     // set loop rate in Hertz
     ros::Rate loop_rate(hz);
@@ -451,7 +489,7 @@ int main(int argc, char **argv){
       ros::spinOnce();
 
       // publish all readied advertised topics
-      map_server.publishMap();
+      mapServer.publishMap();
 
       // sleep to keep at loop rate
       loop_rate.sleep();
