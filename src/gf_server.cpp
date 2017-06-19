@@ -768,8 +768,7 @@ namespace geofrenzy
         //
         // Read from file. Great for testing.
         //
-        if( m_nh.getParam("geojson_file", filename) )
-        // RDK final: if( m_nh.getParam(ParamNameFenceFilename, filename) )
+        if( m_nh.getParam(ParamNameFenceFilename, filename) )
         {
           ROS_DEBUG_STREAM("Reading file " << filename);
 

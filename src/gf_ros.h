@@ -3,6 +3,7 @@
 #ifndef _GF_ROS_H
 #define _GF_ROS_H
 
+#include <math.h>
 #include <string>
 #include "ros/ros.h"
 
@@ -63,6 +64,49 @@ namespace geofrenzy
      */
     const double MapResolution = 0.2; ///< default occupancy grid height
 
+    /*!
+     * \brief Default RGBD vSensor horizontal resolution.
+     *
+     * Units: Number of steps. 
+     */
+    const int RGBDWidthDft = 640;
+
+    /*!
+     * \brief Default RGBD vSensor vertical resolution.
+     *
+     * Units: Number of steps. 
+     */
+    const int RGBDHeightDft = 480;
+
+    /*!
+     * \brief Default RGBD vSensor minimum horizontal field of view angle.
+     *
+     * Units: Radians
+     */
+    const double RGBDHFoVMinDft = -M_PI_2;  ///< 90 degrees to the right
+
+    /*!
+     * \brief Default RGBD vSensor maximum horizontal field of view angle.
+     *
+     * Units: Radians
+     */
+    const double RGBDHFoVMaxDft = M_PI_2;   ///< 90 degrees to the left
+
+    /*!
+     * \brief Default RGBD vSensor minimum vertical field of view angle.
+     *
+     * Units: Radians
+     */
+    const double RGBDVFoVMinDft = M_PI_4;   ///< 45 degrees from up
+
+    /*!
+     * \brief Default RGBD vSensor maximum vertical field of view angle.
+     *
+     * Units: Radians
+     */
+    const double RGBDVFoVMaxDft = M_PI_2; ///< 90 degrees from up (horizontal)
+
+
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // ROS Parameter Server interface
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -82,11 +126,53 @@ namespace geofrenzy
     const char *const ParamNameRoILevel       = "geofrenzy_roi_level";
 
     /*!
-     * \brief Default fence file name.
+     * \brief Default fence file parameter name.
      *
      * If the value is not set, then no file access is tried.
      */
     const char *const ParamNameFenceFilename  = "geofrenzy_fence_filename";
+
+    /*!
+     * \brief RGBD vSensor horizontal resolution parameter name.
+     *
+     * If the value is not set, then RGBDWidthDft is used.
+     */
+    const char *const ParamNameRGBDWidth = "geofrenzy_res_width";
+
+    /*!
+     * \brief RGBD vSensor vertical resolution parameter name.
+     *
+     * If the value is not set, then RGBDHeightDft is used.
+     */
+    const char *const ParamNameRGBDHeight = "geofrenzy_res_width";
+
+    /*!
+     * \brief RGBD vSensor horizontal minimum FoV angle parameter name.
+     *
+     * If the value is not set, then RGBDHFoVMinDft is used.
+     */
+    const char *const ParamNameRGBDHFoVMin = "geofrenzy_hfov_min";
+
+    /*!
+     * \brief RGBD vSensor horizontal maximum FoV angle parameter name.
+     *
+     * If the value is not set, then RGBDHFoVMaxDft is used.
+     */
+    const char *const ParamNameRGBDHFoVMax = "geofrenzy_hfov_max";
+
+    /*!
+     * \brief RGBD vSensor vertical minimum FoV angle parameter name.
+     *
+     * If the value is not set, then RGBDVFoVMinDft is used.
+     */
+    const char *const ParamNameRGBDVFoVMin = "geofrenzy_vfov_min";
+
+    /*!
+     * \brief RGBD vSensor vertical maximum FoV angle parameter name.
+     *
+     * If the value is not set, then RGBDVFoVMaxDft is used.
+     */
+    const char *const ParamNameRGBDVFoVMax = "geofrenzy_vfov_max";
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -115,6 +201,17 @@ namespace geofrenzy
      */
     const char *const NodeRootMapServer  = "gf_map_server";
   
+    /*!
+     * \brief The Geofrenzy ROS virtual RGBD sensor node.
+     *
+     * Since all running ROS nodes must have unique names, the actual server
+     * name is constructed as follows:
+     * ~~~
+     * <root>_<gf_class_idx>
+     * ~~~
+     */
+    const char *const NodeRootRGBDVSensor   = "gf_vsensor_rgba";
+
   
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // ROS subscribed and published (sub)topic names
