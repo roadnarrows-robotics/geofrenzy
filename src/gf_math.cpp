@@ -1,5 +1,6 @@
 // GEOFRENZY FILE HEADER HERE
 
+#include <stdio.h>
 #include <math.h>
 
 #include <iostream>
@@ -76,6 +77,53 @@ namespace geofrenzy
     static inline void mkBlack(EigenRGBA &color)
     {
       color << 0.0, 0.0, 0.0, 0.0;
+    }
+
+    /*!
+     * \brief Make a bounding box between two points within the given height
+     * range.
+     *
+     * \param pt0         Point 0.
+     * \param pt1         Point 1.
+     * \param heightMin   Minimum height.
+     * \param heightMax   Maximum height.
+     * \param epsilon     Bounding region accrucay.
+     * \param[out] bbox   Output bounding box.
+     */
+    static void mkBBox(const geometry_msgs::Point &pt0,
+                       const geometry_msgs::Point &pt1,
+                       const double               heightMin,
+                       const double               heightMax,
+                       const double               epsilon,
+                       EigenBBox3                 &bbox)
+    {
+      // min,max x
+      if( pt0.x <= pt1.x )
+      {
+        bbox.m_min.x() = pt0.x - epsilon;
+        bbox.m_max.x() = pt1.x + epsilon;
+      }
+      else
+      {
+        bbox.m_min.x() = pt1.x - epsilon;
+        bbox.m_max.x() = pt0.x + epsilon;
+      }
+      
+      // min,max y
+      if( pt0.y <= pt1.y )
+      {
+        bbox.m_min.y() = pt0.y - epsilon;
+        bbox.m_max.y() = pt1.y + epsilon;
+      }
+      else
+      {
+        bbox.m_min.y() = pt1.y - epsilon;
+        bbox.m_max.y() = pt0.y + epsilon;
+      }
+
+      // min,max z
+      bbox.m_min.z() = heightMin - epsilon;
+      bbox.m_max.z() = heightMax + epsilon;
     }
 
     /*!
@@ -262,10 +310,12 @@ namespace geofrenzy
       EigenPoint3       pt0, pt1, pt2;
       size_t            i, j;
 
+      // clear
       sceneObj.m_color = color;
-      sceneObj.m_bboxes.clear();
       sceneObj.m_planes.clear();
+      sceneObj.m_bboxes.clear();
 
+      // insufficient points in polygon
       if( numPoints < 2 )
       {
         return;
@@ -275,38 +325,6 @@ namespace geofrenzy
 
       for(i = 0, j = 1; j < numPoints; ++i, ++j)
       {
-        // min,max x
-        if( polygon.points[i].x <= polygon.points[j].x )
-        {
-          bbox.m_min.x() = polygon.points[i].x;
-          bbox.m_max.x() = polygon.points[j].x;
-        }
-        else
-        {
-          bbox.m_min.x() = polygon.points[j].x;
-          bbox.m_max.x() = polygon.points[i].x;
-        }
-        
-        // min,max y
-        if( polygon.points[i].y <= polygon.points[j].y )
-        {
-          bbox.m_min.y() = polygon.points[i].y;
-          bbox.m_max.y() = polygon.points[j].y;
-        }
-        else
-        {
-          bbox.m_min.y() = polygon.points[j].y;
-          bbox.m_max.y() = polygon.points[i].y;
-        }
-
-        // min,max z
-        bbox.m_min.z() = 0.0;
-        bbox.m_max.z() = height;
-        
-        //cerr << "bbox: " << bbox << endl;
-
-        sceneObj.m_bboxes.push_back(bbox);
-
         pt0.x() = polygon.points[i].x;
         pt0.y() = polygon.points[i].y;
         pt0.z() = 0.0;
@@ -315,11 +333,18 @@ namespace geofrenzy
         pt1.y() = polygon.points[j].y;
         pt1.z() = 0.0;
 
-        pt2.x() = pt1.x();
-        pt2.y() = pt1.y();
+        pt2.x() = pt0.x();
+        pt2.y() = pt0.y();
         pt2.z() = height;
 
         sceneObj.m_planes.push_back(EigenPlane3::Through(pt0, pt1, pt2));
+
+        mkBBox(polygon.points[i], polygon.points[j], 0.0, height, 0.001, bbox);
+
+        //cerr << "bbox: " << bbox << endl;
+
+        sceneObj.m_bboxes.push_back(bbox);
+
       }
 
       cerr << "Created scene object: " << endl;
@@ -437,55 +462,48 @@ namespace geofrenzy
       //
       // Alpha blend color(s).
       //
-      mkBlack(colorBlend);
+      if( options & ScanOptionAlphaBlend )
+      {
+        mkBlack(colorBlend);
+
+        for(iter = orderedIntersects.begin();
+            iter != orderedIntersects.end();
+            ++iter)
+        {
+          // blend foreground and background to get new blended color
+          alphaBlend(colorBlend, iter->second.m_rgba, colorBlend);
+
+          // full opacity - further blending is unnecessary
+          if( colorBlend[_A] >= 1.0 )
+          {
+            break;
+          }
+        }
+      }
 
       for(iter = orderedIntersects.begin();
           iter != orderedIntersects.end();
           ++iter)
       {
-        // blend foreground and background to get new blended color
-        alphaBlend(colorBlend, iter->second.m_rgba, colorBlend);
-
-        // full opacity - further blending is unnecessary
-        if( colorBlend[_A] >= 1.0 )
-        {
-          break;
-        }
-      }
-
-      //
-      // Add all intersecting points.
-      //
-      if( options & ScanCollinear )
-      {
-        for(iter = orderedIntersects.begin();
-            iter != orderedIntersects.end();
-            ++iter)
+        if( options & ScanOptionAlphaBlend )
         {
           pushIntersect(intersects, iter->second.m_xyz, colorBlend);
         }
-        return orderedIntersects.size();
+        else
+        {
+          pushIntersect(intersects, iter->second.m_xyz, iter->second.m_rgba);
+        }
+
+        // Add only the nearest intersecting point.
+        if( options & ScanOptionNearest )
+        {
+          return 1;
+        }
       }
 
-      //
-      // Add only the nearest intersecting point.
-      //
-      else
-      {
-        // near point is at the front of ordered list
-        iter = orderedIntersects.begin();
-
-        pushIntersect(intersects, iter->second.m_xyz, colorBlend);
-
-        return 1;
-      }
+      return orderedIntersects.size();
     }
 
-    size_t traceRay(EigenLine3 &ray, const EigenSceneObj &sceneObj,
-                    EigenXYZRGBAList &intersects, uint32_t options)
-    {
-      return 0;
-    }
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Unit Tests
@@ -494,6 +512,7 @@ namespace geofrenzy
 #ifdef GF_MATH_UT
     void utMakeCannedPolygon(const int         polynum,
                              const EigenPoint3 &offset,
+                             const double      scale,
                              Polygon64         &polygon)
     {
       // equilateral triange with side 50m
@@ -506,7 +525,7 @@ namespace geofrenzy
       static const double rectangle[][3] =
       {
         { 0.0, -10.0, 0.0}, {30.0, -10.0, 0.0},
-        {30.0,  10.0, 0.0}, {30.0,   0.0, 0.0},
+        {30.0,  10.0, 0.0}, { 0.0,  10.0, 0.0},
         { 0.0, -10.0, 0.0}
       };
 
@@ -522,15 +541,15 @@ namespace geofrenzy
         { 0.0,     -5.0, 0.0}
       };
 
-      // 30m x 50m tee
+      // 40m x 50m tee
       static const double tee[][3] =
       {
         { 0.0,  -5.0, 0.0},
         {40.0,  -5.0, 0.0},
-        {40.0, -15.0, 0.0},
-        {50.0, -15.0, 0.0},
-        {50.0,  15.0, 0.0},
-        {40.0,  15.0, 0.0},
+        {40.0, -20.0, 0.0},
+        {50.0, -20.0, 0.0},
+        {50.0,  20.0, 0.0},
+        {40.0,  20.0, 0.0},
         {40.0,   5.0, 0.0},
         { 0.0,   5.0, 0.0},
         { 0.0,  -5.0, 0.0},
@@ -565,9 +584,9 @@ namespace geofrenzy
 
       for(size_t i = 0; i < numPoints; ++i)
       {
-        pt.x = poly[i][0] + offset.x();
-        pt.y = poly[i][1] + offset.y();
-        pt.z = poly[i][2] + offset.z();
+        pt.x = scale * poly[i][0] + offset.x();
+        pt.y = scale * poly[i][1] + offset.y();
+        pt.z = scale * poly[i][2] + offset.z();
         polygon.points.push_back(pt);
       }
 

@@ -209,6 +209,12 @@ namespace geofrenzy
     const size_t  _B = 2; ///< blue  (pt[_B] == pt.z())
     const size_t  _A = 3; ///< alpha (pt[_A] == pt.w()?)
 
+    // EigenXYZRBG, EigenXYZRGBA
+    const size_t  _RED    = 3; ///< xyzred   (pt[_RED])
+    const size_t  _GREEN  = 4; ///< xyzgreen (pt[_GREEN])
+    const size_t  _BLUE   = 5; ///< xyzblue  (pt[_BLUE])
+    const size_t  _ALPHA  = 6; ///< xyzalpha (pt[_ALPHA])
+ 
     const double Inf = std::numeric_limits<double>::infinity(); ///< infinity
 
     /*!
@@ -228,10 +234,11 @@ namespace geofrenzy
     {
       /*!
        * The default scanning option.
-       *  - Include only the nearest point of a set of intersections along a
-       *    traced ray.
+       *  - Include all instersecting points along any traced ray. This option
+       *    excludes use of the 2D option.
        *  - Do not produce any 2D structure. That is, if no intersection along
        *    a traced ray is detected, no point is added.
+       *  - Do not alpha blend colors along ray.
        */
       ScanOptionDft = 0x00,
 
@@ -242,10 +249,15 @@ namespace geofrenzy
       ScanOption2D  = 0x01,
 
       /*!
-       * Include all instersecting points along any traced ray. This option
-       * excludes use of the 2D option.
+       *  - Include only the nearest point of a set of intersections along a
+       *    traced ray.
        */
-      ScanCollinear = 0x02    
+      ScanOptionNearest = 0x02,
+
+      /*!
+       * Alpha blend colors.
+       */
+      ScanOptionAlphaBlend = 0x04
     };
 
     /*! \} */ // gfmath_const
@@ -499,17 +511,19 @@ namespace geofrenzy
     const int UtPolynumTriangle   = 0;  ///< equalateral triangle with 50m sides
     const int UtPolynumRectangle  = 1;  ///< 20m x 30m rectangle
     const int UtPolynumHexagon    = 2;  ///< hexagon with 10m sides
-    const int UtPolynumTee        = 3;  ///< 30m x 50m tee 
+    const int UtPolynumTee        = 3;  ///< 40m x 50m tee 
 
     /*!
      * \brief Make a ROS polygon message from a canned shape.
      *
      * \param polynum       Canned shape number. See above.
      * \param offset        Offset add to polygon position.
+     * \param scale         Polygon size scale multiplier. 
      * \param [out] polygon Output polygon message.
      */
     void utMakeCannedPolygon(const int         polynum,
                              const EigenPoint3 &offset,
+                             const double      scale,
                              Polygon64         &polygon);
 
     /*!

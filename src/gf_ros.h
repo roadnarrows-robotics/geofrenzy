@@ -65,46 +65,63 @@ namespace geofrenzy
     const double MapResolution = 0.2; ///< default occupancy grid height
 
     /*!
-     * \brief Default RGBD vSensor horizontal resolution.
+     * \brief Default point cloud horizontal resolution.
      *
      * Units: Number of steps. 
      */
-    const int RGBDWidthDft = 640;
+    const int CloudWidthDft = 160;
 
     /*!
-     * \brief Default RGBD vSensor vertical resolution.
+     * \brief Default point cloud vertical resolution.
      *
      * Units: Number of steps. 
      */
-    const int RGBDHeightDft = 480;
+    const int CloudHeightDft = 120;
 
     /*!
-     * \brief Default RGBD vSensor minimum horizontal field of view angle.
+     * \brief Default point cloud minimum horizontal field of view angle.
      *
      * Units: Radians
      */
-    const double RGBDHFoVMinDft = -M_PI_2;  ///< 90 degrees to the right
+    const double CloudHFoVMinDft = -M_PI_2;  ///< 90 degrees to the right
 
     /*!
-     * \brief Default RGBD vSensor maximum horizontal field of view angle.
+     * \brief Default point cloud maximum horizontal field of view angle.
      *
      * Units: Radians
      */
-    const double RGBDHFoVMaxDft = M_PI_2;   ///< 90 degrees to the left
+    const double CloudHFoVMaxDft = M_PI_2;   ///< 90 degrees to the left
 
     /*!
-     * \brief Default RGBD vSensor minimum vertical field of view angle.
+     * \brief Default point cloud minimum vertical field of view angle.
      *
      * Units: Radians
      */
-    const double RGBDVFoVMinDft = M_PI_4;   ///< 45 degrees from up
+    const double CloudVFoVMinDft = M_PI_4;   ///< 45 degrees from up
 
     /*!
-     * \brief Default RGBD vSensor maximum vertical field of view angle.
+     * \brief Default point cloud maximum vertical field of view angle.
      *
      * Units: Radians
      */
-    const double RGBDVFoVMaxDft = M_PI_2; ///< 90 degrees from up (horizontal)
+    const double CloudVFoVMaxDft = M_PI_2; ///< 90 degrees from up (horizontal)
+
+    /*!
+     * \brief Supported point cloud output formats.
+     */
+    enum CloudFmt
+    {
+      CloudFmtXYZ     = 0,  ///< FLOAT32 x-y-z format
+      CloudFmtXYZRGB  = 1,  ///< FLOAT32 x-y-z, UINT8 r-g-b format
+      CloudFmtXYZRGBA = 2  ///< FLOAT32 x-y-z, UINT8 r-g-b-a format
+    };
+
+    /*!
+     * \brief Default published point cloud output format.
+     *
+     * Units: Enum
+     */
+    const int CloudPublishFmtDft = CloudFmtXYZRGB;
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -133,46 +150,53 @@ namespace geofrenzy
     const char *const ParamNameFenceFilename  = "geofrenzy_fence_filename";
 
     /*!
-     * \brief RGBD vSensor horizontal resolution parameter name.
+     * \brief Cloud horizontal resolution parameter name.
      *
-     * If the value is not set, then RGBDWidthDft is used.
+     * If the value is not set, then CloudWidthDft is used.
      */
-    const char *const ParamNameRGBDWidth = "geofrenzy_res_width";
+    const char *const ParamNameCloudWidth = "geofrenzy_cloud_width";
 
     /*!
-     * \brief RGBD vSensor vertical resolution parameter name.
+     * \brief Cloud vertical resolution parameter name.
      *
-     * If the value is not set, then RGBDHeightDft is used.
+     * If the value is not set, then CloudHeightDft is used.
      */
-    const char *const ParamNameRGBDHeight = "geofrenzy_res_width";
+    const char *const ParamNameCloudHeight = "geofrenzy_cloud_width";
 
     /*!
-     * \brief RGBD vSensor horizontal minimum FoV angle parameter name.
+     * \brief Cloud horizontal FoV minimum angle parameter name.
      *
-     * If the value is not set, then RGBDHFoVMinDft is used.
+     * If the value is not set, then CloudHFoVMinDft is used.
      */
-    const char *const ParamNameRGBDHFoVMin = "geofrenzy_hfov_min";
+    const char *const ParamNameCloudHFoVMin = "geofrenzy_cloud_hfov_min";
 
     /*!
-     * \brief RGBD vSensor horizontal maximum FoV angle parameter name.
+     * \brief Cloud horizontal FoV maximum angle parameter name.
      *
-     * If the value is not set, then RGBDHFoVMaxDft is used.
+     * If the value is not set, then CloudHFoVMaxDft is used.
      */
-    const char *const ParamNameRGBDHFoVMax = "geofrenzy_hfov_max";
+    const char *const ParamNameCloudHFoVMax = "geofrenzy_cloud_hfov_max";
 
     /*!
-     * \brief RGBD vSensor vertical minimum FoV angle parameter name.
+     * \brief Cloud vertical FoV minimum angle parameter name.
      *
-     * If the value is not set, then RGBDVFoVMinDft is used.
+     * If the value is not set, then CloudVFoVMinDft is used.
      */
-    const char *const ParamNameRGBDVFoVMin = "geofrenzy_vfov_min";
+    const char *const ParamNameCloudVFoVMin = "geofrenzy_cloud_vfov_min";
 
     /*!
-     * \brief RGBD vSensor vertical maximum FoV angle parameter name.
+     * \brief Cloud vertical FoV maximum angle parameter name.
      *
-     * If the value is not set, then RGBDVFoVMaxDft is used.
+     * If the value is not set, then CloudVFoVMaxDft is used.
      */
-    const char *const ParamNameRGBDVFoVMax = "geofrenzy_vfov_max";
+    const char *const ParamNameCloudVFoVMax = "geofrenzy_cloud_vfov_max";
+
+    /*!
+     * \brief Cloud published output format parameter name.
+     *
+     * If the value is not set, then CloudPublishFmtDft is used.
+     */
+    const char *const ParamNameCloudPublishFmt = "geofrenzy_cloud_out_fmt";
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -202,7 +226,7 @@ namespace geofrenzy
     const char *const NodeRootMapServer  = "gf_map_server";
   
     /*!
-     * \brief The Geofrenzy ROS virtual RGBD sensor node.
+     * \brief The Geofrenzy ROS cloud virtual sensor node.
      *
      * Since all running ROS nodes must have unique names, the actual server
      * name is constructed as follows:
@@ -210,7 +234,7 @@ namespace geofrenzy
      * <root>_<gf_class_idx>
      * ~~~
      */
-    const char *const NodeRootRGBDVSensor   = "gf_vsensor_rgba";
+    const char *const NodeRootVCloud   = "gf_vcloud";
 
   
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -222,6 +246,7 @@ namespace geofrenzy
     const char *const TopicNameFcDist = "geofrenzy/featureCollection/distance";
     const char *const TopicNameMap    = "geofrenzy/map";
     const char *const TopicNameMapMD  = "geofrenzy/map_metadata";
+    const char *const TopicNameCloud  = "geofrenzy/cloud";
   
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // ROS services
@@ -302,6 +327,19 @@ namespace geofrenzy
      * \param strFrameId      Frame id. No frame = "0", global frame = "1".
      */
     void stampHeader(std_msgs::Header  &header,
+                     const int32_t     nSeqNum = 0,
+                     const std::string strFrameId = "geofrenzy");
+
+    /*!
+     * \brief Fill in ROS standard message header.
+     *
+     * \param [in,out] header Message header.
+     * \param stamp           Time stamp.
+     * \param nSeqNum         Sequence number.
+     * \param strFrameId      Frame id. No frame = "0", global frame = "1".
+     */
+    void stampHeader(std_msgs::Header  &header,
+                     const ros::Time   &stamp,
                      const int32_t     nSeqNum = 0,
                      const std::string strFrameId = "geofrenzy");
 

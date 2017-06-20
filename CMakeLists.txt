@@ -246,8 +246,8 @@ target_link_libraries(gf_server jsoncpp)
 target_link_libraries(gf_server ${FALIB} agent)
 
 # geofrenzy RGBD virtual sensor
-add_executable(gf_vsensor_rgbd
+add_executable(gf_vcloud
   src/gf_math.cpp
   src/gf_ros.cpp
-  src/gf_vsensor_rgbd.cpp)
-target_link_libraries(gf_vsensor_rgbd ${catkin_LIBRARIES})
+  src/gf_vcloud.cpp)
+target_link_libraries(gf_vcloud ${catkin_LIBRARIES})

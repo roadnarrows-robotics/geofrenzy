@@ -73,5 +73,14 @@ namespace geofrenzy
       header.frame_id = strFrameId;
     }
 
+    void stampHeader(std_msgs::Header &header,
+                     const ros::Time  &stamp,
+                     const int32_t    nSeqNum,
+                     const string     strFrameId)
+    {
+      header.seq      = nSeqNum;
+      header.stamp    = ros::Time::now();
+      header.frame_id = strFrameId;
+    }
   } // namespace gf_ros
 } // namespace geofrenzy
