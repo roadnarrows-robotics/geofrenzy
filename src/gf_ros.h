@@ -161,7 +161,7 @@ namespace geofrenzy
      *
      * If the value is not set, then CloudHeightDft is used.
      */
-    const char *const ParamNameCloudHeight = "geofrenzy_cloud_width";
+    const char *const ParamNameCloudHeight = "geofrenzy_cloud_height";
 
     /*!
      * \brief Cloud horizontal FoV minimum angle parameter name.

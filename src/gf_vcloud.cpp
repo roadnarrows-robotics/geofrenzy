@@ -117,6 +117,14 @@ namespace geofrenzy
 
         initCloudMsgFmt(m_msgCloud);
 
+        ROS_INFO_STREAM("Cloud vSensor:" << endl
+            << "  resolution:     " << m_uWidth << "x" << m_uHeight << endl
+            << "  horizontal FoV: " << degrees(m_fHFoVMin)
+                                    << " - " << degrees(m_fHFoVMax) << endl
+            << "  vertical FoV:   " << degrees(m_fVFoVMin)
+                                    << " - " << degrees(m_fVFoVMax) << endl
+            << "  output format:  " << m_ePublishFmt << endl);
+
 #ifdef GF_CLOUD_NODE_UT
         utInit();
 #endif // GF_CLOUD_NODE_UT
