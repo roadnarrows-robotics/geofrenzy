@@ -107,9 +107,9 @@ namespace geofrenzy
         m_nh.param(ParamNameCloudVFoVMax, m_fVFoVMax, CloudVFoVMaxDft);
 
         // resolution (note: no unsigned i/f to parameter server
-        m_nh.param(ParamNameCloudWidth, val, 640); // RDK CloudWidthDft);
+        m_nh.param(ParamNameCloudWidth, val, CloudWidthDft);
         m_uWidth = (size_t)val;
-        m_nh.param(ParamNameCloudHeight, val, 480); // RDK CloudHeightDft);
+        m_nh.param(ParamNameCloudHeight, val, CloudHeightDft);
         m_uHeight = (size_t)val;
 
         // output format
