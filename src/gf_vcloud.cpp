@@ -69,6 +69,11 @@
 #include "geofrenzy/GfDwellThreshold.h"
 
 //
+// ROS tranforms
+//
+#include "tf/transform_listener.h"
+
+//
 // Geofrenzy
 //
 #include "gf_ros.h"
@@ -251,6 +256,9 @@ namespace geofrenzy
       int                       m_ePublishFmt;  ///< publish output format
       sensor_msgs::PointCloud2  m_msgCloud;     ///< point cloud message
 
+      //ROS transform listener
+      tf::TransformListener m_tfListener;
+
       void utInit()
       {
 #ifdef GF_CLOUD_NODE_UT
@@ -337,13 +345,21 @@ namespace geofrenzy
         size_t  i;
 
         //msg.data.clear();
-
+        tf::StampedTransform transform;
+        try{
+          m_tfListener.waitForTransform("map", "base_footprint", ros::Time(0), ros::Duration(3.0));
+          m_tfListener.lookupTransform("map", "base_footprint", ros::Time(0), transform);
+        }
+        catch(tf::TransformException ex){
+          ROS_ERROR("Received exception trying to transform point from global frame "
+                    "to robot frame: %s", ex.what());
+        }
         for(i = 0;
             i < points.size() && i < msg.data.size();
             ++i, ++iter_x, ++iter_y, ++iter_z, ++iter_r, ++iter_g, ++iter_b)
         {
-          *iter_x = (float)points[i][_X];
-          *iter_y = (float)points[i][_Y];
+          *iter_x = (float)points[i][_X] + transform.getOrigin().getX();
+          *iter_y = (float)points[i][_Y] + transform.getOrigin().getY();
           *iter_z = (float)points[i][_Z];
 
           *iter_r = (uint8_t)(points[i][_RED]   * 255.0);
