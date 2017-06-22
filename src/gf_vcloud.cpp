@@ -1,4 +1,33 @@
-// GEOFRENZY FILE HEADER HERE
+////////////////////////////////////////////////////////////////////////////////
+//
+// Package:   Geofrenzy Robot ROS Package
+//
+// Link:      https://github.com/roadnarrows-robotics/geofrenzy
+//
+// File:      gf_vcloud.cpp
+//
+/*! \file
+ *
+ * \brief The Geofrenzy ROS cloud virtual sensor node source.
+ *
+ * \author Bill Coon (bill@roadnarrows.com)
+ * \author Robin Knight (robin.knight@roadnarrows.com)
+ *
+ * \par Maintainer:
+ * Chris Stradtman (chris.stradtman@geo.network)
+ *
+ * \par Copyright:
+ * (C) 2017  GeoNetwork
+ * (http://www.geo.network)
+ * \n All Rights Reserved
+ *
+ * \par License
+ * MIT
+ * 
+ * EULA:
+ * See EULA.md
+ */
+////////////////////////////////////////////////////////////////////////////////
 
 #include <stdio.h>
 
@@ -119,11 +148,11 @@ namespace geofrenzy
 
         ROS_INFO_STREAM("Cloud vSensor:" << endl
             << "  resolution:     " << m_uWidth << "x" << m_uHeight << endl
-            << "  horizontal FoV: " << degrees(m_fHFoVMin)
-                                    << " - " << degrees(m_fHFoVMax) << endl
-            << "  vertical FoV:   " << degrees(m_fVFoVMin)
-                                    << " - " << degrees(m_fVFoVMax) << endl
-            << "  output format:  " << m_ePublishFmt << endl);
+            << "  horizontal FoV: " << "[" << degrees(m_fHFoVMin) << ", "
+                                    << degrees(m_fHFoVMax) << "]" << endl
+            << "  vertical FoV:   " << "[" << degrees(m_fVFoVMin) << ", "
+                                    << degrees(m_fVFoVMax) << "]" << endl
+            << "  output format:  " << m_ePublishFmt);
 
 #ifdef GF_CLOUD_NODE_UT
         utInit();
@@ -317,9 +346,9 @@ namespace geofrenzy
           *iter_y = (float)points[i][_Y];
           *iter_z = (float)points[i][_Z];
 
-          *iter_r = (uint8_t)(points[i][_RED]   * points[i][_ALPHA] * 255.0);
-          *iter_g = (uint8_t)(points[i][_GREEN] * points[i][_ALPHA] * 255.0);
-          *iter_b = (uint8_t)(points[i][_BLUE]  * points[i][_ALPHA] * 255.0);
+          *iter_r = (uint8_t)(points[i][_RED]   * 255.0);
+          *iter_g = (uint8_t)(points[i][_GREEN] * 255.0);
+          *iter_b = (uint8_t)(points[i][_BLUE]  * 255.0);
         }
 
         stampHeader(msg.header, msg.header.seq+1, "cloud");
@@ -330,6 +359,7 @@ namespace geofrenzy
        */
       void cbFcDist(const geofrenzy::GfDistFeatureCollection::ConstPtr &msg)
       {
+#ifndef GF_CLOUD_NODE_UT
         ROS_DEBUG(TopicNameFcDist);
 
         EigenSceneObj sceneObj;
@@ -353,6 +383,7 @@ namespace geofrenzy
         {
           ++m_nPublishCnt;
         }
+#endif // !GF_CLOUD_NODE_UT
       }
   };
 
