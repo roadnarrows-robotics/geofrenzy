@@ -149,6 +149,10 @@ namespace geofrenzy
         // output format
         m_nh.param(ParamNameCloudPublishFmt, m_ePublishFmt, CloudPublishFmtDft);
 
+        //global frame and robot frame used for transformation
+        m_nh.param(ParamNameGlobalFrame, m_globalFrame, GlobalFrameDft);
+        m_nh.param(ParamNameRobotFrame, m_robotFrame, RobotFrameDft);
+
         initCloudMsgFmt(m_msgCloud);
 
         ROS_INFO_STREAM("Cloud vSensor:" << endl
@@ -258,6 +262,8 @@ namespace geofrenzy
 
       //ROS transform listener
       tf::TransformListener m_tfListener;
+      std::string m_globalFrame;
+      std::string m_robotFrame;
 
       void utInit()
       {
@@ -347,8 +353,8 @@ namespace geofrenzy
         //msg.data.clear();
         tf::StampedTransform transform;
         try{
-          m_tfListener.waitForTransform("map", "base_footprint", ros::Time(0), ros::Duration(3.0));
-          m_tfListener.lookupTransform("map", "base_footprint", ros::Time(0), transform);
+          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, ros::Time(0), ros::Duration(3.0));
+          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, ros::Time(0), transform);
         }
         catch(tf::TransformException ex){
           ROS_ERROR("Received exception trying to transform point from global frame "

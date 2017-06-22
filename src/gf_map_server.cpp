@@ -97,6 +97,8 @@ namespace geofrenzy
 
         //ROS Transform Listener
         tf::TransformListener m_tfListener;
+        std::string m_globalFrame;
+        std::string m_robotFrame;
 
         // Messaging processing overhead
         ros::Time m_atime;        ///< last callback time
@@ -120,6 +122,9 @@ namespace geofrenzy
          * \brief Constructor for MapServer
          */
         ROS_DEBUG_STREAM("MapServer gf_class_idx = " << m_fenceClass);
+        //global frame and robot frame used for transformation
+        m_nh.param(ParamNameGlobalFrame, m_globalFrame, GlobalFrameDft);
+        m_nh.param(ParamNameRobotFrame, m_robotFrame, RobotFrameDft);
     }
 
     /*!
@@ -314,20 +319,20 @@ namespace geofrenzy
         ROS_DEBUG("Feature Collection Callback");
 
         //Fetch values from parameter server
-        m_nh.param("map_width", mapWidth, MapWidth);
-        m_nh.param("map_height", mapHeight, MapHeight);
-        m_nh.param("map_resolution", mapResolution, MapResolution);
+        m_nh.param(ParamNameMapWidth, mapWidth, MapWidthDft);
+        m_nh.param(ParamNameMapHeight, mapHeight, MapHeightDft);
+        m_nh.param(ParamNameMapResolution, mapResolution, MapResolutionDft);
 
         //Get Robot transform
         m_atime = ros::Time::now();
         geometry_msgs::PoseStamped gfMapPose;
-        gfMapPose.header.frame_id="base_footprint";
+        gfMapPose.header.frame_id=m_robotFrame;
         gfMapPose.header.stamp = m_atime;
 
         tf::StampedTransform transform;
         try{
-          m_tfListener.waitForTransform("map", "base_footprint", m_atime, ros::Duration(3.0));
-          m_tfListener.lookupTransform("map", "base_footprint", m_atime, transform);
+          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, m_atime, ros::Duration(3.0));
+          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, m_atime, transform);
         }
         catch(tf::TransformException ex){
           ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
@@ -381,7 +386,7 @@ namespace geofrenzy
         m_mapMetadata.map_load_time = m_atime;
         m_mapMetadata.origin = gfMapPose.pose;
         m_occupancyGrid.info = m_mapMetadata;
-        m_occupancyGrid.header.frame_id="map";
+        m_occupancyGrid.header.frame_id = m_globalFrame;
         m_occupancyGrid.header.stamp = m_atime;
         ++m_nPublishCnt;
 

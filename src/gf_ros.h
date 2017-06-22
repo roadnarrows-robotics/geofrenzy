@@ -48,21 +48,21 @@ namespace geofrenzy
      *
      * Units: pixels
      */
-    const int MapWidth = 250; ///< default occupancy grid width
+    const int MapWidthDft = 250; ///< default occupancy grid width
 
     /*!
      * \brief Default map width for occupancy grid published by map server.
      *
      * Units: pixels
      */
-    const int MapHeight = 250; ///< default occupancy grid height
+    const int MapHeightDft = 250; ///< default occupancy grid height
 
     /*!
      * \brief Default map resolution for occupancy grid published by map server.
      *
      * Units: meters per pixel
      */
-    const double MapResolution = 0.2; ///< default occupancy grid height
+    const double MapResolutionDft = 0.2; ///< default occupancy grid resolution
 
     /*!
      * \brief Default point cloud horizontal resolution.
@@ -105,6 +105,20 @@ namespace geofrenzy
      * Units: Radians
      */
     const double CloudVFoVMaxDft = M_PI_2; ///< 90 degrees from up (horizontal)
+
+    /*!
+     * \brief Default global frame for transformations
+     *
+     *
+     */
+    const std::string GlobalFrameDft = "map";   ///< default global frame
+
+    /*!
+     * \brief Default global frame for transformations
+     *
+     *
+     */
+    const std::string RobotFrameDft = "base_footprint";   ///< default global frame
 
     /*!
      * \brief Supported point cloud output formats.
@@ -198,6 +212,40 @@ namespace geofrenzy
      */
     const char *const ParamNameCloudPublishFmt = "geofrenzy_cloud_out_fmt";
 
+    /*!
+     * \brief Map width parameter name
+     *
+     * If the value is not set, then MapWidthDft is used.
+     */
+    const char *const ParamNameMapWidth = "geofrenzy_map_width";
+
+    /*!
+     * \brief Map height parameter name
+     *
+     * If the value is not set, then MapHeightDft is used.
+     */
+    const char *const ParamNameMapHeight = "geofrenzy_map_height";
+
+    /*!
+     * \brief Map resoltion parameter name
+     *
+     * If the value is not set, then MapResolutionDft is used.
+     */
+    const char *const ParamNameMapResolution = "geofrenzy_map_resolution";
+
+    /*!
+     * \brief Global Frame parameter name.
+     *
+     * If the value is not set, then GlobalFrameDft is used.
+     */
+    const char *const ParamNameGlobalFrame = "geofrenzy_global_frame";
+
+    /*!
+     * \brief Robot Frame parameter name.
+     *
+     * If the value is not set, then RobotFrameDft is used.
+     */
+    const char *const ParamNameRobotFrame = "geofrenzy_robot_frame";
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Geofrenzy ROS node root names
