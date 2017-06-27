@@ -1,3 +1,7 @@
+# Status
+
+THIS PACKAGE IS A WORK IN PROGRESS
+
 # Package Summary
 The geofrenzy package provides a set of ROS nodes, tools, and examples for GeoNetwork geofencing applications.
 
@@ -17,7 +21,7 @@ All Rights Reserved
 
 ## License
 MIT<br>
-See the EULA for more details.
+See the [EULA](https://github.com/roadnarrows-robotics/geofrenzy/blob/master/EULA.md)<br> for more details.
 
 ## See Also
 See documentation for more details.
