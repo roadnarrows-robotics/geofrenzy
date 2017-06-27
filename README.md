@@ -1,6 +1,9 @@
 # Status
 
-THIS PACKAGE IS A WORK IN PROGRESS
+THIS PACKAGE IS A WORK IN PROGRESS.
+
+Design and operation subject to change. 
+Positive Delta from Alpha but not Beta.
 
 # Package Summary
 The geofrenzy package provides a set of ROS nodes, tools, and examples for GeoNetwork geofencing applications.
