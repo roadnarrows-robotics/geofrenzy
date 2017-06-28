@@ -101,7 +101,7 @@ namespace geofrenzy
         std::string m_robotFrame;
 
         // Messaging processing overhead
-        ros::Time m_atime;        ///< last callback time
+        ros::Time m_fixtime;        ///< last NavSat fix time
         int       m_nPublishCnt;  ///< publish counter
 
         //Messages for publishing
@@ -116,7 +116,7 @@ namespace geofrenzy
 
 
     MapServer::MapServer(ros::NodeHandle &nh, double hz, uint64_t gf_class_idx) :
-        m_fenceClass(gf_class_idx), m_nh(nh), m_hz(hz), m_atime(0.0), m_nPublishCnt(0)
+        m_fenceClass(gf_class_idx), m_nh(nh), m_hz(hz), m_fixtime(0.0), m_nPublishCnt(0)
     {
         /*!
          * \brief Constructor for MapServer
@@ -324,15 +324,15 @@ namespace geofrenzy
         m_nh.param(ParamNameMapResolution, mapResolution, MapResolutionDft);
 
         //Get Robot transform
-        m_atime = ros::Time::now();
+        m_fixtime = distFeatures.fix_time;
         geometry_msgs::PoseStamped gfMapPose;
         gfMapPose.header.frame_id=m_robotFrame;
-        gfMapPose.header.stamp = m_atime;
+        gfMapPose.header.stamp = ros::Time::now();
 
         tf::StampedTransform transform;
         try{
-          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, m_atime, ros::Duration(3.0));
-          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, m_atime, transform);
+          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, m_fixtime, ros::Duration(3.0));
+          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, m_fixtime, transform);
         }
         catch(tf::TransformException ex){
           ROS_ERROR("Received exception trying to transform point from map to base_footprint: %s", ex.what());
@@ -383,11 +383,11 @@ namespace geofrenzy
         m_mapMetadata.resolution = mapGrid.m_gridResolution;
         m_mapMetadata.width = mapGrid.m_gridWidth;
         m_mapMetadata.height = mapGrid.m_gridLength;
-        m_mapMetadata.map_load_time = m_atime;
+        m_mapMetadata.map_load_time = ros::Time::now();
         m_mapMetadata.origin = gfMapPose.pose;
         m_occupancyGrid.info = m_mapMetadata;
         m_occupancyGrid.header.frame_id = m_globalFrame;
-        m_occupancyGrid.header.stamp = m_atime;
+        m_occupancyGrid.header.stamp = ros::Time::now();
         ++m_nPublishCnt;
 
     }

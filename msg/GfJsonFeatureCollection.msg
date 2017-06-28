@@ -12,3 +12,4 @@ Header          header      # Standard ROS header
 time            access_time # The last valid portal access time.
 std_msgs/String features    # The collection of features with geographic
                             # centric fences formatted as a json string.
+time            fix_time    # time when last NavFix was generated

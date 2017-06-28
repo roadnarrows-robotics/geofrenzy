@@ -264,6 +264,7 @@ namespace geofrenzy
       tf::TransformListener m_tfListener;
       std::string m_globalFrame;
       std::string m_robotFrame;
+      ros::Time m_fixTime;
 
       void utInit()
       {
@@ -353,8 +354,8 @@ namespace geofrenzy
  
         tf::StampedTransform transform;
         try{
-          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, ros::Time(0), ros::Duration(3.0));
-          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, ros::Time(0), transform);
+          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, m_fixTime, ros::Duration(3.0));
+          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, m_fixTime, transform);
         }
         catch(tf::TransformException ex){
           ROS_ERROR("Received exception trying to transform point from global frame "
@@ -402,6 +403,7 @@ namespace geofrenzy
         EigenSceneObj sceneObj;
         size_t        i, j;
 
+        m_fixTime = msg->fix_time;
         m_scene.clear();
 
         for(i = 0; i < msg->features.size(); ++i)

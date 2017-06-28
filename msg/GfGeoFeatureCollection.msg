@@ -13,3 +13,4 @@ Header          header      # Standard ROS header
 time            access_time # The last valid portal access time.
 GfGeoFeature[]  features    # The collection of features with geographic
                             # centric fences.
+time            fix_time    # time when last NavFix was generated

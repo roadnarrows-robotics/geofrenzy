@@ -1026,6 +1026,9 @@ namespace geofrenzy
           ROS_INFO_STREAM("No GPS acquired.");
           return;
         }
+
+        //Set time fix was acquired
+        m_fixTime = msg->header.stamp;
   
         // new location
         m_previousLat  = m_currentLat;
@@ -1122,15 +1125,18 @@ namespace geofrenzy
         // Json feature collection
         m_msgFcJson.features.data = strJson;
         m_msgFcJson.access_time   = m_atime;
+        m_msgFcJson.fix_time = m_fixTime;
         stampHeader(m_msgFcJson.header, m_msgFcJson.header.seq+1);
 
         // geographic centric feature collection (data filled on update)
         m_msgFcGeo.access_time = m_atime;
+        m_msgFcGeo.fix_time = m_fixTime;
         stampHeader(m_msgFcGeo.header, m_msgFcGeo.header.seq+1);
 
         // distance centric feature collection
         convertGeoToDistMsg(m_msgFcGeo, m_msgFcDist);
         m_msgFcDist.access_time = m_atime;
+        m_msgFcDist.fix_time = m_fixTime;
         stampHeader(m_msgFcDist.header, m_msgFcDist.header.seq+1);
 
         ++m_nPublishCnt;
@@ -1209,6 +1215,7 @@ namespace geofrenzy
 
       // Messaging processing overhead
       ros::Time m_atime;        ///< last portal access time
+      ros::Time m_fixTime;      ///< last NavSat fix time
       int       m_nPublishCnt;  ///< publish counter
 
       // Message for publishing
