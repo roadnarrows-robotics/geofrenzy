@@ -6,6 +6,9 @@ GeoFrenzy is a "Doing Business As" name and trademark for GeoNetwork.
 [geo.network](http://geo.network)<br>
 All Rights Reserved
 
+## License:
+MIT License
+
 ## Permissions:
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
