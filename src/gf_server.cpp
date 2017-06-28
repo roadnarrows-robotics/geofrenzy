@@ -902,10 +902,10 @@ namespace geofrenzy
               // add point
               geoPolygon.points.push_back(geoPoint);
             }
-          }
 
-          // add polygon fence
-          geoFeature.geometry.push_back(geoPolygon);
+            // add polygon fence
+            geoFeature.geometry.push_back(geoPolygon);
+          }
 
           //
           // Loop the json feature entitlements.

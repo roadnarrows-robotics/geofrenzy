@@ -337,8 +337,6 @@ namespace geofrenzy
       {
         sensor_msgs::PointCloud2Modifier modifier(msg);
 
-        //modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
-
         modifier.resize(points.size());
 
         sensor_msgs::PointCloud2Iterator<float>   iter_x(msg, "x");
@@ -347,10 +345,12 @@ namespace geofrenzy
         sensor_msgs::PointCloud2Iterator<uint8_t> iter_r(msg, "r");
         sensor_msgs::PointCloud2Iterator<uint8_t> iter_g(msg, "g");
         sensor_msgs::PointCloud2Iterator<uint8_t> iter_b(msg, "b");
+        sensor_msgs::PointCloud2Iterator<uint8_t> iter_a(msg, "a");
 
         size_t  i;
 
         //msg.data.clear();
+ 
         tf::StampedTransform transform;
         try{
           m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, ros::Time(0), ros::Duration(3.0));
@@ -360,17 +360,32 @@ namespace geofrenzy
           ROS_ERROR("Received exception trying to transform point from global frame "
                     "to robot frame: %s", ex.what());
         }
-        for(i = 0;
-            i < points.size() && i < msg.data.size();
-            ++i, ++iter_x, ++iter_y, ++iter_z, ++iter_r, ++iter_g, ++iter_b)
+
+        for(i = 0; i < points.size() && i < msg.data.size(); ++i)
         {
           *iter_x = (float)points[i][_X] + transform.getOrigin().getX();
           *iter_y = (float)points[i][_Y] + transform.getOrigin().getY();
           *iter_z = (float)points[i][_Z];
 
-          *iter_r = (uint8_t)(points[i][_RED]   * 255.0);
-          *iter_g = (uint8_t)(points[i][_GREEN] * 255.0);
-          *iter_b = (uint8_t)(points[i][_BLUE]  * 255.0);
+          ++iter_x; ++iter_y; ++iter_z;
+
+          // include color
+          if( (m_ePublishFmt == CloudFmtXYZRGB) ||
+              (m_ePublishFmt == CloudFmtXYZRGBA) )
+          {
+            *iter_r = (uint8_t)(points[i][_RED]   * 255.0);
+            *iter_g = (uint8_t)(points[i][_GREEN] * 255.0);
+            *iter_b = (uint8_t)(points[i][_BLUE]  * 255.0);
+
+            ++iter_r; ++iter_g; ++iter_b;
+
+            // include alpha
+            if( m_ePublishFmt == CloudFmtXYZRGBA )
+            {
+              *iter_a = (uint8_t)(points[i][_ALPHA]  * 255.0);
+              ++iter_a;
+            }
+          }
         }
 
         stampHeader(msg.header, msg.header.seq+1, "cloud");
