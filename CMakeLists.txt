@@ -231,6 +231,10 @@ endif()
 #message( STATUS ${FALIB})
 include_directories(src include $(catkin_INCLUDE_DIRS))
 
+# gprof profiler compile and link options
+# Uncomment to use
+#set(GPROF_OPTS PUBLIC -pg -fprofile-arcs)
+
 # Geofrenzy map server node
 add_executable(gf_map_server
   src/gf_ros.cpp
@@ -250,4 +254,7 @@ add_executable(gf_vcloud
   src/gf_math.cpp
   src/gf_ros.cpp
   src/gf_vcloud.cpp)
-target_link_libraries(gf_vcloud ${catkin_LIBRARIES})
+target_link_libraries(gf_vcloud
+  ${GPROF_OPTS}
+  ${catkin_LIBRARIES})
+#target_compile_options(gf_vcloud ${GPROF_OPTS})

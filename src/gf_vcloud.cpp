@@ -84,9 +84,15 @@ using namespace std;
 using namespace boost::assign;
 using namespace geofrenzy::gf_ros;
 using namespace geofrenzy::gf_math;
+using namespace geofrenzy::gf_math::idx;
 
+//
+// Unit Test Switch (only available if math ut is also enabled)  
+//
 #ifdef GF_MATH_UT
-#undef GF_CLOUD_NODE_UT   ///< cloud node unit test (only if math ut enabled)  
+#undef GF_VCLOUD_NODE_UT  ///< define to enable unit test
+#else
+#undef GF_VCLOUD_NODE_UT  ///< ut always disabled
 #endif // GF_MATH_UT
 
 namespace geofrenzy
@@ -140,7 +146,7 @@ namespace geofrenzy
         m_nh.param(ParamNameCloudVFoVMin, m_fVFoVMin, CloudVFoVMinDft);
         m_nh.param(ParamNameCloudVFoVMax, m_fVFoVMax, CloudVFoVMaxDft);
 
-        // resolution (note: no unsigned i/f to parameter server
+        // resolution (note: no unsigned i/f to parameter server)
         m_nh.param(ParamNameCloudWidth, val, CloudWidthDft);
         m_uWidth = (size_t)val;
         m_nh.param(ParamNameCloudHeight, val, CloudHeightDft);
@@ -162,10 +168,6 @@ namespace geofrenzy
             << "  vertical FoV:   " << "[" << degrees(m_fVFoVMin) << ", "
                                     << degrees(m_fVFoVMax) << "]" << endl
             << "  output format:  " << m_ePublishFmt);
-
-#ifdef GF_CLOUD_NODE_UT
-        utInit();
-#endif // GF_CLOUD_NODE_UT
 
         return true;
       }
@@ -206,9 +208,15 @@ namespace geofrenzy
         string  strServerNode = makeNodeName(NodeRootFenceServer, m_gfClassIdx);
         string  strTopic = "/" + strServerNode + "/" + TopicNameFcDist;
 
+#ifdef GF_VCLOUD_NODE_UT
+        m_subscriptions[strTopic] = m_nh.subscribe(strTopic, 1,
+                                              &vSensorCloud::utFcDist,
+                                              &(*this));
+#else
         m_subscriptions[strTopic] = m_nh.subscribe(strTopic, 1,
                                               &vSensorCloud::cbFcDist,
                                               &(*this));
+#endif // GF_VCLOUD_NODE_UT
       }
 
       /*!
@@ -218,12 +226,24 @@ namespace geofrenzy
        */
       void publish()
       {
+#ifdef GF_VCLOUD_NODE_UT
+        // force publishing on every cycle
+        if( m_nPublishCnt <= 0 )
+        {
+          utCreateFixedScene();
+        }
+#endif // GF_VCLOUD_NODE_UT
+
         if( m_nPublishCnt > 0 )
         {
           EigenXYZRGBAList      points;
 
+          ROS_INFO_STREAM("Scan " << m_scene.size() << " fences.");
+
           scanScene(m_fHFoVMin, m_fHFoVMax, m_fVFoVMin, m_fVFoVMax,
                     m_uWidth, m_uHeight, m_scene, points, ScanOptionDft);
+
+          ROS_INFO_STREAM("Update and publish cloud message.");
 
           updateCloudMsg(points, m_msgCloud);
 
@@ -245,15 +265,15 @@ namespace geofrenzy
       MapSubscriptions  m_subscriptions;  ///< Geofrenzy server subscriptions
 
       // sensor properties
-      double  m_fHFoVMin;
-      double  m_fHFoVMax;
-      double  m_fVFoVMin;
-      double  m_fVFoVMax;
-      size_t  m_uWidth;
-      size_t  m_uHeight;
+      double  m_fHFoVMin;   ///< min horizontal fov (radians)
+      double  m_fHFoVMax;   ///< max horizontal fov (radians)
+      double  m_fVFoVMin;   ///< min vertical fov (radians)
+      double  m_fVFoVMax;   ///< max vertical fov (radians)
+      size_t  m_uWidth;     ///< num of steps between min,max HFoV
+      size_t  m_uHeight;    ///< num of steps between min,max VFoV
 
       // scene
-      EigenScene  m_scene;
+      EigenScene  m_scene;  ///< scene of polygonal shapes with attributes
 
       // messaging processing 
       int                       m_nPublishCnt;  ///< publish counter
@@ -266,9 +286,144 @@ namespace geofrenzy
       std::string m_robotFrame;
       ros::Time m_fixTime;
 
-      void utInit()
+      /*!
+       * \brief Initialize cloud message output format.
+       *
+       * \param msg PointCloud2 ROS message.
+       */
+      void initCloudMsgFmt(sensor_msgs::PointCloud2 &msg)
       {
-#ifdef GF_CLOUD_NODE_UT
+        sensor_msgs::PointCloud2Modifier modifier(msg);
+
+        switch( m_ePublishFmt )
+        {
+          case CloudFmtXYZ:
+            modifier.setPointCloud2FieldsByString(1, "xyz");
+            break;
+          case CloudFmtXYZRGBA:
+            modifier.setPointCloud2FieldsByString(2, "xyz", "rgba");
+            break;
+          case CloudFmtXYZRGB:
+          default:
+            modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
+            break;
+        }
+      }
+
+      /*!
+       * \brief Update cloud message with new scene points.
+       *
+       * \param points  Detected scene points.
+       * \param msg     PointCloud2 ROS message.
+       */
+      void updateCloudMsg(const EigenXYZRGBAList   &points, 
+                          sensor_msgs::PointCloud2 &msg)
+      {
+        sensor_msgs::PointCloud2Modifier modifier(msg);
+
+        // resize cloud (is this light weight?)
+        modifier.resize(points.size());
+
+        // iterators
+        sensor_msgs::PointCloud2Iterator<float>   iter_x(msg, "x");
+        sensor_msgs::PointCloud2Iterator<float>   iter_y(msg, "y");
+        sensor_msgs::PointCloud2Iterator<float>   iter_z(msg, "z");
+        sensor_msgs::PointCloud2Iterator<uint8_t> iter_r(msg, "r");
+        sensor_msgs::PointCloud2Iterator<uint8_t> iter_g(msg, "g");
+        sensor_msgs::PointCloud2Iterator<uint8_t> iter_b(msg, "b");
+        sensor_msgs::PointCloud2Iterator<uint8_t> iter_a(msg, "a");
+
+        //msg.data.clear();
+ 
+        tf::StampedTransform transform;
+
+#ifdef GF_VCLOUD_NODE_UT
+        transform.getOrigin().setX(0.0);
+        transform.getOrigin().setY(0.0);
+#else
+        // transform
+        try{
+          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, m_fixTime, ros::Duration(3.0));
+          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, m_fixTime, transform);
+        }
+        catch(tf::TransformException ex){
+          ROS_ERROR("Received exception trying to transform point from global frame "
+                    "to robot frame: %s", ex.what());
+        }
+#endif // GF_VCLOUD_NODE_UT
+
+        // Convert points to pointcloud
+        for(size_t i = 0; i < points.size() && i < msg.data.size(); ++i)
+        {
+          *iter_x = (float)points[i][_X] + transform.getOrigin().getX();
+          *iter_y = (float)points[i][_Y] + transform.getOrigin().getY();
+          *iter_z = (float)points[i][_Z];
+
+          ++iter_x; ++iter_y; ++iter_z;
+
+          // include color
+          if( (m_ePublishFmt == CloudFmtXYZRGB) ||
+              (m_ePublishFmt == CloudFmtXYZRGBA) )
+          {
+            *iter_r = (uint8_t)(points[i][_XYZRED]   * Color24ChannelMax);
+            *iter_g = (uint8_t)(points[i][_XYZGREEN] * Color24ChannelMax);
+            *iter_b = (uint8_t)(points[i][_XYZBLUE]  * Color24ChannelMax);
+
+            ++iter_r; ++iter_g; ++iter_b;
+
+            // include alpha
+            if( m_ePublishFmt == CloudFmtXYZRGBA )
+            {
+              *iter_a = (uint8_t)(points[i][_XYZALPHA]  * Color24ChannelMax);
+              ++iter_a;
+            }
+          }
+        }
+
+        stampHeader(msg.header, msg.header.seq+1, "cloud");
+      }
+
+      /*!
+       * \brief Distance feature collection subscribed callback.
+       */
+      void cbFcDist(const geofrenzy::GfDistFeatureCollection::ConstPtr &msg)
+      {
+        ROS_DEBUG(TopicNameFcDist);
+
+        EigenSceneObj sceneObj;
+        size_t        i, j;
+
+        m_fixTime = msg->fix_time;
+        m_scene.clear();
+
+        for(i = 0; i < msg->features.size(); ++i)
+        {
+          const GfDistFeature &feat = msg->features[i]; 
+
+          for(j = 0; j < feat.geometry.size(); ++j)
+          {
+            m_scene.push_back(sceneObj);
+            createSceneObj(feat.geometry[j], FenceColorDft, 2.0,
+                m_scene.back());
+          }
+        }
+
+        if( m_scene.size() > 0 )
+        {
+          ++m_nPublishCnt;
+        }
+      }
+
+#ifdef GF_VCLOUD_NODE_UT
+      // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+      // Unit Test
+      // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+      /*!
+       * \brief Unit test creation of fixed scene.
+       */
+      void utCreateFixedScene()
+      {
         EigenSceneObj         sceneObj;
         geofrenzy::Polygon64  polygon;
         EigenPoint3           offset1(2.0, 0.0, 0.0);
@@ -280,6 +435,8 @@ namespace geofrenzy
         EigenRGBA             color3(0.5, 0.0, 0.5, 0.5);
         EigenRGBA             color4(0.1, 0.5, 0.1, 0.5);
         double                scale  = 0.1;
+
+        m_scene.clear();
 
         //
         // Object one
@@ -311,121 +468,20 @@ namespace geofrenzy
         utMakeCannedPolygon(UtPolynumTriangle, offset4, 0.05, polygon);
         m_scene.push_back(sceneObj);
         createSceneObj(polygon, color4, 2.0, m_scene.back());
-#endif // GF_CLOUD_NODE_UT
-      }
 
-      void initCloudMsgFmt(sensor_msgs::PointCloud2 &msg)
-      {
-        sensor_msgs::PointCloud2Modifier modifier(msg);
-
-        switch( m_ePublishFmt )
-        {
-          case CloudFmtXYZ:
-            modifier.setPointCloud2FieldsByString(1, "xyz");
-            break;
-          case CloudFmtXYZRGBA:
-            modifier.setPointCloud2FieldsByString(2, "xyz", "rgba");
-            break;
-          case CloudFmtXYZRGB:
-          default:
-            modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
-            break;
-        }
-      }
-
-      void updateCloudMsg(const EigenXYZRGBAList   &points, 
-                          sensor_msgs::PointCloud2 &msg)
-      {
-        sensor_msgs::PointCloud2Modifier modifier(msg);
-
-        modifier.resize(points.size());
-
-        sensor_msgs::PointCloud2Iterator<float>   iter_x(msg, "x");
-        sensor_msgs::PointCloud2Iterator<float>   iter_y(msg, "y");
-        sensor_msgs::PointCloud2Iterator<float>   iter_z(msg, "z");
-        sensor_msgs::PointCloud2Iterator<uint8_t> iter_r(msg, "r");
-        sensor_msgs::PointCloud2Iterator<uint8_t> iter_g(msg, "g");
-        sensor_msgs::PointCloud2Iterator<uint8_t> iter_b(msg, "b");
-        sensor_msgs::PointCloud2Iterator<uint8_t> iter_a(msg, "a");
-
-        size_t  i;
-
-        //msg.data.clear();
- 
-        tf::StampedTransform transform;
-        try{
-          m_tfListener.waitForTransform(m_globalFrame, m_robotFrame, m_fixTime, ros::Duration(3.0));
-          m_tfListener.lookupTransform(m_globalFrame, m_robotFrame, m_fixTime, transform);
-        }
-        catch(tf::TransformException ex){
-          ROS_ERROR("Received exception trying to transform point from global frame "
-                    "to robot frame: %s", ex.what());
-        }
-
-        for(i = 0; i < points.size() && i < msg.data.size(); ++i)
-        {
-          *iter_x = (float)points[i][_X] + transform.getOrigin().getX();
-          *iter_y = (float)points[i][_Y] + transform.getOrigin().getY();
-          *iter_z = (float)points[i][_Z];
-
-          ++iter_x; ++iter_y; ++iter_z;
-
-          // include color
-          if( (m_ePublishFmt == CloudFmtXYZRGB) ||
-              (m_ePublishFmt == CloudFmtXYZRGBA) )
-          {
-            *iter_r = (uint8_t)(points[i][_RED]   * 255.0);
-            *iter_g = (uint8_t)(points[i][_GREEN] * 255.0);
-            *iter_b = (uint8_t)(points[i][_BLUE]  * 255.0);
-
-            ++iter_r; ++iter_g; ++iter_b;
-
-            // include alpha
-            if( m_ePublishFmt == CloudFmtXYZRGBA )
-            {
-              *iter_a = (uint8_t)(points[i][_ALPHA]  * 255.0);
-              ++iter_a;
-            }
-          }
-        }
-
-        stampHeader(msg.header, msg.header.seq+1, "cloud");
+        ++m_nPublishCnt;
       }
 
       /*!
-       * \brief Distance feature collection subscribed callback.
+       * \brief Unit test distance feature collection subscribed callback.
        */
-      void cbFcDist(const geofrenzy::GfDistFeatureCollection::ConstPtr &msg)
+      void utFcDist(const geofrenzy::GfDistFeatureCollection::ConstPtr &msg)
       {
-#ifndef GF_CLOUD_NODE_UT
-        ROS_DEBUG(TopicNameFcDist);
-
-        EigenSceneObj sceneObj;
-        size_t        i, j;
-
-        m_fixTime = msg->fix_time;
-        m_scene.clear();
-
-        for(i = 0; i < msg->features.size(); ++i)
-        {
-          const GfDistFeature &feat = msg->features[i]; 
-
-          for(j = 0; j < feat.geometry.size(); ++j)
-          {
-            m_scene.push_back(sceneObj);
-            createSceneObj(feat.geometry[j], FenceColorDft, 2.0,
-                m_scene.back());
-          }
-        }
-
-        if( m_scene.size() > 0 )
-        {
-          ++m_nPublishCnt;
-        }
-#endif // !GF_CLOUD_NODE_UT
+        // ignore message, create fixed scene
+        utCreateFixedScene();
       }
+#endif // GF_VCLOUD_NODE_UT
   };
-
 
 } // namespace geofrenzy
 

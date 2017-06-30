@@ -26,6 +26,8 @@ namespace geofrenzy
 {
   namespace gf_math
   {
+    using namespace idx;
+
     /*!
      * \brief Local structure to hold intermediary intersection info.
      */
@@ -80,6 +82,34 @@ namespace geofrenzy
     }
 
     /*!
+     * \brief Make theta limits from 2 points.
+     *
+     * \param pt0         Point 0.
+     * \param pt1         Point 1.
+     * \param epsilon     Limits accrucay.
+     * \param[out] ptLim  Output thetat min,max limits.
+     */
+    static void mkThetaLimits(const EigenPoint3 &pt0,
+                              const EigenPoint3 &pt1,
+                              const double      epsilon,
+                              EigenPoint2       &ptLim)
+    {
+      double theta0 = atan2(pt0.y(), pt0.x());
+      double theta1 = atan2(pt1.y(), pt1.x());
+
+      if( theta0 <= theta1 )
+      {
+        ptLim[_MIN] = theta0 - epsilon;
+        ptLim[_MAX] = theta1 + epsilon;
+      }
+      else
+      {
+        ptLim[_MIN] = theta1 - epsilon;
+        ptLim[_MAX] = theta0 + epsilon;
+      }
+    }
+
+    /*!
      * \brief Make a bounding box between two points within the given height
      * range.
      *
@@ -90,35 +120,35 @@ namespace geofrenzy
      * \param epsilon     Bounding region accrucay.
      * \param[out] bbox   Output bounding box.
      */
-    static void mkBBox(const geometry_msgs::Point &pt0,
-                       const geometry_msgs::Point &pt1,
-                       const double               heightMin,
-                       const double               heightMax,
-                       const double               epsilon,
-                       EigenBBox3                 &bbox)
+    static void mkBBox(const EigenPoint3 &pt0,
+                       const EigenPoint3 &pt1,
+                       const double      heightMin,
+                       const double      heightMax,
+                       const double      epsilon,
+                       EigenBBox3        &bbox)
     {
       // min,max x
-      if( pt0.x <= pt1.x )
+      if( pt0.x() <= pt1.x() )
       {
-        bbox.m_min.x() = pt0.x - epsilon;
-        bbox.m_max.x() = pt1.x + epsilon;
+        bbox.m_min.x() = pt0.x() - epsilon;
+        bbox.m_max.x() = pt1.x() + epsilon;
       }
       else
       {
-        bbox.m_min.x() = pt1.x - epsilon;
-        bbox.m_max.x() = pt0.x + epsilon;
+        bbox.m_min.x() = pt1.x() - epsilon;
+        bbox.m_max.x() = pt0.x() + epsilon;
       }
       
       // min,max y
-      if( pt0.y <= pt1.y )
+      if( pt0.y() <= pt1.y() )
       {
-        bbox.m_min.y() = pt0.y - epsilon;
-        bbox.m_max.y() = pt1.y + epsilon;
+        bbox.m_min.y() = pt0.y() - epsilon;
+        bbox.m_max.y() = pt1.y() + epsilon;
       }
       else
       {
-        bbox.m_min.y() = pt1.y - epsilon;
-        bbox.m_max.y() = pt0.y + epsilon;
+        bbox.m_min.y() = pt1.y() - epsilon;
+        bbox.m_max.y() = pt0.y() + epsilon;
       }
 
       // min,max z
@@ -194,9 +224,9 @@ namespace geofrenzy
                             const unsigned int blue,
                             EigenRGB           &rgb)
     {
-      rgb[_R] = (double)(  red & 0x0ff)/255.0;
-      rgb[_G] = (double)(green & 0x0ff)/255.0;
-      rgb[_B] = (double)( blue & 0x0ff)/255.0;
+      rgb[_RED]   = (double)(  red & 0x0ff)/Color24ChannelMax;
+      rgb[_GREEN] = (double)(green & 0x0ff)/Color24ChannelMax;
+      rgb[_BLUE]  = (double)( blue & 0x0ff)/Color24ChannelMax;
     }
 
     void rgba24ToIntensities(const unsigned int red,
@@ -205,21 +235,21 @@ namespace geofrenzy
                             const double       alpha,
                             EigenRGBA          &rgba)
     {
-      rgba[_R] = (double)(  red & 0x0ff)/255.0;
-      rgba[_G] = (double)(green & 0x0ff)/255.0;
-      rgba[_B] = (double)( blue & 0x0ff)/255.0;
+      rgba[_RED]   = (double)(  red & 0x0ff)/Color24ChannelMax;
+      rgba[_GREEN] = (double)(green & 0x0ff)/Color24ChannelMax;
+      rgba[_BLUE]  = (double)( blue & 0x0ff)/Color24ChannelMax;
 
       if( alpha < 0.0 )
       {
-        rgba[_A] = 0.0;
+        rgba[_ALPHA] = 0.0;
       }
       else if( alpha > 1.0 )
       {
-        rgba[_A] = 1.0;
+        rgba[_ALPHA] = 1.0;
       }
       else
       {
-        rgba[_A] = alpha;
+        rgba[_ALPHA] = alpha;
       }
     }
 
@@ -228,9 +258,9 @@ namespace geofrenzy
                             unsigned int   &green,
                             unsigned int   &blue)
     {
-      red   = (unsigned int)(rgb[_R] * 255.0) & 0x0ff;
-      green = (unsigned int)(rgb[_G] * 255.0) & 0x0ff;
-      blue  = (unsigned int)(rgb[_B] * 255.0) & 0x0ff;
+      red   = (unsigned int)(rgb[_RED]   * Color24ChannelMax) & 0x0ff;
+      green = (unsigned int)(rgb[_GREEN] * Color24ChannelMax) & 0x0ff;
+      blue  = (unsigned int)(rgb[_BLUE]  * Color24ChannelMax) & 0x0ff;
     }
 
     void intensitiesToRgb24(const EigenRGBA &rgba,
@@ -239,30 +269,36 @@ namespace geofrenzy
                             unsigned int    &blue,
                             double          &alpha)
     {
-      red   = (unsigned int)(rgba[_R] * 255.0) & 0x0ff;
-      green = (unsigned int)(rgba[_G] * 255.0) & 0x0ff;
-      blue  = (unsigned int)(rgba[_B] * 255.0) & 0x0ff;
-      alpha = rgba[_A];
+      red   = (unsigned int)(rgba[_RED]   * Color24ChannelMax) & 0x0ff;
+      green = (unsigned int)(rgba[_GREEN] * Color24ChannelMax) & 0x0ff;
+      blue  = (unsigned int)(rgba[_BLUE]  * Color24ChannelMax) & 0x0ff;
+      alpha = rgba[_ALPHA];
     }
 
     void alphaBlend(const EigenRGBA &colorFg,
                     const EigenRGBA &colorBg,
                     EigenRGBA       &colorOut)
     {
-      double fgAlpha  = colorFg[_A];
-      double bgAlpha  = colorBg[_A];
+      double fgAlpha  = colorFg[_ALPHA];
+      double bgAlpha  = colorBg[_ALPHA];
       double outAlpha = fgAlpha + bgAlpha * (1.0 - fgAlpha);
 
       if( outAlpha > 0.0 )
       {
         colorOut = (colorFg * fgAlpha +
                     colorBg * bgAlpha * (1.0 - fgAlpha)) / outAlpha; 
-        colorOut[_A] = outAlpha;
+        colorOut[_ALPHA] = outAlpha;
       }
       else
       {
         mkBlack(colorOut);
       }
+    }
+
+    ostream &operator<<(ostream &os, const EigenPoint2 &pt)
+    {
+      os << "(" << pt[0] << "," << pt[1] << ")";
+      return os;
     }
 
     ostream &operator<<(ostream &os, const EigenPoint3 &pt)
@@ -308,10 +344,12 @@ namespace geofrenzy
       EigenPlane3       plane;
       double            height;
       EigenPoint3       pt0, pt1, pt2;
+      EigenPoint2       ptLim;
       size_t            i, j;
 
       // clear
       sceneObj.m_color = color;
+      sceneObj.m_thetas.clear();
       sceneObj.m_planes.clear();
       sceneObj.m_bboxes.clear();
 
@@ -337,20 +375,22 @@ namespace geofrenzy
         pt2.y() = pt0.y();
         pt2.z() = height;
 
+        mkThetaLimits(pt0, pt1, 0.001, ptLim);
+
+        mkBBox(pt0, pt1, 0.0, height, 0.001, bbox);
+
+        sceneObj.m_thetas.push_back(ptLim);
         sceneObj.m_planes.push_back(EigenPlane3::Through(pt0, pt1, pt2));
-
-        mkBBox(polygon.points[i], polygon.points[j], 0.0, height, 0.001, bbox);
-
-        //cerr << "bbox: " << bbox << endl;
-
         sceneObj.m_bboxes.push_back(bbox);
 
+        //cerr << "limits: " << ptLim << endl;
+        //cerr << "bbox:   " << bbox << endl;
       }
 
-      cerr << "Created scene object: " << endl;
-      cerr << "  color:  " << sceneObj.m_color << endl;
-      cerr << "  height: " << fenceHeight << endl;
-      cerr << "  faces:  " << sceneObj.m_planes.size() << endl;
+      //cerr << "Created scene object: " << endl;
+      //cerr << "  color:  " << sceneObj.m_color << endl;
+      //cerr << "  height: " << fenceHeight << endl;
+      //cerr << "  faces:  " << sceneObj.m_planes.size() << endl;
     }
 
     void scanScene(const double thetaMin, const double thetaMax,
@@ -363,8 +403,6 @@ namespace geofrenzy
       double      thetaFoV = thetaMax - thetaMin; // theta field of view
       double      phiFoV   = phiMax - phiMin;     // phi field of view
       double      theta, phi;                     // working angles
-      EigenPoint3 pt0(0.0, 0.0, 0.0);             // observer's origin
-      EigenPoint3 pt1;                            // working (x,y,z) point
       size_t      i, j;                           // working indices
 
       //
@@ -381,22 +419,21 @@ namespace geofrenzy
         {
           theta = thetaMin + (thetaFoV * (double)j) / (double)width;
           
-          sphericalToCartesian(1.0, theta, phi, pt1);
-
-          EigenLine3 ray = EigenLine3::Through(pt0, pt1);
-
-          traceRay(ray, scene, intersects, options);
+          traceRay(theta, phi, scene, intersects, options);
         }
       }
     }
 
-    size_t traceRay(const EigenLine3 &ray,
+    size_t traceRay(const double     theta,
+                    const double     phi,
                     const EigenScene &scene,
                     EigenXYZRGBAList &intersects,
                     uint32_t         options)
     {
-      double        t;                          // intersection parameter value
       EigenPoint3   pt;                         // working point
+      bool          hasRay = false;             // lazy init boolean for ray
+      EigenLine3    ray;                        // ray
+      double        t;                          // intersection parameter value
       RayIntersect  ri;                         // ray intersect info
       RayOrderedIntersects  orderedIntersects;  // ordered list of intersects
       EigenRGBA     colorBlend;                 // alpha blended color
@@ -415,6 +452,21 @@ namespace geofrenzy
         //
         for(j = 0; j < sceneObj.m_planes.size(); ++j)
         {
+          // Pre-filter the ray for this face's min,max thetas. 
+          if( (theta < sceneObj.m_thetas[j][_MIN]) ||
+              (theta > sceneObj.m_thetas[j][_MAX]) )
+          {
+            continue;
+          }
+
+          // Lazy init of ray (performance tweak).
+          if( !hasRay )
+          {
+            sphericalToCartesian(1.0, theta, phi, pt);
+            ray = EigenLine3::Through(Origin3, pt);
+            hasRay = true;
+          }
+
           // Find intersection with 2D plane.
           t = ray.intersectionParameter(sceneObj.m_planes[j]);
 
@@ -474,13 +526,16 @@ namespace geofrenzy
           alphaBlend(colorBlend, iter->second.m_rgba, colorBlend);
 
           // full opacity - further blending is unnecessary
-          if( colorBlend[_A] >= 1.0 )
+          if( colorBlend[_ALPHA] >= 1.0 )
           {
             break;
           }
         }
       }
 
+      //
+      // Loop through all detected ray intersections.
+      //
       for(iter = orderedIntersects.begin();
           iter != orderedIntersects.end();
           ++iter)

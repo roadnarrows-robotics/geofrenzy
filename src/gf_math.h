@@ -41,6 +41,12 @@ namespace geofrenzy
 
     /*!
      * \ingroup gfmath_types_geo
+     * \brief Point in 2D space: 2x1 vector of doubles.
+     */
+    typedef Eigen::Vector2d EigenPoint2;
+
+    /*!
+     * \ingroup gfmath_types_geo
      * \brief Point in 3D space: 3x1 vector of doubles.
      */
     typedef Eigen::Vector3d EigenPoint3;
@@ -123,6 +129,13 @@ namespace geofrenzy
 
     /*! 
      * \ingroup gfmath_types_scene
+     * \brief List vector of min,max thetas for polyhedra faces in polar 
+     * coordinates.
+     */
+    typedef std::vector<EigenPoint2> EigenPoint2List;
+
+    /*! 
+     * \ingroup gfmath_types_scene
      * \brief List vector of planes container type.
      */
     typedef std::vector<EigenPlane3> EigenPlane3List;
@@ -143,9 +156,10 @@ namespace geofrenzy
      */
     struct EigenSceneObj
     {
-      EigenRGBA         m_color;    ///< RGBA color of fence
-      EigenPlane3List   m_planes;   ///< list of fence planes
-      EigenBBox3List    m_bboxes;   ///< list of fence clipping bounding boxes
+      EigenRGBA       m_color;  ///< RGBA color of fence
+      EigenPoint2List m_thetas; ///< list of face theta limits (polar coords)
+      EigenPlane3List m_planes; ///< list of fence planes
+      EigenBBox3List  m_bboxes; ///< list of fence clipping bounding boxes
     };
 
     /*! 
@@ -195,37 +209,86 @@ namespace geofrenzy
     /*!
      * \defgroup gfmath_const Constants
      * \brief Data constants.
+     *
+     * Note that indices are placed into a sub-namespace to reduce chances of
+     * naming conflicts.
      * \{
      */
-
-    // EigenPoint3
-    const size_t  _X = 0; ///< x coordinate (pt[_X] == pt.x())
-    const size_t  _Y = 1; ///< y coordinate (pt[_Y] == pt.y())
-    const size_t  _Z = 2; ///< z coordinate (pt[_Z] == pt.z())
-
-    // EigenRBG, EigenRGBA
-    const size_t  _R = 0; ///< red   (pt[_R] == pt.x())
-    const size_t  _G = 1; ///< green (pt[_G] == pt.y())
-    const size_t  _B = 2; ///< blue  (pt[_B] == pt.z())
-    const size_t  _A = 3; ///< alpha (pt[_A] == pt.w()?)
-
-    // EigenXYZRBG, EigenXYZRGBA
-    const size_t  _RED    = 3; ///< xyzred   (pt[_RED])
-    const size_t  _GREEN  = 4; ///< xyzgreen (pt[_GREEN])
-    const size_t  _BLUE   = 5; ///< xyzblue  (pt[_BLUE])
-    const size_t  _ALPHA  = 6; ///< xyzalpha (pt[_ALPHA])
+    namespace idx
+    {
+      //
+      // Minimum and maximum indices.
+      //
+      // EigenPoint2
+      //
+      const size_t  _MIN = 0; ///< x coordinate (= pt.x())
+      const size_t  _MAX = 1; ///< y coordinate (= pt.y())
+  
+      //
+      // Cartesian x,y,z coordinates indices.
+      //
+      // EigenPoint2(_X,_Y only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
+      //
+      const size_t  _X = 0; ///< x coordinate (= pt.x())
+      const size_t  _Y = 1; ///< y coordinate (= pt.y())
+      const size_t  _Z = 2; ///< z coordinate (= pt.z())
+  
+      //
+      // Spherical coordinates indices r,theta,phi.
+      //
+      // EigenPoint3
+      //
+      const size_t  _R      = 0;  ///< radial distance [0, inf).
+      const size_t  _THETA  = 1;  ///< azimuthal angle from x+ axis (-pi, pi].
+      const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
+  
+      //
+      // Color red-green-blue-alpha indices.
+      //
+      // EigenRBG, EigenRGBA
+      //
+      const size_t  _RED    = 0; ///< red   (= pt.x())
+      const size_t  _GREEN  = 1; ///< green (= pt.y())
+      const size_t  _BLUE   = 2; ///< blue  (= pt.z())
+      const size_t  _ALPHA  = 3; ///< alpha (= pt.w()?)
+  
+      //
+      // Color red-green-blue-alpha indices for XYZ+ points.
+      //
+      // EigenXYZRBG, EigenXYZRGBA
+      //
+      const size_t  _XYZRED   = 3; ///< xyzred
+      const size_t  _XYZGREEN = 4; ///< xyzgreen
+      const size_t  _XYZBLUE  = 5; ///< xyzblue
+      const size_t  _XYZALPHA = 6; ///< xyzalpha
+    } // namespace idx
  
     const double Inf = std::numeric_limits<double>::infinity(); ///< infinity
 
     /*!
+     * \brief Origin in 2D space.
+     */
+    const EigenPoint2 Origin2(0.0, 0.0);
+
+    /*!
+     * \brief Origin in 3D space.
+     */
+    const EigenPoint3 Origin3(0.0, 0.0, 0.0);
+
+    /*!
+     * \brief Maximum 24-bit color channel (r,g,b) value.
+     */
+    const double Color24ChannelMax = 255.0;
+
+    /*!
      * \brief Default fence color. 50% transparent blueish gray.
      */
-    const EigenRGBA FenceColorDft(0.25, 0.25, 0.35, 0.50);
+    const EigenRGBA FenceColorDft(0.30, 0.30, 0.45, 0.50);
 
     /*!
      * \brief Minimum fence height (meters).
      */
-    const double    FenceMinHeight = 0.10;
+    const double FenceMinHeight = 0.10;
 
     /*!
      * \brief Scanning bit-or'ed options.
@@ -249,8 +312,8 @@ namespace geofrenzy
       ScanOption2D  = 0x01,
 
       /*!
-       *  - Include only the nearest point of a set of intersections along a
-       *    traced ray.
+       * Include only the nearest point of a set of intersections along a
+       * traced ray.
        */
       ScanOptionNearest = 0x02,
 
@@ -416,6 +479,8 @@ namespace geofrenzy
      *
      * \return Reference to output stream.
      */
+    std::ostream &operator<<(std::ostream &os, const EigenPoint2 &pt);
+
     std::ostream &operator<<(std::ostream &os, const EigenPoint3 &pt);
 
     std::ostream &operator<<(std::ostream &os, const EigenRGBA &pt);
@@ -481,14 +546,18 @@ namespace geofrenzy
      * \brief Trace ray through virtual scene to generate a list of
      * intersecting depth + color points.
      *
-     * \param       ray         The ray (parametrized line) to trace.
+     * The Sperical coordinates are as used in mathematics.
+     *
+     * \param       theta       Ray's azimuthal angle from x+ axis (-pi, pi].
+     * \param       phi         Ray's polar angle from z+ [0, pi].
      * \param       scene       The scene.
      * \param[out]  intersects  List of intersecting points.
      * \param       options     Options to control the trace.
      *
      * \return Number of intersections added.
      */
-    size_t traceRay(const EigenLine3 &ray,
+    size_t traceRay(const double     theta,
+                    const double     phi,
                     const EigenScene &scene,
                     EigenXYZRGBAList &intersects,
                     uint32_t         options = ScanOptionDft);
@@ -500,7 +569,7 @@ namespace geofrenzy
     // Unit Tests
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-#define GF_MATH_UT  ///< define/undef to enable/disable unit test functions.
+#undef GF_MATH_UT  ///< define/undef to enable/disable unit test functions.
 
 #ifdef GF_MATH_UT
     /*!
