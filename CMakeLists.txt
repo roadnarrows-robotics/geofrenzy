@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   occupancy_grid_utils
   swri_transform_util
+  cv_bridge
 )
 
 ## System dependencies are found with CMake's conventions
@@ -258,3 +259,9 @@ target_link_libraries(gf_vcloud
   ${GPROF_OPTS}
   ${catkin_LIBRARIES})
 #target_compile_options(gf_vcloud ${GPROF_OPTS})
+
+# geofrenzy sensor relay
+add_executable(gf_sensor_relay
+  src/gf_ros.cpp
+  src/gf_sensor_relay.cpp)
+target_link_libraries(gf_sensor_relay ${catkin_LIBRARIES})

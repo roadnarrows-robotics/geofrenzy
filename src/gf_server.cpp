@@ -636,7 +636,7 @@ namespace geofrenzy
         {
           uint64_t    gf_ent_idx  = entitlements[i]["ent_idx"].asUInt64();
           std::string gf_ent_base = entitlements[i]["ent_base"].asString();
-
+          ROS_INFO_STREAM("New Entitlement: " << gf_ent_idx << " : " << gf_ent_base);
           // new
           if( m_entitlements.find(gf_ent_idx) == m_entitlements.end() )
           {

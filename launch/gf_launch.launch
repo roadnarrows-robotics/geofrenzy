@@ -1,10 +1,10 @@
 <launch>
   <!-- Start Geofrenzy Node -->
-  <node name="gf_server_168" pkg="geofrenzy" type="gf_server" args="_gf_class_idx:=168" output="screen" />
-  <param name="gf_server_168/geojson_file" type="str" value="/home/woundzoom/catkin_ws/src/laelaps_2dnav/samplefences/playground_fences.json" />
+  <node name="gf_server_168" pkg="geofrenzy" type="gf_server" args="_gf_class_idx:=168" />
+  <param name="gf_server_168/geofrenzy_fence_filename" type="str" value="/home/woundzoom/catkin_ws/src/laelaps_2dnav/samplefences/shape_fences.json" />
 
   <!-- Start Geofrenzy Map Server -->
-  <node name="gf_map_server_168" pkg="geofrenzy" type="gf_map_server" args="_gf_class_idx:=168" output="screen">
+  <node name="gf_map_server_168" pkg="geofrenzy" type="gf_map_server" args="_gf_class_idx:=168">
     <remap from="gf_map_server_168/geofrenzy/map" to="/map"/>
     <remap from="gf_map_server_168/geofrenzy/map_metadata" to="/map_metadata"/>
   </node>
@@ -13,5 +13,8 @@
   <node name="pointcloud_to_laserscan_node" pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node">
     <remap from="scan" to="scan_from_pointcloud"/>
   </node>
+
+  <!-- Start Sensor Relay -->
+  <node name="gf_sensor_relay" pkg="geofrenzy" type="gf_sensor_relay" output="screen"/>
 
 </launch>
