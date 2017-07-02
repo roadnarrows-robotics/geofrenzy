@@ -1,6 +1,6 @@
 # GeoFrenzy appkit Package End User License Agreement
 
-Copyright [yyyy] [GeoNetwork]
+Copyright [2017] [GeoNetwork]
 [geo.network](http://geo.network)
 
 Licensed under the **Apache License, Version 2.0** (the "License");
