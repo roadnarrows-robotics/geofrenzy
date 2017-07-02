@@ -11,7 +11,7 @@ The geofrenzy package provides a set of ROS nodes, tools, and examples for GeoNe
 * Maintainer status: maintained
 * Maintainer: Chris Stradman <chris.stradtman AT geo.network> 
 * Authors: Robin D Knight <robin.knight AT roadnarrows.com>, Bill Coon <bill AT roadnarrows.com>, Chris Stradman <chris.stradtman AT geo.network>
-* License: MIT
+* License: Apache 2.0
 * Source: git https://github.com/roadnarrows-robotics/geofrenzy (branch: main)
 
 ## Description
