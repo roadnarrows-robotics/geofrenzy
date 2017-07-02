@@ -23,7 +23,7 @@ This is a ROS package by GeoNetwork which provides open-source nodes, tools, and
 All Rights Reserved
 
 ## License
-MIT<br>
+Apache 2.0<br>
 See the [EULA](https://github.com/roadnarrows-robotics/geofrenzy/blob/master/EULA.md)<br> for more details.
 
 ## See Also
