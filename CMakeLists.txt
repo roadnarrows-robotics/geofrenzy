@@ -265,3 +265,9 @@ add_executable(gf_sensor_relay
   src/gf_ros.cpp
   src/gf_sensor_relay.cpp)
 target_link_libraries(gf_sensor_relay ${catkin_LIBRARIES})
+
+install(
+  PROGRAMS 
+    scripts/latlongmeters.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
