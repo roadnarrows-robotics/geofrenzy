@@ -119,7 +119,7 @@ BuiltInGeoCoords = {
   #'AVC2017':      (0.0, 0.0),  # RDK TODO need real Denver location coordinates
   'AVC2017':      (40.38085964, -105.099197), # RDK Use Boulder for now
   'Berlin':       (52.5200, 13.4050),
-  'Boulder':      (40.38085964, -105.099197),
+  'Boulder':      (40.380882911, -105.099170503),
   'Brisbane':     (-27.4698, 153.0251),
   'Fiji':         (-17.7134, 178.0650),
   'Guam':         (13.4443, 144.7937),
@@ -284,6 +284,30 @@ def geomeasure(lat1, lon1, lat2, lon2):
   return d * 1000.0 # meters
 
 ##
+# \brief Calculate the meters/degree latitude and longitude.
+#
+# The WGS84 spheroid model of the Earth is used.
+#
+# \param lat    Geographic latitude (degrees)
+# \param lon    Geographic longitude (degrees)
+#
+# \return Returns m/degree latitude and longitude
+#
+def mpd(lat, lon):
+  rlat = radians(lat)
+
+  mpdLat = 111132.92 \
+            - 559.82 * m.cos(2.0 * rlat) \
+            + 1.175 * m.cos(4.0 * rlat) \
+            - 0.0023 * m.cos(6.0 * rlat)
+
+  mpdLon = 111412.84 * m.cos(rlat) \
+            - 93.5 * m.cos(3.0 * rlat) \
+            + 0.118 * m.cos(5.0 * rlat)
+
+  return mpdLat, mpdLon
+
+##
 # \brief Calculate the geographic position at a small distance from the given
 # position.
 #
@@ -294,24 +318,21 @@ def geomeasure(lat1, lon1, lat2, lon2):
 # \param lon    Starting geographic longitude (degrees)
 # \param dx     Delta position along N-S line (meters)
 # \param dy     Delta position along W-E line (meters)
+# \param trace  For debugging.
 #
-# \return New delta geographic latitude and longitude in degrees.
+# \return New geographic latitude and longitude in degrees.
 #
-def geopos(lat, lon, dx, dy):
-  rlat = radians(lat)
-  rlon = radians(lon)
-
-  m_per_deg_lat =   111132.92 \
-                  - 559.82 * m.cos(2.0 * rlat) \
-                  + 1.175 * m.cos(4.0 * rlat) \
-                  - 0.0023 * m.cos(6.0 * rlat)
-
-  m_per_deg_lon =   111412.84 * m.cos(rlat) \
-                    - 93.5 * m.cos(3.0 * rlat) \
-                    + 0.118 * m.cos(5.0 * rlat)
+def geopos(lat, lon, dx, dy, trace=False):
+  m_per_deg_lat, m_per_deg_lon = mpd(lat, lon)
 
   dlat = dx/m_per_deg_lat
   dlon = dy/m_per_deg_lon
+
+  if trace:
+    print "lat, lon:   {0}, {1}".format(round(lat,8), round(lon,8))
+    print "m/deg:      {0}, {1}".format(m_per_deg_lat, m_per_deg_lon)
+    print "delta:      {0}, {1}".format(dlat, dlon)
+    print "new pos:    {0}, {1}".format(round(lat+dlat,8), round(lon+dlon,8))
 
   return lat + dlat, lon + dlon
 
@@ -525,26 +546,30 @@ def processPaths(shapes, cliArgs):
   lon0      = shapes['starting_longitude']
   lat0      = shapes['starting_latitude']
   scale     = shapes['scale']
-  rotate    = radians(shapes['rotate'])
+  rotate    = shapes['rotate']
   translate = shapes['translate']
 
   # affine composing transformation matrices
   affine = []
 
   # rotate
-  affine.append( np.matrix([
+  if rotate != 0.0:
+    rotate = radians(rotate)
+    affine.append( np.matrix([
         [m.cos(rotate),  m.sin(rotate), 0],
         [-m.sin(rotate), m.cos(rotate), 0],
         [0.0, 0.0, 1.0]]) )
 
   # scale
-  affine.append( np.matrix([
+  if scale != 1.0:
+    affine.append( np.matrix([
       [scale, 0.0, 0.0],
       [0.0, scale, 0.0],
       [0.0, 0.0, 1.0]]) )
 
   # translate
-  affine.append( np.matrix([
+  if translate[0] != 0.0 or translate[1] != 0.0:
+    affine.append( np.matrix([
       [1.0, 0.0, translate[0]],
       [0.0, 1.0, translate[1]],
       [0.0, 0.0, 1.0]]) )
@@ -560,16 +585,16 @@ def processPaths(shapes, cliArgs):
     tpath = []
     gpath = []
     for x, y in path:
-      x_, y_ = transform(x, y, affine)
-      tpath.append([x_, y_])
-      lat, lon = geopos(lat0, lon0, x_, y_)
+      x1, y1 = transform(x, y, affine)
+      tpath.append([x1, y1])
+      lat, lon = geopos(lat0, lon0, x1, y1)
       gpath.append([lon, lat])
     gpath.append(gpath[0]) # close path
     transpaths.append(tpath)
     geopaths.append(gpath)
 
   if cliArgs['trace']:
-    print "Transformed: "
+    print "Affine Transformed: "
     printPaths(transpaths)
 
   return geopaths
@@ -759,6 +784,36 @@ def pprintFeatureCollection(fc, cliArgs):
 # The main
 # ------------------------------------------------------------------------------
 if __name__ == '__main__':
+  ##
+  # Unit test geographic positions.
+  #
+  def utGeoPos():
+    utLoc = {
+      'Saint Petersburg':
+        {'lat': 60.0, 'lon': 30.3, 'mpd_lat': 111000.0, 'mpd_lon': 55800.0},
+      'Greenwich':
+        {'lat': 51.48, 'lon': 0.0, 'mpd_lat': 111000.0, 'mpd_lon': 69470.0},
+      'Bordeaux':
+        {'lat': 44.73, 'lon': -0.58, 'mpd_lat': 111000.0, 'mpd_lon': 78850.0},
+      'New Orleans':
+        {'lat': 29.95, 'lon': -90.07, 'mpd_lat': 111000.0, 'mpd_lon': 96490.0},
+      'Quito':
+        {'lat': 0.23, 'lon': -78.52, 'mpd_lat': 111000.0, 'mpd_lon': 111300.0},
+    }
+
+    for k,d in utLoc.items():
+      print "--  {0}  --".format(k)
+      print "  Calculated:"
+      geopos(d['lat'], d['lon'], 10.0, 10.0, True)
+      mpdLat, mpdLon = mpd(d['lat'], d['lon'])
+      print "  Expected:"
+      print "m/deg:      {0}, {1}".format(d['mpd_lat'], d['mpd_lon'])
+      print "diff:       {0}, {1}".format(mpdLat-d['mpd_lat'],
+                                          mpdLon-d['mpd_lon'])
+      print
+  ##
+
+
   argv = sys.argv
 
   # command-line interface arguments dictionary
@@ -812,3 +867,5 @@ if __name__ == '__main__':
     print "#### Feature Collection Output ####"
 
   pprintFeatureCollection(fc, cliArgs)
+
+  #utGeoPos()

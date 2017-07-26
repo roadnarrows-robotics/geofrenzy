@@ -27,242 +27,132 @@ namespace geofrenzy
      * \{
      */
 
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Eigen geometric constructs
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
     /*!
-     * \defgroup gfmath_types_geo Geometric Data Types
-     * \brief Geometric constructs in 3 dimensional ambient space.
-     *
-     * Eigen data types versions of geometric constructs such as point, line,
-     * color, and plane.
+     * \defgroup gfmath_types Data Types
+     * \brief Geofrenzy math data types.
+     * \{
+     * \}
      */
 
     /*!
-     * \ingroup gfmath_types_geo
+     * \defgroup gfmath_const Constants
+     * \brief Geofrenzy math data constants.
+     * \{
+     * \}
+     */
+
+    /*!
+     * \defgroup gfmath_basic_ops Basic Operations 
+     * \brief Geofrenzy math basic operations.
+     * \{
+     * \}
+     */
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Eigen geometric constructs and simple operations.
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*!
+     * \ingroup gfmath_types
+     * \brief Basic Geometric Data Types
+     *
+     * Eigen data types versions of geometric constructs in 3 dimensional
+     * ambient space, such as point, line, and plane.
+     * \{
+     */
+
+    /*!
      * \brief Point in 2D space: 2x1 vector of doubles.
      */
     typedef Eigen::Vector2d EigenPoint2;
 
     /*!
-     * \ingroup gfmath_types_geo
      * \brief Point in 3D space: 3x1 vector of doubles.
      */
     typedef Eigen::Vector3d EigenPoint3;
 
     /*!
-     * \ingroup gfmath_types_geo
      * \brief Parameterized 1D line in 3d space: l(t) = o + t * d.
      */
     typedef Eigen::ParametrizedLine<double, 3> EigenLine3;
 
     /*!
-     * \ingroup gfmath_types_geo
      * \brief 2D plane in 3D space.
      */
     typedef Eigen::Hyperplane<double, 3> EigenPlane3;
 
     /*!
-     * \ingroup gfmath_types_geo
-     * \brief Bounding box cuboid.
-     * */
-    struct EigenBBox3
+     * \brief 1 2-tuple minimum,maximum limit.
+     *
+     * Limits: [minmax[_MIN], minmax[_MAX]]
+     */
+    typedef EigenPoint2 EigenMinMax1; 
+
+    /*!
+     * \brief 2 2-tuple minimum,maximum limits.
+     *
+     * Limits: [m_min[k], m_max[k]], k=0,1
+     */
+    struct EigenMinMax2
     {
-      EigenPoint3 m_min;  ///< minimum x,y,z
-      EigenPoint3 m_max;  ///< maximum x,y,z
+      EigenPoint2 m_min;  ///< minimums k=0,1 or x,y
+      EigenPoint2 m_max;  ///< maximums k=0,1 or x,y
     };
 
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Eigen color spaces
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
     /*!
-     * \defgroup gfmath_types_color Color Data Types
-     * \brief Color data types.
-     */
-
-    /*!
-     * \ingroup gfmath_types_color
-     * \brief Color specified as red-green-blue: 3x1 vector of doubles.
+     * \brief 2 3-tuple minimum,maximum limits.
      *
-     * Each color component is a color intensity in the range [0.0, 1.0]
-     * where 0.0 is no color and 1.0 is full intensity.
+     * Limits: [m_min[k], m_max[k]], k=0,2
      */
-    typedef EigenPoint3 EigenRGB;
-
-    /*!
-     * \ingroup gfmath_types_color
-     * \brief Color specified as red-green-blue-alpha: 4x1 vector of doubles.
-     *
-     * Each color component is a color intensity in the range [0.0, 1.0]
-     * where 0.0 is no color and 1.0 is full intensity.
-     *
-     * The alpha channel is in the range [0.0, 1.0] where 0.0 completely
-     * transparent and 1.0 is completely opaque.
-     */
-    typedef Eigen::Vector4d EigenRGBA;
-
-    /*!
-     * \ingroup gfmath_types_color
-     * \brief Depth plus color: 6x1 vector of doubles.
-     */
-    typedef Eigen::Matrix<double, 6, 1> EigenXYZRGB;
-
-    /*!
-     * \ingroup gfmath_types_color
-     * \brief Depth plus color plus alpha: 7x1 vector of doubles.
-     */
-    typedef Eigen::Matrix<double, 7, 1> EigenXYZRGBA;
-
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Eigen scene
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \defgroup gfmath_types_scene Scene Data Types
-     * \brief An Eigen scene is built up of objects, with each object
-     * corresponding to a Geofrenzy fence.
-     */
-
-    /*! 
-     * \ingroup gfmath_types_scene
-     * \brief List vector of min,max thetas for polyhedra faces in polar 
-     * coordinates.
-     */
-    typedef std::vector<EigenPoint2> EigenPoint2List;
-
-    /*! 
-     * \ingroup gfmath_types_scene
-     * \brief List vector of planes container type.
-     */
-    typedef std::vector<EigenPlane3> EigenPlane3List;
-
-    /*! 
-     * \ingroup gfmath_types_scene
-     * \brief List vector of bounding boxes container type.
-     */
-    typedef std::vector<EigenBBox3> EigenBBox3List;
-
-    /*! 
-     * \ingroup gfmath_types_scene
-     * \brief Eigen scene object data type.
-     *
-     * Each object has an associated RGBA color, and two synchronized lists of
-     * 2D planes and their clipping regions. Each plane is the infinite
-     * extension of a Geofrenzy fence polygon segment. 
-     */
-    struct EigenSceneObj
+    struct EigenMinMax3
     {
-      EigenRGBA       m_color;  ///< RGBA color of fence
-      EigenPoint2List m_thetas; ///< list of face theta limits (polar coords)
-      EigenPlane3List m_planes; ///< list of fence planes
-      EigenBBox3List  m_bboxes; ///< list of fence clipping bounding boxes
+      EigenPoint3 m_min;  ///< minimum k=0,2 or x,y,z
+      EigenPoint3 m_max;  ///< maximum k=0,2 or x,y,z
     };
 
-    /*! 
-     * \ingroup gfmath_types_scene
-     * \brief Eigen scene data type is a vector of scene objects.
+    /*!
+     * \brief Bounding box rectangular cuboid.
      */
-    typedef std::vector<EigenSceneObj> EigenScene;
+    typedef EigenMinMax3 EigenBBox3;
 
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Ouput types  
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    /*! \} */ // gfmath_types
 
     /*!
-     * \defgroup gfmath_types_out Output Data Types
-     * \brief Geofrenzy math calculated ouput data types.
-     *
-     * From Geofrenzy features, a synthetic set of depth plus color points 
-     * are generated. These data points can be converted to standard set of
-     * ROS messages to create virtual sensors such as point cloud structured
-     * light sensors and laser scanners. 
-     */
-
-    /*! 
-     * \ingroup gfmath_types_out
-     * \brief List of depth plus RGB insensity points.
-     *
-     * The list may or may not be an 2D ordered list and may contain multiple
-     * collinear points for the same (x,y).
-     */
-    typedef std::vector<EigenXYZRGB> EigenXYZRGBList;
-
-    /*! 
-     * \ingroup gfmath_types_out
-     * \brief List of depth plus RGBA insensity points.
-     *
-     * The list may or may not be an 2D ordered list and may contain multiple
-     * collinear points for the same (x,y).
-     */
-    typedef std::vector<EigenXYZRGBA> EigenXYZRGBAList;
-
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Constants
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \defgroup gfmath_const Constants
-     * \brief Data constants.
-     *
-     * Note that indices are placed into a sub-namespace to reduce chances of
-     * naming conflicts.
+     * \ingroup gfmath_const
+     * \brief Geometric constants.
      * \{
      */
-    namespace idx
-    {
-      //
-      // Minimum and maximum indices.
-      //
-      // EigenPoint2
-      //
-      const size_t  _MIN = 0; ///< x coordinate (= pt.x())
-      const size_t  _MAX = 1; ///< y coordinate (= pt.y())
+
+    /*!
+     * \brief Minimum and maximum indices.
+     *
+     * \sa EigenPoint2
+     */
+    const size_t  _MIN = 0; ///< x coordinate (= pt.x())
+    const size_t  _MAX = 1; ///< y coordinate (= pt.y())
   
-      //
-      // Cartesian x,y,z coordinates indices.
-      //
-      // EigenPoint2(_X,_Y only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
-      //
-      const size_t  _X = 0; ///< x coordinate (= pt.x())
-      const size_t  _Y = 1; ///< y coordinate (= pt.y())
-      const size_t  _Z = 2; ///< z coordinate (= pt.z())
+    /*!
+     * Cartesian x,y,z coordinates indices.
+     *
+     * \sa EigenPoint2(_X,_Y only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
+     *
+     */
+    const size_t  _X = 0; ///< x coordinate (= pt.x())
+    const size_t  _Y = 1; ///< y coordinate (= pt.y())
+    const size_t  _Z = 2; ///< z coordinate (= pt.z())
   
-      //
-      // Spherical coordinates indices r,theta,phi.
-      //
-      // EigenPoint3
-      //
-      const size_t  _R      = 0;  ///< radial distance [0, inf).
-      const size_t  _THETA  = 1;  ///< azimuthal angle from x+ axis (-pi, pi].
-      const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
-  
-      //
-      // Color red-green-blue-alpha indices.
-      //
-      // EigenRBG, EigenRGBA
-      //
-      const size_t  _RED    = 0; ///< red   (= pt.x())
-      const size_t  _GREEN  = 1; ///< green (= pt.y())
-      const size_t  _BLUE   = 2; ///< blue  (= pt.z())
-      const size_t  _ALPHA  = 3; ///< alpha (= pt.w()?)
-  
-      //
-      // Color red-green-blue-alpha indices for XYZ+ points.
-      //
-      // EigenXYZRBG, EigenXYZRGBA
-      //
-      const size_t  _XYZRED   = 3; ///< xyzred
-      const size_t  _XYZGREEN = 4; ///< xyzgreen
-      const size_t  _XYZBLUE  = 5; ///< xyzblue
-      const size_t  _XYZALPHA = 6; ///< xyzalpha
-    } // namespace idx
- 
+    /*!
+     * \brief Spherical coordinates indices r,theta,phi.
+     *
+     * \sa EigenPoint3
+     */
+    const size_t  _R      = 0;  ///< radial distance [0, inf).
+    const size_t  _THETA  = 1;  ///< azimuthal angle from x+ axis (-pi, pi].
+    const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
+
+    /*!
+     * \brief Infinity
+     */
     const double Inf = std::numeric_limits<double>::infinity(); ///< infinity
 
     /*!
@@ -276,19 +166,605 @@ namespace geofrenzy
     const EigenPoint3 Origin3(0.0, 0.0, 0.0);
 
     /*!
-     * \brief Maximum 24-bit color channel (r,g,b) value.
+     * \brief Minimum fence height (meters).
      */
-    const double Color24ChannelMax = 255.0;
+    const double FenceMinHeight = 0.10;
+
+    /*! \} */ // gfmath_const
+  
+    /*!
+     * \ingroup gfmath_basic_ops
+     * \brief Geometric basic operations.
+     * \{
+     */
+
+    /*!
+     * \brief Convert degrees to radians.
+     *
+     * \param degrees Degrees.
+     *
+     * \return Radians
+     */
+    inline double radians(const double degrees)
+    {
+      return degrees / 180.0 * M_PI;
+    }
+
+    /*!
+     * \brief Convert radians to degrees.
+     *
+     * \param radians  Radians
+     *
+     * \return Degrees
+     */
+    inline double degrees(const double radians)
+    {
+      return 180.0 * radians / M_PI;
+    }
+
+    /*!
+     * \brief Cap value between [min, max].
+     *
+     * \param val Value to cap.
+     * \param min Minimum value.
+     * \param max Maximum value.
+     *
+     * \return Capped value [min, max].
+     */
+    inline double cap(const double val, const double min, const double max)
+    {
+      return val < min? min: val > max? max: val;
+    }
+
+    /*!
+     * \brief Remap angle into equivalent (-pi, pi] range.
+     *
+     * \param a   Angle (radians).
+     *
+     * \return Equivalent angle in (-pi, pi].
+     */
+    inline double pi2pi(const double a)
+    {
+      if( a > M_PI )
+      {
+        return a - 2.0 * M_PI;
+      }
+      else if( a <= -M_PI )
+      {
+        return a + 2.0 * M_PI;
+      }
+      else
+      {
+        return a;
+      }
+    }
+
+    /*!
+     * \brief Conditionally rotate angle pi radians if negative.
+     *
+     * \param a   Angle (radians).
+     *
+     * \return New angle in [0.0, pi].
+     */
+    inline double rot180if(const double a)
+    {
+      return a >= 0.0? a: a + M_PI;
+    }
+
+    /*!
+     * \brief Rotate angle pi radians.
+     *
+     * \param a   Angle (radians).
+     *
+     * \return Rotated angle in (-pi, pi].
+     */
+    inline double rot180(const double a)
+    {
+      return pi2pi(a + M_PI);
+    }
+
+    /*!
+     * \brief Convert spherical coordinate (r,theta,phi) to Cartesion (x,y,z).
+     *
+     * The Sperical coordinates are as used in mathematics.
+     *
+     * \param r     Radial distance [0, inf).
+     * \param theta Azimuthal angle from x+ axis (-pi, pi].
+     * \param phi   Polar angle from z+ [0, pi].
+     *
+     * \return Cartesion (x,y,z) point.
+     */
+    inline EigenPoint3 sphericalToCartesian(const double r,
+                                            const double theta,
+                                            const double phi)
+    {
+      return EigenPoint3(r * sin(phi) * cos(theta),
+                         r * sin(phi) * sin(theta),
+                         r * cos(phi));
+    }
+    
+    /*!
+     * \brief Convert spherical coordinate (r,theta,phi) to Cartesion (x,y,z).
+     *
+     * The Sperical coordinates are as used in mathematics.
+     *
+     * \param       r       Radial distance [0, inf)
+     * \param       theta   Azimuthal angle from x+ axis (-pi, pi].
+     * \param       phi     Polar angle from z+ [0, pi].
+     * \param[out]  pt      Cartesion (x,y,z) point.
+     */
+    inline void sphericalToCartesian(const double r,
+                                     const double theta,
+                                     const double phi,
+                                     EigenPoint3  &pt)
+    {
+      pt << r * sin(phi) * cos(theta), r * sin(phi) * sin(theta), r * cos(phi);
+    }
+
+    /*!
+     * \brief Calculate the Euclidean distance between two points in Re2.
+     *
+     * \param pt0   Point 0.
+     * \param pt1   Point 1.
+     *
+     * \return Distance >= 0.0
+     */
+    inline double distance(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    {
+      return sqrt(pow(pt1.x()-pt0.x(), 2.0) + pow(pt1.y()-pt0.y(), 2.0));
+    }
+
+    /*!
+     * \brief Calculate the Euclidean distance between two points in Re3.
+     *
+     * \param pt0   Point 0.
+     * \param pt1   Point 1.
+     *
+     * \return Distance >= 0.0
+     */
+    inline double distance(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
+    {
+      return sqrt(pow(pt1.x()-pt0.x(), 2.0) +
+                  pow(pt1.y()-pt0.y(), 2.0) +
+                  pow(pt1.z()-pt0.z(), 2.0));
+    }
+
+    /*!
+     * \brief Calculate the distance from the origin (0,0) to a line in 2D.
+     *
+     * The 2D line is defined by the two points pt1 and pt2. Only the x and y
+     * components are used (z is ignored).
+     *
+     * The projection point forms an orthogonal line between the origin and
+     * that projection point.
+     *
+     * The projection on the line pt1,pt2 of the point pt0 forms a point on the
+     * line that defines an orthogonal line between the projection and point
+     * pt0
+     *
+     * \param pt1   Line point 1.
+     * \param pt2   Line point 2.
+     *
+     * \return Projection distance >= 0.0
+     */
+    inline double projection2(const EigenPoint3 &pt1, const EigenPoint3 &pt2)
+    {
+      return fabs(pt2.x() * pt1.y() - pt2.y() * pt1.x()) /
+              sqrt(pow(pt2.y() - pt1.y(), 2.0) + pow(pt2.x() - pt1.x(), 2.0));
+    }
+
+    /*!
+     * \brief Calculate the distance from a point pt0 to a line in 2D.
+     *
+     * The 2D line is defined by the two points pt1 and pt2. Only the x and y
+     * components are used (z is ignored). Likewise only x and y components of
+     * pt0 are used.
+     *
+     * The projection on the line pt1,pt2 of the point pt0 forms a point on the
+     * line that defines an orthogonal line between the projection and point
+     * pt0
+     *
+     * \param pt1   Line point 1.
+     * \param pt2   Line point 2.
+     * \param pt0   Point to project.
+     *
+     * \return Projection distance >= 0.0
+     */
+    inline double projection2(const EigenPoint3 &pt1,
+                              const EigenPoint3 &pt2,
+                              const EigenPoint3 &pt0)
+    {
+      double dx = pt2.x() - pt1.x();
+      double dy = pt2.y() - pt1.y();
+
+      return fabs(dy*pt0.x() - dx*pt0.y() + pt2.x()*pt1.y() - pt2.y()*pt1.x()) /
+              sqrt(pow(dy, 2.0) + pow(dx, 2.0));
+    }
+
+    /*!
+     * \brief Calculate the inclination angle of a line.
+     *
+     * The 2D line is defined by the two points pt0 and pt1. Only the x and y
+     * components are used (z is ignored).
+     *
+     * The inclination is the angle to the x-axis in [0.0, pi].
+     *
+     * \param pt0   Line point 1.
+     * \param pt1   Line point 2.
+     *
+     * \return Inclination (radians).
+     */
+    inline double inclination2(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
+    {
+      double alpha = atan2(pt1.y() - pt0.y(), pt1.x() - pt0.x());
+
+      return alpha >= 0.0? alpha: alpha + M_PI;
+    }
+
+    /*!
+     * \brief Check if the value is within the min,max limits.
+     *
+     * \param val   Value to check.
+     * \param lim   Limits.
+     *
+     * \return Returns true or false if value in [min, max].
+     */
+    inline bool within(const double &val, const EigenMinMax1 &lim)
+    {
+      return  (val >= lim[_MIN]) && (val <= lim[_MAX]);
+    }
+
+    /*!
+     * \brief Check if the value is within one of the set of min,max limits.
+     *
+     * \param val   Value to check.
+     * \param lim   Limits.
+     *
+     * \return Returns true or false if value in [min[k], max[k]], k=0,1.
+     */
+    inline bool within(const double &val, const EigenMinMax2 &lim)
+    {
+      return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
+              ((val >= lim.m_min[1]) && (val <= lim.m_max[1]));
+    }
+
+    /*!
+     * \brief Check if the value is within one of the set of min,max limits.
+     *
+     * \param val   Value to check.
+     * \param lim   Limits.
+     *
+     * \return Returns true or false if value in [min[k], max[k]], k=0,2.
+     */
+    inline bool within(const double &val, const EigenMinMax3 &lim)
+    {
+      return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
+              ((val >= lim.m_min[1]) && (val <= lim.m_max[1])) ||
+              ((val >= lim.m_min[2]) && (val <= lim.m_max[2]));
+    }
+
+    /*!
+     * \brief Test if point is contained within a rectangular cuboid bounding
+     * box.
+     *
+     * \param pt    Point to test.
+     * \param bbox  Bounding box.
+     *
+     * \return Returns true or false.
+     */
+    inline bool contained(const EigenPoint3 &pt, const EigenBBox3 &bbox)
+    {
+      return  (pt.x() >= bbox.m_min.x()) && (pt.x() <= bbox.m_max.x()) &&
+              (pt.y() >= bbox.m_min.y()) && (pt.y() <= bbox.m_max.y()) &&
+              (pt.z() >= bbox.m_min.z()) && (pt.z() <= bbox.m_max.z());
+    }
+
+    /*! \} */ // gfmath_basic_ops
+
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Eigen color spaces and simple operations.
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*!
+     * \ingroup gfmath_types
+     * \brief Basic Color Data Types
+     * \{
+     */
+
+    /*!
+     * \brief Color specified as red-green-blue: 3x1 vector of doubles.
+     *
+     * Each color component is a color intensity in the range [0.0, 1.0]
+     * where 0.0 is no color and 1.0 is full intensity.
+     */
+    typedef EigenPoint3 EigenRGB;
+
+    /*!
+     * \brief Color specified as red-green-blue-alpha: 4x1 vector of doubles.
+     *
+     * Each color component is a color intensity in the range [0.0, 1.0]
+     * where 0.0 is no color and 1.0 is full intensity.
+     *
+     * The alpha channel is in the range [0.0, 1.0] where 0.0 completely
+     * transparent and 1.0 is completely opaque.
+     */
+    typedef Eigen::Vector4d EigenRGBA;
+
+    /*!
+     * \brief Depth plus color: 6x1 vector of doubles.
+     */
+    typedef Eigen::Matrix<double, 6, 1> EigenXYZRGB;
+
+    /*!
+     * \brief Depth plus color plus alpha: 7x1 vector of doubles.
+     */
+    typedef Eigen::Matrix<double, 7, 1> EigenXYZRGBA;
+
+    /*! \} */ // gfmath_types
+
+    /*!
+     * \ingroup gfmath_const
+     * \brief Color constants.
+     * \{
+     */
+
+    /*!
+     * \brief Color red-green-blue-alpha indices.
+     *
+     * \sa EigenRBG, EigenRGBA
+     */
+    const size_t  _RED    = 0; ///< red   (= pt.x())
+    const size_t  _GREEN  = 1; ///< green (= pt.y())
+    const size_t  _BLUE   = 2; ///< blue  (= pt.z())
+    const size_t  _ALPHA  = 3; ///< alpha (= pt.w()?)
+  
+    /*!
+     * \brief Color red-green-blue-alpha indices for XYZ+ points.
+     *
+     * \sa EigenXYZRBG, EigenXYZRGBA
+     */
+    const size_t  _XYZRED   = 3; ///< xyzred
+    const size_t  _XYZGREEN = 4; ///< xyzgreen
+    const size_t  _XYZBLUE  = 5; ///< xyzblue
+    const size_t  _XYZALPHA = 6; ///< xyzalpha
+
+    /*!
+     * \brief Maximum 24-bit color 8-bit channel (rgb) values and mask.
+     */
+    const double        Color24ChanMin  =   0.0;    ///< minimum value
+    const double        Color24ChanMax  = 255.0;    ///< maximum value
+    const unsigned int  Color24ChanMask = 0x00ff;   ///< mask
 
     /*!
      * \brief Default fence color. 50% transparent blueish gray.
      */
     const EigenRGBA FenceColorDft(0.30, 0.30, 0.45, 0.50);
 
+    /*! \} */ // gfmath_const
+ 
     /*!
-     * \brief Minimum fence height (meters).
+     * \ingroup gfmath_basic_ops
+     * \brief Color basic operations.
+     * \{
      */
-    const double FenceMinHeight = 0.10;
+
+    /*!
+     * \brief Make black color.
+     *
+     * \param[out] color  Color to black.
+     */
+    inline void mkBlack(EigenRGB &color)
+    {
+      color << 0.0, 0.0, 0.0;
+    }
+
+    /*!
+     * \brief Make transparent black color.
+     *
+     * \param[out] color  Color to black.
+     */
+    inline void mkBlack(EigenRGBA &color)
+    {
+      color << 0.0, 0.0, 0.0, 0.0;
+    }
+
+    /*!
+     * \brief Convert 24-bit red-green-blue color space into color intensities.
+     *
+     * \param       red     Red   [0, 255].
+     * \param       green   Green [0, 255].
+     * \param       blue    Blue  [0, 255].
+     * \param[out]  rgb     Color intensities [0.0, 1.0].
+     */
+    inline void rgb24ToIntensities(const unsigned int red,
+                                   const unsigned int green,
+                                   const unsigned int blue,
+                                   EigenRGB           &rgb)
+    {
+      rgb <<  (double)(  red & Color24ChanMask)/Color24ChanMax,
+              (double)(green & Color24ChanMask)/Color24ChanMax,
+              (double)( blue & Color24ChanMask)/Color24ChanMax;
+    }
+
+    /*!
+     * \brief Convert 24-bit red-green-blue plus alpha color space into color
+     * intensities plus alpha.
+     *
+     * \param       red     Red   [0, 255].
+     * \param       green   Green [0, 255].
+     * \param       blue    Blue  [0, 255].
+     * \param       alpha   Alpha transparent to opaque [0.0, 1.0].
+     * \param[out]  rgba    Color intensities plus alpha [0.0, 1.0].
+     */
+    inline void rgb24ToIntensities(const unsigned int red,
+                                   const unsigned int green,
+                                   const unsigned int blue,
+                                   const double       alpha,
+                                   EigenRGBA          &rgba)
+    {
+      rgba << (double)(  red & Color24ChanMask)/Color24ChanMax,
+              (double)(green & Color24ChanMask)/Color24ChanMax,
+              (double)( blue & Color24ChanMask)/Color24ChanMax,
+              cap(alpha, 0.0, 1.0);
+    }
+
+    /*!
+     * \brief Convert color intensities into 24-bit red-green-blue color space.
+     *
+     * \param[in]   rgb     Color intensities [0.0, 1.0].
+     * \param[out]  red     Red   [0, 255].
+     * \param[out]  green   Green [0, 255].
+     * \param[out]  blue    Blue  [0, 255].
+     */
+    inline void intensitiesToRgb24(const EigenRGB &rgb,
+                                   unsigned int   &red,
+                                   unsigned int   &green,
+                                   unsigned int   &blue)
+    {
+      red   = (unsigned int)(rgb[_RED]   * Color24ChanMax) & Color24ChanMask;
+      green = (unsigned int)(rgb[_GREEN] * Color24ChanMax) & Color24ChanMask;
+      blue  = (unsigned int)(rgb[_BLUE]  * Color24ChanMax) & Color24ChanMask;
+    }
+
+    /*!
+     * \brief Convert color intensities plus alpha channel into 24-bit
+     * red-green-blue plus alpha color space.
+     *
+     * \param[in]   rgba    Color intensities plus alpha [0.0, 1.0] plus alpha.
+     * \param[out]  red     Red   [0, 255].
+     * \param[out]  green   Green [0, 255].
+     * \param[out]  blue    Blue  [0, 255].
+     * \param       alpha   Alpha transparent to opaque [0.0, 1.0].
+     */
+    inline void intensitiesToRgb24(const EigenRGBA &rgba,
+                                   unsigned int    &red,
+                                   unsigned int    &green,
+                                   unsigned int    &blue,
+                                   double          &alpha)
+    {
+      red   = (unsigned int)(rgba[_RED]   * Color24ChanMax) & Color24ChanMask;
+      green = (unsigned int)(rgba[_GREEN] * Color24ChanMax) & Color24ChanMask;
+      blue  = (unsigned int)(rgba[_BLUE]  * Color24ChanMax) & Color24ChanMask;
+      alpha = rgba[_ALPHA];
+    }
+
+    /*!
+     * \brief Blend two colors using the alpha channel.
+     *
+     * \sa https://en.wikipedia.org/wiki/Alpha_compositing
+     *
+     * \param[in]   colorFg   Foreground color intensities + alpha.
+     * \param[in]   colorBg   Background color intensities + alpha.
+     * \param[out]  colorOut  Output blended color intensities + alpha.
+     */
+    void alphaBlend(const EigenRGBA &colorFg,
+                    const EigenRGBA &colorBg,
+                    EigenRGBA       &colorOut);
+
+    /*! \} */ // gfmath_basic_ops
+
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Eigen basic containers.
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*! 
+     * \ingroup gfmath_types
+     * \brief Basic container types.
+     * \{
+     */
+
+    /*!
+     * \brief List (vector) of 2D points.
+     */
+    typedef std::vector<EigenPoint2> EigenPoint2List;
+
+    /*! 
+     * \brief List (vector) of 3D points.
+     * \brief List vector of planes container type.
+     */
+    typedef std::vector<EigenPlane3> EigenPlane3List;
+
+    /*! 
+     * \brief List (vector) of limits container type.
+     */
+    typedef std::vector<EigenMinMax2> EigenMinMax2List;
+
+    /*! 
+     * \brief List (vector) of 3D bounding boxes container type.
+     */
+    typedef std::vector<EigenBBox3> EigenBBox3List;
+
+    /*! \} */ // gfmath_types
+
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Eigen scene
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*!
+     * \defgroup gfmath_scene Scene Data Types and Functions
+     * \brief An Eigen scene is built up of objects, with each object
+     * a set of attributes and surfaces.
+     *
+     * \{
+     */
+
+    /*!
+     * \brief Eigen planar surface rendering properties.
+     *
+     * The properties are used to speed computer rendering of a surface.
+     */
+    struct EigenSurface
+    {
+      unsigned int  m_num;        ///< surface number in scene object
+      EigenPoint3   m_pt0;        ///< planar surface base point 0
+      EigenPoint3   m_pt1;        ///< planar surface base point 1
+      EigenPoint3   m_pt2;        ///< planar surface upper point 2
+      EigenPlane3   m_plane;      ///< infinite plane
+      double        m_length;     ///< surface length
+      double        m_height;     ///< surface height
+      double        m_inclination;///< surface inclination angle from x-axis
+      double        m_projection; ///< project origin (distance) on base 2D line
+      EigenBBox3    m_bbox;       ///< clipping bounding box
+      EigenMinMax2  m_thetas;     ///< horizontal apparent theta surface limits
+      double        m_subtended;  ///< subtended angle of surface from viewer
+    };
+
+    /*!
+     * \brief List (vector) of surfaces container type.
+     */
+    typedef std::vector<EigenSurface> EigenSurfaceList;
+
+    /*! 
+     * \brief Eigen scene object data type.
+     *
+     * Each object has a a set of rendering attributes (e.g. color, texture)
+     * plus a set of surfaces. The set of surfaces typically specifiy a fully
+     * connected, close shape (e.g. polyhedron), but this is not a requirement.
+     *
+     * A scene object must contain at least one surface.
+     */
+    struct EigenSceneObj
+    {
+      EigenRGBA         m_color;    ///< RGBA color attribute
+      EigenSurfaceList  m_surfaces; ///< the object surfaces
+
+      /*!
+       * \brief Clear scene object of surfaces and set attribute defaults.
+       */
+      void clear()
+      {
+        m_color = FenceColorDft;
+        m_surfaces.clear();
+      }
+    };
+
+    /*! 
+     * \brief Eigen scene data type is a vector of scene objects.
+     */
+    typedef std::vector<EigenSceneObj> EigenScene;
 
     /*!
      * \brief Scanning bit-or'ed options.
@@ -323,182 +799,49 @@ namespace geofrenzy
       ScanOptionAlphaBlend = 0x04
     };
 
-    /*! \} */ // gfmath_const
+    /*! \} */ // gfmath_scene
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Functions
+    // Ouput types  
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
- 
+
     /*!
-     * \defgroup gfmath_func  Functions
+     * \ingroup gfmath_scene
+     * \defgroup gfmath_cloud Output Cloud Data Types
+     * \brief Geofrenzy math calculated ouput data types.
+     *
+     * From Geofrenzy features, a synthetic set of depth plus color points 
+     * are generated. These data points can be converted to standard set of
+     * ROS messages to create virtual sensors such as point cloud structured
+     * light sensors and laser scanners. 
+     *
      * \{
      */
 
-    /*!
-     * \brief Convert degrees to radians.
+    /*! 
+     * \brief List of depth plus RGB insensity points.
      *
-     * \param degress Degrees.
-     *
-     * \return Radians
+     * The list may or may not be an 2D ordered list and may contain multiple
+     * collinear points for the same (x,y).
      */
-    inline double radians(const double degrees)
-    {
-      return degrees / 180.0 * M_PI;
-    }
+    typedef std::vector<EigenXYZRGB> EigenXYZRGBList;
 
-    /*!
-     * \brief Convert radians to degress.
+    /*! 
+     * \ingroup gfmath_types_out
+     * \brief List of depth plus RGBA insensity points.
      *
-     * \return radians  Radians
-     *
-     * \param Degrees
+     * The list may or may not be an 2D ordered list and may contain multiple
+     * collinear points for the same (x,y).
      */
-    inline double degrees(const double radians)
-    {
-      return 180.0 * radians / M_PI;
-    }
+    typedef std::vector<EigenXYZRGBA> EigenXYZRGBAList;
+
+    /*! \} */ // gfmath_cloud
 
     /*!
-     * \brief Convert spherical coordinate (r,theta,phi) to Cartesion (x,y,z).
-     *
-     * The Sperical coordinates are as used in mathematics.
-     *
-     * \param r     Radial distance [0, inf).
-     * \param theta Azimuthal angle from x+ axis (-pi, pi].
-     * \param phi   Polar angle from z+ [0, pi].
-     *
-     * \return Cartesion (x,y,z) point.
+     * \ingroup gfmath_scene
+     * \{
      */
-    EigenPoint3 sphericalToCartesian(const double r,
-                                     const double theta,
-                                     const double phi);
-    
-    /*!
-     * \brief Convert spherical coordinate (r,theta,phi) to Cartesion (x,y,z).
-     *
-     * The Sperical coordinates are as used in mathematics.
-     *
-     * \param       r       Radial distance [0, inf)
-     * \param       theta   Azimuthal angle from x+ axis (-pi, pi].
-     * \param       phi     Polar angle from z+ [0, pi].
-     * \param[out]  pt      Cartesion (x,y,z) point.
-     */
-    void sphericalToCartesian(const double r,
-                              const double theta,
-                              const double phi,
-                              EigenPoint3  &pt);
-
-    /*!
-     * \brief Test if point is within a cuboid bounding box.
-     *
-     * \param pt    Point to test location.
-     * \param bbox  Bounding box.
-     *
-     * \return Returns true or false.
-     */
-    bool within(const EigenPoint3 &pt, const EigenBBox3 &bbox);
-    
-    /*!
-     * \brief Convert 24-bit red-green-blue color space into color intensities.
-     *
-     * \param       red     Red   [0, 255].
-     * \param       green   Green [0, 255].
-     * \param       blue    Blue  [0, 255].
-     * \param[out]  rgb     Color intensities [0.0, 1.0].
-     */
-    void rgb24ToIntensities(const unsigned int red,
-                            const unsigned int green,
-                            const unsigned int blue,
-                            EigenRGB           &rgb);
-
-    /*!
-     * \brief Convert 24-bit red-green-blue-alpha color space into color
-     * intensities plus alpha.
-     *
-     * \param       red     Red   [0, 255].
-     * \param       green   Green [0, 255].
-     * \param       blue    Blue  [0, 255].
-     * \param       alpha   Alpha transparent to opaque [0.0, 1.0].
-     * \param[out]  rgba    Color intensities plus alpha [0.0, 1.0].
-     */
-    void rgb24ToIntensities(const unsigned int red,
-                            const unsigned int green,
-                            const unsigned int blue,
-                            const double       alpha,
-                            EigenRGBA          &rgba);
-
-    /*!
-     * \brief Convert color intensities into 24-bit red-green-blue color space.
-     *
-     * \param[in]   rgb     Color intensities [0.0, 1.0].
-     * \param[out]  red     Red   [0, 255].
-     * \param[out]  green   Green [0, 255].
-     * \param[out]  blue    Blue  [0, 255].
-     */
-    void intensitiesToRgb24(const EigenRGB &rgb,
-                            unsigned int   &red,
-                            unsigned int   &green,
-                            unsigned int   &blue);
-
-    /*!
-     * \brief Convert color intensities plus alpha channel into 24-bit
-     * red-green-blue-alpha color space.
-     *
-     * \param[in]   rgba    Color intensities plus alpha [0.0, 1.0] plus alpha.
-     * \param[out]  red     Red   [0, 255].
-     * \param[out]  green   Green [0, 255].
-     * \param[out]  blue    Blue  [0, 255].
-     * \param       alpha   Alpha transparent to opaque [0.0, 1.0].
-     */
-    void intensitiesToRgb24(const EigenRGBA &rgba,
-                            unsigned int    &red,
-                            unsigned int    &green,
-                            unsigned int    &blue,
-                            double          &alpha);
-
-    /*!
-     * \brief Blend two colors using the alpha channel.
-     *
-     * \sa https://en.wikipedia.org/wiki/Alpha_compositing
-     *
-     * \param[in]   colorFg   Foreground color intensities + alpha.
-     * \param[in]   colorBg   Background color intensities + alpha.
-     * \param[out]  colorOut  Output blended color intensities + alpha.
-     */
-    void alphaBlend(const EigenRGBA &colorFg,
-                    const EigenRGBA &colorBg,
-                    EigenRGBA       &colorOut);
-
-    ///@{
-    /*!
-     * \brief Point stream insertion operator.
-     *
-     * \param os  Output stream.
-     * \param pt  Object to insert.
-     *
-     * \return Reference to output stream.
-     */
-    std::ostream &operator<<(std::ostream &os, const EigenPoint2 &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenPoint3 &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenRGBA &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenXYZRGB &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenXYZRGBA &pt);
-    ///@}
-
-    /*!
-     * \brief Bounding box stream insertion operator.
-     *
-     * \param os    Output stream.
-     * \param bbox  Object to insert.
-     *
-     * \return Reference to output stream.
-     */
-    std::ostream &operator<<(std::ostream &os, const EigenBBox3 &bbox);
 
     /*!
      * \brief Create a scene object.
@@ -558,12 +901,38 @@ namespace geofrenzy
      */
     size_t traceRay(const double     theta,
                     const double     phi,
+                    const double     thetaNext,
                     const EigenScene &scene,
                     EigenXYZRGBAList &intersects,
                     uint32_t         options = ScanOptionDft);
 
-    /*! \} */ // end of gfmath_func group
+    /*! \} */ // gfmath_scene
 
+    ///@{
+    /*!
+     * \brief Stream insertion operators.
+     *
+     * \param os  Output stream.
+     * \param arg Object to insert.
+     *
+     * \return Reference to output stream.
+     */
+    std::ostream &operator<<(std::ostream &os, const EigenPoint2 &pt);
+
+    std::ostream &operator<<(std::ostream &os, const EigenPoint3 &pt);
+
+    std::ostream &operator<<(std::ostream &os, const EigenRGBA &pt);
+
+    std::ostream &operator<<(std::ostream &os, const EigenXYZRGB &pt);
+
+    std::ostream &operator<<(std::ostream &os, const EigenXYZRGBA &pt);
+
+    std::ostream &operator<<(std::ostream &os, const EigenMinMax2 &minmax);
+
+    std::ostream &operator<<(std::ostream &os, const EigenMinMax3 &minmax);
+
+    std::ostream &operator<<(std::ostream &os, const EigenSurface &surface);
+    ///@}
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Unit Tests

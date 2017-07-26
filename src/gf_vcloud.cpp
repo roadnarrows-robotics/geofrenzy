@@ -84,7 +84,6 @@ using namespace std;
 using namespace boost::assign;
 using namespace geofrenzy::gf_ros;
 using namespace geofrenzy::gf_math;
-using namespace geofrenzy::gf_math::idx;
 
 //
 // Unit Test Switch (only available if math ut is also enabled)  
@@ -365,16 +364,16 @@ namespace geofrenzy
           if( (m_ePublishFmt == CloudFmtXYZRGB) ||
               (m_ePublishFmt == CloudFmtXYZRGBA) )
           {
-            *iter_r = (uint8_t)(points[i][_XYZRED]   * Color24ChannelMax);
-            *iter_g = (uint8_t)(points[i][_XYZGREEN] * Color24ChannelMax);
-            *iter_b = (uint8_t)(points[i][_XYZBLUE]  * Color24ChannelMax);
+            *iter_r = (uint8_t)(points[i][_XYZRED]   * Color24ChanMax);
+            *iter_g = (uint8_t)(points[i][_XYZGREEN] * Color24ChanMax);
+            *iter_b = (uint8_t)(points[i][_XYZBLUE]  * Color24ChanMax);
 
             ++iter_r; ++iter_g; ++iter_b;
 
             // include alpha
             if( m_ePublishFmt == CloudFmtXYZRGBA )
             {
-              *iter_a = (uint8_t)(points[i][_XYZALPHA]  * Color24ChannelMax);
+              *iter_a = (uint8_t)(points[i][_XYZALPHA]  * Color24ChanMax);
               ++iter_a;
             }
           }

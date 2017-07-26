@@ -1,0 +1,14 @@
+{
+  "starting_longitude": "Boulder",
+  "starting_latitude":  "Boulder",
+  "scale": 1.0,
+  "rotate": 0.0,
+  "translate": [1.0, -0.0001],
+  "path":
+  [
+    [1.0, 0.0],
+    [1.0, 3.0],
+    [-1.0, 3.0],
+    [-1.0, 0.0]
+  ]
+}

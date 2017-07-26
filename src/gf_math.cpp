@@ -26,7 +26,15 @@ namespace geofrenzy
 {
   namespace gf_math
   {
-    using namespace idx;
+    /*!
+     * \brief Hard-coded Tune Parameters.
+     */
+    const double EpsilonLinear      = 0.001;  ///< surface linear precision
+    const double EpsilonAngular     = radians(1.0);
+                                              ///< surface angular precision
+    const double EpsilonOrigin      = 0.5;    ///< origin distance precision
+    const double DeltaParStepMin    = 0.1;    ///< parallel surface scan step
+    const double DeltaParStepScale  = 1.05;   ///< parallel surface geometric
 
     /*!
      * \brief Local structure to hold intermediary intersection info.
@@ -62,23 +70,68 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Make black color.
+     * \brief Add two angles keeping result in [-pi, pi].
      *
-     * \param[out] color  Color to black.
+     * \param theta0  Angle 0 in radians.
+     * \param theta1  Angle 1 in radians.
+     *
+     * \return Added angles in radians.
      */
-    static inline void mkBlack(EigenRGB &color)
+    static inline double addAngles(const double theta0, const double theta1)
     {
-      color << 0.0, 0.0, 0.0;
+      return pi2pi(theta0 + theta1);
     }
 
     /*!
-     * \brief Make transparent black color.
+     * \brief Make a bounding box around sets of x,y,z ranges.
      *
-     * \param[out] color  Color to black.
+     * \param x0,x1       X range.
+     * \param y0,y1       Y range.
+     * \param z0,z1       Z range.
+     * \param epsilon     Bounding region precision.
+     * \param[out] bbox   Output bounding box.
      */
-    static inline void mkBlack(EigenRGBA &color)
+    static void mkBBox(const double x0, const double x1,
+                       const double y0, const double y1,
+                       const double z0, const double z1,
+                       const double epsilon,
+                       EigenBBox3   &bbox)
     {
-      color << 0.0, 0.0, 0.0, 0.0;
+      // min,max x
+      if( x0 <= x1 )
+      {
+        bbox.m_min.x() = x0 - epsilon;
+        bbox.m_max.x() = x1 + epsilon;
+      }
+      else
+      {
+        bbox.m_min.x() = x1 - epsilon;
+        bbox.m_max.x() = x0 + epsilon;
+      }
+      
+      // min,max y
+      if( y0 <= y1 )
+      {
+        bbox.m_min.y() = y0 - epsilon;
+        bbox.m_max.y() = y1 + epsilon;
+      }
+      else
+      {
+        bbox.m_min.y() = y1 - epsilon;
+        bbox.m_max.y() = y0 + epsilon;
+      }
+      
+      // min,max z
+      if( z0 <= z1 )
+      {
+        bbox.m_min.z() = z0 - epsilon;
+        bbox.m_max.z() = z1 + epsilon;
+      }
+      else
+      {
+        bbox.m_min.z() = z1 - epsilon;
+        bbox.m_max.z() = z0 + epsilon;
+      }
     }
 
     /*!
@@ -86,74 +139,85 @@ namespace geofrenzy
      *
      * \param pt0         Point 0.
      * \param pt1         Point 1.
-     * \param epsilon     Limits accrucay.
-     * \param[out] ptLim  Output thetat min,max limits.
+     * \param epsilon     Limits precision.
+     * \param[out] ptLim  Output theta min,max limits.
      */
-    static void mkThetaLimits(const EigenPoint3 &pt0,
-                              const EigenPoint3 &pt1,
-                              const double      epsilon,
-                              EigenPoint2       &ptLim)
+    static void calcSurfaceThetas(EigenSurface &surface,
+                                  const double e_ang,
+                                  const double e_origin)
     {
-      double theta0 = atan2(pt0.y(), pt0.x());
-      double theta1 = atan2(pt1.y(), pt1.x());
+      double theta0 = atan2(surface.m_pt0.y(), surface.m_pt0.x());
+      double theta1 = atan2(surface.m_pt1.y(), surface.m_pt1.x());
 
-      if( theta0 <= theta1 )
+      // swap
+      if( theta0 > theta1 )
       {
-        ptLim[_MIN] = theta0 - epsilon;
-        ptLim[_MAX] = theta1 + epsilon;
+        double t = theta0;
+        theta0 = theta1;
+        theta1 = t;
       }
+
+      // surface edge-on from origin
+      if( surface.m_projection < e_origin )
+      {
+        surface.m_thetas.m_min[0] = surface.m_inclination - e_ang;
+        surface.m_thetas.m_max[0] = surface.m_inclination + e_ang;
+
+        // reflect accross origin
+        surface.m_thetas.m_min[1] = rot180(surface.m_thetas.m_min[0]);
+        surface.m_thetas.m_max[1] = rot180(surface.m_thetas.m_max[0]);
+
+        surface.m_subtended = 2 * e_ang;
+      }
+
+      // one range
+      else if( (theta1 - theta0) <= M_PI )
+      {
+        surface.m_thetas.m_min[0] = theta0 - e_ang;
+        surface.m_thetas.m_max[0] = theta1 + e_ang;
+        surface.m_thetas.m_min[1] = surface.m_thetas.m_min[0];
+        surface.m_thetas.m_max[1] = surface.m_thetas.m_max[0];
+
+        surface.m_subtended =
+                surface.m_thetas.m_max[0] - surface.m_thetas.m_min[0];
+      }
+
+      // spans across quadrants II and III (-pi), so two ranges
       else
       {
-        ptLim[_MIN] = theta1 - epsilon;
-        ptLim[_MAX] = theta0 + epsilon;
+        surface.m_thetas.m_min[0] = -M_PI;
+        surface.m_thetas.m_max[0] = theta0 + e_ang;
+        surface.m_thetas.m_min[1] = theta1 - e_ang;
+        surface.m_thetas.m_max[1] = M_PI;
+
+        surface.m_subtended =
+                surface.m_thetas.m_max[0] - surface.m_thetas.m_min[0] +
+                surface.m_thetas.m_max[1] - surface.m_thetas.m_min[1];
       }
     }
 
-    /*!
-     * \brief Make a bounding box between two points within the given height
-     * range.
-     *
-     * \param pt0         Point 0.
-     * \param pt1         Point 1.
-     * \param heightMin   Minimum height.
-     * \param heightMax   Maximum height.
-     * \param epsilon     Bounding region accrucay.
-     * \param[out] bbox   Output bounding box.
-     */
-    static void mkBBox(const EigenPoint3 &pt0,
-                       const EigenPoint3 &pt1,
-                       const double      heightMin,
-                       const double      heightMax,
-                       const double      epsilon,
-                       EigenBBox3        &bbox)
+    static void calcSurfaceParams(const double x0, const double x1,
+                                  const double y0, const double y1,
+                                  const double z0, const double z1,
+                                  EigenSurface &surface)
     {
-      // min,max x
-      if( pt0.x() <= pt1.x() )
-      {
-        bbox.m_min.x() = pt0.x() - epsilon;
-        bbox.m_max.x() = pt1.x() + epsilon;
-      }
-      else
-      {
-        bbox.m_min.x() = pt1.x() - epsilon;
-        bbox.m_max.x() = pt0.x() + epsilon;
-      }
-      
-      // min,max y
-      if( pt0.y() <= pt1.y() )
-      {
-        bbox.m_min.y() = pt0.y() - epsilon;
-        bbox.m_max.y() = pt1.y() + epsilon;
-      }
-      else
-      {
-        bbox.m_min.y() = pt1.y() - epsilon;
-        bbox.m_max.y() = pt0.y() + epsilon;
-      }
+      surface.m_pt0 << x0, y0, 0.0;
+      surface.m_pt1 << x1, y1, 0.0;
+      surface.m_pt2 << x0, y0, z1;
 
-      // min,max z
-      bbox.m_min.z() = heightMin - epsilon;
-      bbox.m_max.z() = heightMax + epsilon;
+      // 3 points define a plane
+      surface.m_plane   = EigenPlane3::Through(surface.m_pt0,
+                                               surface.m_pt1,
+                                               surface.m_pt2);
+
+      surface.m_length      = distance(surface.m_pt0, surface.m_pt1);
+      surface.m_height      = fabs(z1 - z0);
+      surface.m_inclination = inclination2(surface.m_pt0, surface.m_pt1);
+      surface.m_projection  = projection2(surface.m_pt0, surface.m_pt1);
+
+      mkBBox(x0, x1, y0, y1, z0, z1, EpsilonLinear, surface.m_bbox);
+
+      calcSurfaceThetas(surface, EpsilonAngular, EpsilonOrigin);
     }
 
     /*!
@@ -179,100 +243,43 @@ namespace geofrenzy
      */
     static const EigenXYZRGBA InfPt = mkInf();
 
-    EigenPoint3 sphericalToCartesian(const double r,
-                                     const double theta,
-                                     const double phi)
+    size_t projectRay(const EigenLine3 &ray,
+                      double t,
+                      const double stepSize,
+                      const double stepScale,
+                      const EigenRGBA &color,
+                      const EigenSurface &surface,
+                      RayOrderedIntersects  &orderedIntersects)
     {
-      return EigenPoint3(r * sin(phi) * cos(theta),
-                         r * sin(phi) * sin(theta),
-                         r * cos(phi));
+      EigenPoint3   pt;                 // working point
+      RayIntersect  ri;                 // ray intersect info
+      double        step    = stepSize; // step size
+      size_t        n       = 0;        // number of points added   
+      bool          isvalid = true;     // valid so far
 
-    }
+      ri.m_rgba = color;  // surface has one color
 
-    void sphericalToCartesian(const double r,
-                              const double theta,
-                              const double phi,
-                              EigenPoint3  &pt)
-    {
-      pt.x() = r * sin(phi) * cos(theta);
-      pt.y() = r * sin(phi) * sin(theta);
-      pt.z() = r * cos(phi);
-    }
-
-    bool within(const EigenPoint3 &pt, const EigenBBox3 &bbox)
-    {
-      if( (pt.x() < bbox.m_min.x()) || (pt.x() > bbox.m_max.x()) )
+      while( isvalid )
       {
-        return false;
-      }
-      else if( (pt.y() < bbox.m_min.y()) || (pt.y() > bbox.m_max.y()) )
-      {
-        return false;
-      }
-      else if( (pt.z() < bbox.m_min.z()) || (pt.z() > bbox.m_max.z()) )
-      {
-        return false;
-      }
-      else
-      {
-        return true;
-      }
-    }
+        pt = ray.pointAt(t);                  // point along ray
+        pt = surface.m_plane.projection(pt);  // project point into plane
 
-    void rgb24ToIntensities(const unsigned int red,
-                            const unsigned int green,
-                            const unsigned int blue,
-                            EigenRGB           &rgb)
-    {
-      rgb[_RED]   = (double)(  red & 0x0ff)/Color24ChannelMax;
-      rgb[_GREEN] = (double)(green & 0x0ff)/Color24ChannelMax;
-      rgb[_BLUE]  = (double)( blue & 0x0ff)/Color24ChannelMax;
-    }
+        // add point if within surface
+        if( (isvalid = contained(pt, surface.m_bbox)) )
+        {
+          ri.m_xyz = pt;              // ray intersection
 
-    void rgba24ToIntensities(const unsigned int red,
-                            const unsigned int green,
-                            const unsigned int blue,
-                            const double       alpha,
-                            EigenRGBA          &rgba)
-    {
-      rgba[_RED]   = (double)(  red & 0x0ff)/Color24ChannelMax;
-      rgba[_GREEN] = (double)(green & 0x0ff)/Color24ChannelMax;
-      rgba[_BLUE]  = (double)( blue & 0x0ff)/Color24ChannelMax;
+          orderedIntersects[t] = ri;  // add to ascending ordered list
 
-      if( alpha < 0.0 )
-      {
-        rgba[_ALPHA] = 0.0;
+          step *= stepScale;          // geometrically increase step size
+
+          t += step;                  // next parametrize line value
+
+          ++n;                        // number of points added
+        }
       }
-      else if( alpha > 1.0 )
-      {
-        rgba[_ALPHA] = 1.0;
-      }
-      else
-      {
-        rgba[_ALPHA] = alpha;
-      }
-    }
-
-    void intensitiesToRgb24(const EigenRGB &rgb,
-                            unsigned int   &red,
-                            unsigned int   &green,
-                            unsigned int   &blue)
-    {
-      red   = (unsigned int)(rgb[_RED]   * Color24ChannelMax) & 0x0ff;
-      green = (unsigned int)(rgb[_GREEN] * Color24ChannelMax) & 0x0ff;
-      blue  = (unsigned int)(rgb[_BLUE]  * Color24ChannelMax) & 0x0ff;
-    }
-
-    void intensitiesToRgb24(const EigenRGBA &rgba,
-                            unsigned int    &red,
-                            unsigned int    &green,
-                            unsigned int    &blue,
-                            double          &alpha)
-    {
-      red   = (unsigned int)(rgba[_RED]   * Color24ChannelMax) & 0x0ff;
-      green = (unsigned int)(rgba[_GREEN] * Color24ChannelMax) & 0x0ff;
-      blue  = (unsigned int)(rgba[_BLUE]  * Color24ChannelMax) & 0x0ff;
-      alpha = rgba[_ALPHA];
+      
+      return n;
     }
 
     void alphaBlend(const EigenRGBA &colorFg,
@@ -328,9 +335,45 @@ namespace geofrenzy
       return os;
     }
 
-    ostream &operator<<(ostream &os, const EigenBBox3 &bbox)
+    ostream &operator<<(ostream &os, const EigenMinMax2 &minmax)
     {
-      os << "[" << bbox.m_min << ", " << bbox.m_max << "]";
+      os << "[" << minmax.m_min << ", " << minmax.m_max << "]";
+      return os;
+    }
+
+    ostream &operator<<(ostream &os, const EigenMinMax3 &minmax)
+    {
+      os << "[" << minmax.m_min << ", " << minmax.m_max << "]";
+      return os;
+    }
+
+    ostream &operator<<(ostream &os, const EigenSurface &surface)
+    {
+      os << "{" << endl
+        << "  surface:      " << surface.m_num << endl
+        << "  points:       "
+          << surface.m_pt0 << ", "
+          << surface.m_pt1 << ", "
+          << surface.m_pt2 << endl
+        << "  plane:        " << surface.m_plane.coeffs() << endl
+        << "  length:       " << surface.m_length << endl
+        << "  height:       " << surface.m_height << endl
+        << "  inclination:  " << degrees(surface.m_inclination) << endl
+        << "  projection:   " << surface.m_projection << endl
+        << "  bbox:         " << surface.m_bbox << endl
+        << "  theta limits: " 
+          << "["
+            << degrees(surface.m_thetas.m_min[0]) << ", "
+            << degrees(surface.m_thetas.m_max[0])
+          << "], "
+          << "["
+            << degrees(surface.m_thetas.m_min[1]) << ", "
+            << degrees(surface.m_thetas.m_max[1])
+          << "], "
+          << endl
+        << "  subtended:    " << degrees(surface.m_subtended) << endl
+        << "}";
+          
       return os;
     }
 
@@ -340,18 +383,12 @@ namespace geofrenzy
                         EigenSceneObj   &sceneObj)
     {
       size_t            numPoints = polygon.points.size();
-      EigenBBox3        bbox;
-      EigenPlane3       plane;
+      EigenSurface      surface;
       double            height;
-      EigenPoint3       pt0, pt1, pt2;
-      EigenPoint2       ptLim;
       size_t            i, j;
 
       // clear
-      sceneObj.m_color = color;
-      sceneObj.m_thetas.clear();
-      sceneObj.m_planes.clear();
-      sceneObj.m_bboxes.clear();
+      sceneObj.clear();
 
       // insufficient points in polygon
       if( numPoints < 2 )
@@ -359,38 +396,34 @@ namespace geofrenzy
         return;
       }
 
+      // constrain height
       height = fenceHeight < FenceMinHeight? FenceMinHeight: fenceHeight;
 
+      //
+      // Attrubutes
+      //
+      sceneObj.m_color = color;
+
+      //
+      // Loop through polygon points to create scene object surfaces.
+      //
       for(i = 0, j = 1; j < numPoints; ++i, ++j)
       {
-        pt0.x() = polygon.points[i].x;
-        pt0.y() = polygon.points[i].y;
-        pt0.z() = 0.0;
+        sceneObj.m_surfaces.push_back(surface);
 
-        pt1.x() = polygon.points[j].x;
-        pt1.y() = polygon.points[j].y;
-        pt1.z() = 0.0;
+        sceneObj.m_surfaces.back().m_num = i;
 
-        pt2.x() = pt0.x();
-        pt2.y() = pt0.y();
-        pt2.z() = height;
+        calcSurfaceParams(polygon.points[i].x, polygon.points[j].x,
+                          polygon.points[i].y, polygon.points[j].y,
+                          0.0, height,
+                          sceneObj.m_surfaces.back());
 
-        mkThetaLimits(pt0, pt1, 0.001, ptLim);
-
-        mkBBox(pt0, pt1, 0.0, height, 0.001, bbox);
-
-        sceneObj.m_thetas.push_back(ptLim);
-        sceneObj.m_planes.push_back(EigenPlane3::Through(pt0, pt1, pt2));
-        sceneObj.m_bboxes.push_back(bbox);
-
-        //cerr << "limits: " << ptLim << endl;
-        //cerr << "bbox:   " << bbox << endl;
+        //cerr << sceneObj.m_surfaces.back() << endl;
       }
 
       //cerr << "Created scene object: " << endl;
-      //cerr << "  color:  " << sceneObj.m_color << endl;
-      //cerr << "  height: " << fenceHeight << endl;
-      //cerr << "  faces:  " << sceneObj.m_planes.size() << endl;
+      //cerr << "  color:    " << sceneObj.m_color << endl;
+      //cerr << "  surfaces: " << sceneObj.m_surfaces.size() << endl;
     }
 
     void scanScene(const double thetaMin, const double thetaMax,
@@ -400,32 +433,30 @@ namespace geofrenzy
                    EigenXYZRGBAList       &intersects,
                    uint32_t               options)
     {
-      double      thetaFoV = thetaMax - thetaMin; // theta field of view
-      double      phiFoV   = phiMax - phiMin;     // phi field of view
-      double      theta, phi;                     // working angles
-      size_t      i, j;                           // working indices
+      double thetaStep = (thetaMax - thetaMin) / (double)(width - 1);
+      double phiStep   = (phiMax - phiMin) / (double)(height - 1);
+      double theta, phi;
+      double thetaNext;
 
       //
       // Loop through scene top to bottom.
       //
-      for(i = 0; i < height; ++i)
+      for(phi = phiMin; phi <= phiMax; phi += phiStep)
       {
-        phi = phiMin + (phiFoV * (double)i) / (double)height;
-
         //
         // Loop through scene right to left.
         //
-        for(j = 0; j < width; ++j)
+        for(theta = thetaMin; theta <= thetaMax; theta += thetaStep)
         {
-          theta = thetaMin + (thetaFoV * (double)j) / (double)width;
-          
-          traceRay(theta, phi, scene, intersects, options);
+          thetaNext = theta >= thetaMax? thetaMax: thetaNext + thetaStep;
+          traceRay(theta, phi, thetaNext, scene, intersects, options);
         }
       }
     }
 
     size_t traceRay(const double     theta,
                     const double     phi,
+                    const double     thetaNext,
                     const EigenScene &scene,
                     EigenXYZRGBAList &intersects,
                     uint32_t         options)
@@ -435,9 +466,10 @@ namespace geofrenzy
       EigenLine3    ray;                        // ray
       double        t;                          // intersection parameter value
       RayIntersect  ri;                         // ray intersect info
-      RayOrderedIntersects  orderedIntersects;  // ordered list of intersects
       EigenRGBA     colorBlend;                 // alpha blended color
       size_t        i, j;                       // working indices
+
+      RayOrderedIntersects  orderedIntersects;  // ordered list of intersects
 
       //
       // Loop through all the scene objects to find all ray intersections.
@@ -445,21 +477,30 @@ namespace geofrenzy
       for(i = 0; i < scene.size(); ++i)
       {
         const EigenSceneObj &sceneObj = scene[i];
+        const EigenRGBA     &color    = sceneObj.m_color; 
 
         //
-        // Loop through all of a scene object's polygonal faces to find all
+        // Loop through all of a scene object's polygonal surfaces to find all
         // ray intersections with this object.
         //
-        for(j = 0; j < sceneObj.m_planes.size(); ++j)
+        for(j = 0; j < sceneObj.m_surfaces.size(); ++j)
         {
-          // Pre-filter the ray for this face's min,max thetas. 
-          if( (theta < sceneObj.m_thetas[j][_MIN]) ||
-              (theta > sceneObj.m_thetas[j][_MAX]) )
+          const EigenSurface &surface = sceneObj.m_surfaces[j];
+
+#if 0 // RDK TODO
+if( surface.m_num == 2 )
+{  
+  if( theta >= radians(-100) && theta <= radians(-80) )
+    cerr << "rdk: " << degrees(theta) << endl;
+}
+#endif // RDK TODO
+          // pre-filter the ray on this surface's min,max apparent thetas
+          if( !within(theta, surface.m_thetas) )
           {
             continue;
           }
 
-          // Lazy init of ray (performance tweak).
+          // lazy init of ray (performance tweak)
           if( !hasRay )
           {
             sphericalToCartesian(1.0, theta, phi, pt);
@@ -467,29 +508,64 @@ namespace geofrenzy
             hasRay = true;
           }
 
-          // Find intersection with 2D plane.
-          t = ray.intersectionParameter(sceneObj.m_planes[j]);
+          //
+          // Find intersection with 2D plane in 3D ambient space.
+          //
+          // Note that t can take on both positive and negative values,
+          // but given how the ray was contructed, t will always be
+          // non-negative.
+          //
+          t = ray.intersectionParameter(surface.m_plane);
 
-          // Intersection found (if no intersection, t has value inf or nan).
-          if( isnormal(t) )
+          // check if ray does not intersect surface
+          if( isnan(t) || isinf(t) )
           {
-            // Calculate the point along ray at t (plane intersection).
-            pt = ray.pointAt(t);
+            continue;
+          }
 
-            // Test if the intersecting point is within the bounding box.
-            if( within(pt, sceneObj.m_bboxes[j]) )
+          // calculate the point along the ray at t (plane intersection)
+          pt = ray.pointAt(t);
+
+          // check if the intersecting point is outside of the bounding box.
+          if( !contained(pt, surface.m_bbox) )
+          {
+            continue;
+          }
+
+          // ray intersection
+          ri.m_rgba = color;
+          ri.m_xyz  = pt;
+
+          // add to ascending distance ordered list
+          orderedIntersects[t] = ri;
+
+          //
+          // This surface is nearly parallel to the ray. To guarantee sufficient
+          // point density of this surface, travel along the ray and project
+          // points onto the surface.
+          //
+#if 0 // RDK TODO
+          if( !(options & ScanOptionNearest) &&
+              (surface.m_projection < EpsilonOrigin) )
+          {
+            // test if this ray is the closest to parallel surface
+            if( fabs((rot180if(theta)     - surface.m_inclination)) <=
+                fabs((rot180if(thetaNext) - surface.m_inclination)) )
             {
-              // equivalent ordering as distance
-              t = fabs(t);
-
-              // ray intersection
-              ri.m_xyz  = pt;
-              ri.m_rgba = sceneObj.m_color;
-
-              // add to ascending ordered list
-              orderedIntersects[t] = ri;
+if( surface.m_num == 2 )
+{  
+cerr << "rdk: "
+  << " surface " << surface.m_num << ":"
+  << " phi = " << degrees(phi)
+  << " theta = " << degrees(theta)
+  << endl;
+}
+              projectRay(ray, t+DeltaParStepMin,
+                DeltaParStepMin, DeltaParStepScale,
+                color, surface, orderedIntersects);
             }
           }
+#endif // RDK TODO
         }
       }
 
@@ -558,7 +634,6 @@ namespace geofrenzy
 
       return orderedIntersects.size();
     }
-
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Unit Tests
