@@ -243,21 +243,123 @@ namespace geofrenzy
      */
     static const EigenXYZRGBA InfPt = mkInf();
 
+#if 0 // RDK
+    size_t parallelRay(double theta,
+                       double phi,
+                       const double stepSize,
+                       const double stepScale,
+                       const EigenRGBA &color,
+                       const EigenSurface &surface,
+                       RayOrderedIntersects  &orderedIntersects)
+    {
+      EigenPoint3 pt0(surface.m_pt0);
+      EigenPoint3 pt1(surface.m_pt1);
+
+      double d0 = distance(Origin3, pt0);
+      double d1 = distance(Origin3, pt1);
+
+      if( d1 > d0 )
+      {
+        EigenPoint3 pt(pt0);
+        pt0 = pt1;
+        pt1 = pt;
+      }
+
+      int q   = quadrant(theta);
+      int q0  = quadrant(pt0);
+      int q1  = quadrant(pt1);
+
+#if 0
+      double y = y_intercept(surface.m_pt0, surface.m_pt1);
+      double x = x_intercept(surface.m_pt0, surface.m_pt1);
+#endif
+
+      if( (q == q0) && (q == q1) )
+      {
+        // nada
+      }
+      else if( q != q0 )
+      {
+      }
+    }
+
     size_t projectRay(const EigenLine3 &ray,
-                      double t,
                       const double stepSize,
                       const double stepScale,
                       const EigenRGBA &color,
                       const EigenSurface &surface,
                       RayOrderedIntersects  &orderedIntersects)
     {
+      double        t;
       EigenPoint3   pt;                 // working point
       RayIntersect  ri;                 // ray intersect info
       double        step    = stepSize; // step size
       size_t        n       = 0;        // number of points added   
       bool          isvalid = true;     // valid so far
 
+      EigenPoint3 ptu(ray.pointAt(1.0)); // a point along ray
+
+      // ray projected onto x-y plane
+      EigenLine2  ray_xy(Origin2, xy(ray.pointAt(1.0)));
+
+      EigenPoint2 pt0(xy(surface.m_pt0));
+      EigenPoint2 pt1(xy(surface.m_pt1));
+
+      EigenPoint2 normal = polarToCartesian(1.0, surface.m_inclination+M_PI_2);
+
+      EigenLine2 ray0(pt0, pt0+normal);
+
+      EigenPoint2 qt0 = intersection(ray_xy, ray0);
+
+      double t0 = t_param(ray_xy, qt0.x());
+
+      EignePoint2 nt0, nt1;
+      
+      // find normal to surface
+      sphericalToCartesian(1.0, surface.m_inclination+M_PI_2, M_PI_2, normal);
+
+      EigenPoint3 nt0 = pt0 + normal;
+
+      qt0 = intersection(
       ri.m_rgba = color;  // surface has one color
+
+      double d0 = distance(Origin3, pt0);
+      double d1 = distance(Origin3, pt1);
+
+      if( d1 > d0 )
+      {
+        EigenPoint3 pt(pt0);
+        double      d = d0;
+
+        pt0 = pt1; pt1 = pt;
+        d0  = d1;  d1  = d;
+      }
+
+      pt = ray.projection(pt0);
+
+      EigenPoint3 dir = ray.direction();
+
+      if( dir.x() != 0.0 )
+      {
+        t = pt.x() / dir.x();
+      }
+      else if( dir.y() != 0.0 )
+      {
+        t = pt.y() / dir.y();
+      }
+      else
+      {
+        t = 0.0;
+      }
+
+      if( t < 0.0 )
+      {
+        t = 0.0;
+      }
+      else
+      {
+        t = d0;
+      }
 
       while( isvalid )
       {
@@ -281,7 +383,207 @@ namespace geofrenzy
       
       return n;
     }
+#endif 
 
+    /*!
+     * \brief Trace ray through virtual scene to generate a list of
+     * intersecting depth + color points.
+     *
+     * The Sperical coordinates are as used in mathematics.
+     *
+     * \param       theta       Ray's azimuthal angle from x+ axis (-pi, pi].
+     * \param       phi         Ray's polar angle from z+ [0, pi].
+     * \param       scene       The scene.
+     * \param[out]  intersects  List of intersecting points.
+     * \param       options     Options to control the trace.
+     *
+     * \return Number of intersections added.
+     */
+    static size_t traceRay(const double     theta,
+                           const double     phi,
+                           const double     thetaNext,
+                           const EigenScene &scene,
+                           EigenXYZRGBAList &intersects,
+                           uint32_t         options)
+    {
+      EigenPoint3   pt;                         // working point
+      bool          hasRay = false;             // lazy init boolean for ray
+      EigenLine3    ray;                        // ray
+      double        t;                          // intersection parameter value
+      RayIntersect  ri;                         // ray intersect info
+      EigenRGBA     colorBlend;                 // alpha blended color
+      size_t        i, j;                       // working indices
+
+      RayOrderedIntersects  orderedIntersects;  // ordered list of intersects
+
+      //
+      // Loop through all the scene objects to find all ray intersections.
+      //
+      for(i = 0; i < scene.size(); ++i)
+      {
+        const EigenSceneObj &sceneObj = scene[i];
+        const EigenRGBA     &color    = sceneObj.m_color; 
+
+        //
+        // Loop through all of a scene object's polygonal surfaces to find all
+        // ray intersections with this object.
+        //
+        for(j = 0; j < sceneObj.m_surfaces.size(); ++j)
+        {
+          const EigenSurface &surface = sceneObj.m_surfaces[j];
+
+#if 0 // RDK TODO
+if( surface.m_num == 2 )
+{  
+  if( theta >= radians(-100) && theta <= radians(-80) )
+    cerr << "rdk: " << degrees(theta) << endl;
+}
+#endif // RDK TODO
+          // pre-filter any ray on this surface's min,max subtended thetas
+          if( !within(theta, surface.m_thetas) )
+          {
+            continue;
+          }
+
+          // lazy init of ray (performance tweak)
+          if( !hasRay )
+          {
+            sphericalToCartesian(1.0, theta, phi, pt);
+            ray = EigenLine3::Through(Origin3, pt);
+            hasRay = true;
+          }
+
+#if 0 // RDK
+          //
+          // This surface is nearly parallel to the ray. To guarantee sufficient
+          // point density of this surface, travel along the ray and project
+          // points onto the surface.
+          //
+          if( SCANOPT_XRAY_VIS(options) &&
+              (surface.m_projection < EpsilonOrigin) )
+          {
+            // test if this ray is the closest parallel to the surface
+            if( fabs((rot180if(theta)     - surface.m_inclination)) <=
+                fabs((rot180if(thetaNext) - surface.m_inclination)) )
+            {
+if( surface.m_num == 2 )
+{  
+cerr << "rdk: "
+  << " surface " << surface.m_num << ":"
+  << " phi = " << degrees(phi)
+  << " theta = " << degrees(theta)
+  << endl;
+}
+              parallelRay(theta, phi, DeltaParStepMin, DeltaParStepScale,
+                        color, surface, orderedIntersects);
+            }
+          }
+
+          //
+          // Find intersection with 2D plane in 3D ambient space.
+          //
+          // Note that t can take on both positive and negative values,
+          // but given how the ray was contructed, t will always be
+          // non-negative.
+          //
+          else
+          {
+#endif
+            t = ray.intersectionParameter(surface.m_plane);
+
+            // check if ray does not intersect surface
+            if( isnan(t) || isinf(t) )
+            {
+              continue;
+            }
+
+            // calculate the point along the ray at t (plane intersection)
+            pt = ray.pointAt(t);
+
+            // check if the intersecting point is outside of the bounding box.
+            if( !contained(pt, surface.m_bbox) )
+            {
+              continue;
+            }
+
+            // ray intersection
+            ri.m_rgba = color;
+            ri.m_xyz  = pt;
+
+            // add to ascending distance ordered list
+            orderedIntersects[t] = ri;
+#if 0 // RDK
+          }
+#endif
+        }
+      }
+
+      //
+      // No intersections.
+      //
+      if( orderedIntersects.empty() )
+      {
+        if( SCANOPT_2D(options) )
+        {
+          intersects.push_back(InfPt);
+          return 1;
+        }
+        else
+        {
+          return 0;
+        }
+      }
+
+      RayOrderedIntersects::iterator  iter;
+
+      //
+      // Alpha blend color(s).
+      //
+      if( SCANOPT_ALPHA_BLEND(options) )
+      {
+        mkBlack(colorBlend);
+
+        for(iter = orderedIntersects.begin();
+            iter != orderedIntersects.end();
+            ++iter)
+        {
+          // blend foreground and background to get new blended color
+          alphaBlend(colorBlend, iter->second.m_rgba, colorBlend);
+
+          // full opacity - further blending is unnecessary
+          if( colorBlend[_ALPHA] >= 1.0 )
+          {
+            break;
+          }
+        }
+      }
+
+      //
+      // Loop through all detected ray intersections/prjections.
+      //
+      for(iter = orderedIntersects.begin();
+          iter != orderedIntersects.end();
+          ++iter)
+      {
+        if( SCANOPT_ALPHA_BLEND(options) )
+        {
+          pushIntersect(intersects, iter->second.m_xyz, colorBlend);
+        }
+        else
+        {
+          pushIntersect(intersects, iter->second.m_xyz, iter->second.m_rgba);
+        }
+
+        // add only the nearest intersecting point
+        if( SCANOPT_NEAREST_ONLY(options) )
+        {
+          return 1;
+        }
+      }
+
+      return orderedIntersects.size();
+    }
+          
     void alphaBlend(const EigenRGBA &colorFg,
                     const EigenRGBA &colorBg,
                     EigenRGBA       &colorOut)
@@ -377,6 +679,58 @@ namespace geofrenzy
       return os;
     }
 
+   int quadrant(const EigenPoint2 &pt)
+   {
+      static double epsilon = 10e-6;
+
+      // on an axis - no quadrant
+      if( (fabs(pt.x()) < epsilon) || (fabs(pt.y()) < epsilon) )
+      {
+        return 0;
+      }
+      // QI or QIV
+      else if( pt.x() > 0.0 )
+      {
+        return pt.y() > 0.0? 1: 4;
+      }
+      // QII or QIII
+      else
+      {
+        return pt.y() > 0.0? 2: 3;
+      }
+    }
+
+    int quadrant(const double theta)
+    {
+      static double epsilon = 10e-5;
+
+      // QI
+      if( (theta > epsilon) && (theta < M_PI_2-epsilon) )
+      {
+        return 1;
+      }
+      // QII
+      else if( (theta > M_PI_2+epsilon) && (theta < M_PI-epsilon) )
+      {
+        return 2;
+      }
+      // QIII
+      else if( (theta > -M_PI+epsilon)  && (theta < -M_PI_2-epsilon) )
+      {
+        return 3;
+      }
+      // QIV
+      else if( (theta > -M_PI_2+epsilon) && (theta < epsilon) )
+      {
+        return 4;
+      }
+      // no quadrant
+      else
+      {
+        return 0;
+      }
+    }
+
     void createSceneObj(const Polygon64 &polygon,
                         const EigenRGBA &color,
                         const double    &fenceHeight,
@@ -452,187 +806,6 @@ namespace geofrenzy
           traceRay(theta, phi, thetaNext, scene, intersects, options);
         }
       }
-    }
-
-    size_t traceRay(const double     theta,
-                    const double     phi,
-                    const double     thetaNext,
-                    const EigenScene &scene,
-                    EigenXYZRGBAList &intersects,
-                    uint32_t         options)
-    {
-      EigenPoint3   pt;                         // working point
-      bool          hasRay = false;             // lazy init boolean for ray
-      EigenLine3    ray;                        // ray
-      double        t;                          // intersection parameter value
-      RayIntersect  ri;                         // ray intersect info
-      EigenRGBA     colorBlend;                 // alpha blended color
-      size_t        i, j;                       // working indices
-
-      RayOrderedIntersects  orderedIntersects;  // ordered list of intersects
-
-      //
-      // Loop through all the scene objects to find all ray intersections.
-      //
-      for(i = 0; i < scene.size(); ++i)
-      {
-        const EigenSceneObj &sceneObj = scene[i];
-        const EigenRGBA     &color    = sceneObj.m_color; 
-
-        //
-        // Loop through all of a scene object's polygonal surfaces to find all
-        // ray intersections with this object.
-        //
-        for(j = 0; j < sceneObj.m_surfaces.size(); ++j)
-        {
-          const EigenSurface &surface = sceneObj.m_surfaces[j];
-
-#if 0 // RDK TODO
-if( surface.m_num == 2 )
-{  
-  if( theta >= radians(-100) && theta <= radians(-80) )
-    cerr << "rdk: " << degrees(theta) << endl;
-}
-#endif // RDK TODO
-          // pre-filter the ray on this surface's min,max apparent thetas
-          if( !within(theta, surface.m_thetas) )
-          {
-            continue;
-          }
-
-          // lazy init of ray (performance tweak)
-          if( !hasRay )
-          {
-            sphericalToCartesian(1.0, theta, phi, pt);
-            ray = EigenLine3::Through(Origin3, pt);
-            hasRay = true;
-          }
-
-          //
-          // Find intersection with 2D plane in 3D ambient space.
-          //
-          // Note that t can take on both positive and negative values,
-          // but given how the ray was contructed, t will always be
-          // non-negative.
-          //
-          t = ray.intersectionParameter(surface.m_plane);
-
-          // check if ray does not intersect surface
-          if( isnan(t) || isinf(t) )
-          {
-            continue;
-          }
-
-          // calculate the point along the ray at t (plane intersection)
-          pt = ray.pointAt(t);
-
-          // check if the intersecting point is outside of the bounding box.
-          if( !contained(pt, surface.m_bbox) )
-          {
-            continue;
-          }
-
-          // ray intersection
-          ri.m_rgba = color;
-          ri.m_xyz  = pt;
-
-          // add to ascending distance ordered list
-          orderedIntersects[t] = ri;
-
-          //
-          // This surface is nearly parallel to the ray. To guarantee sufficient
-          // point density of this surface, travel along the ray and project
-          // points onto the surface.
-          //
-#if 0 // RDK TODO
-          if( !(options & ScanOptionNearest) &&
-              (surface.m_projection < EpsilonOrigin) )
-          {
-            // test if this ray is the closest to parallel surface
-            if( fabs((rot180if(theta)     - surface.m_inclination)) <=
-                fabs((rot180if(thetaNext) - surface.m_inclination)) )
-            {
-if( surface.m_num == 2 )
-{  
-cerr << "rdk: "
-  << " surface " << surface.m_num << ":"
-  << " phi = " << degrees(phi)
-  << " theta = " << degrees(theta)
-  << endl;
-}
-              projectRay(ray, t+DeltaParStepMin,
-                DeltaParStepMin, DeltaParStepScale,
-                color, surface, orderedIntersects);
-            }
-          }
-#endif // RDK TODO
-        }
-      }
-
-      //
-      // No intersections.
-      //
-      if( orderedIntersects.empty() )
-      {
-        if( options & ScanOption2D )
-        {
-          intersects.push_back(InfPt);
-          return 1;
-        }
-        else
-        {
-          return 0;
-        }
-      }
-
-      RayOrderedIntersects::iterator  iter;
-
-      //
-      // Alpha blend color(s).
-      //
-      if( options & ScanOptionAlphaBlend )
-      {
-        mkBlack(colorBlend);
-
-        for(iter = orderedIntersects.begin();
-            iter != orderedIntersects.end();
-            ++iter)
-        {
-          // blend foreground and background to get new blended color
-          alphaBlend(colorBlend, iter->second.m_rgba, colorBlend);
-
-          // full opacity - further blending is unnecessary
-          if( colorBlend[_ALPHA] >= 1.0 )
-          {
-            break;
-          }
-        }
-      }
-
-      //
-      // Loop through all detected ray intersections.
-      //
-      for(iter = orderedIntersects.begin();
-          iter != orderedIntersects.end();
-          ++iter)
-      {
-        if( options & ScanOptionAlphaBlend )
-        {
-          pushIntersect(intersects, iter->second.m_xyz, colorBlend);
-        }
-        else
-        {
-          pushIntersect(intersects, iter->second.m_xyz, iter->second.m_rgba);
-        }
-
-        // Add only the nearest intersecting point.
-        if( options & ScanOptionNearest )
-        {
-          return 1;
-        }
-      }
-
-      return orderedIntersects.size();
     }
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .

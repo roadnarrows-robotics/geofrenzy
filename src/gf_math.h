@@ -72,7 +72,12 @@ namespace geofrenzy
     typedef Eigen::Vector3d EigenPoint3;
 
     /*!
-     * \brief Parameterized 1D line in 3d space: l(t) = o + t * d.
+     * \brief Parameterized 1D line in 2D space: l(t) = o + t * d.
+     */
+    typedef Eigen::ParametrizedLine<double, 2> EigenLine2;
+
+    /*!
+     * \brief Parameterized 1D line in 3D space: l(t) = o + t * d.
      */
     typedef Eigen::ParametrizedLine<double, 3> EigenLine3;
 
@@ -302,7 +307,8 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Calculate the Euclidean distance between two points in Re2.
+     * \brief Calculate the Euclidean absolute distance between two points in
+     * Re2.
      *
      * \param pt0   Point 0.
      * \param pt1   Point 1.
@@ -315,7 +321,8 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Calculate the Euclidean distance between two points in Re3.
+     * \brief Calculate the Euclidean absolute distance between two points in
+     * Re3.
      *
      * \param pt0   Point 0.
      * \param pt1   Point 1.
@@ -442,6 +449,15 @@ namespace geofrenzy
               ((val >= lim.m_min[1]) && (val <= lim.m_max[1])) ||
               ((val >= lim.m_min[2]) && (val <= lim.m_max[2]));
     }
+
+    int quadrant(const EigenPoint2 &pt);
+
+    inline int quadrant(const EigenPoint3 &pt)
+    {
+      return quadrant(EigenPoint2(pt.x(), pt.y()));
+    }
+
+    int quadrant(const double theta);
 
     /*!
      * \brief Test if point is contained within a rectangular cuboid bounding
@@ -682,9 +698,8 @@ namespace geofrenzy
 
     /*! 
      * \brief List (vector) of 3D points.
-     * \brief List vector of planes container type.
      */
-    typedef std::vector<EigenPlane3> EigenPlane3List;
+    typedef std::vector<EigenPoint3> EigenPoint3List;
 
     /*! 
      * \brief List (vector) of limits container type.
@@ -719,6 +734,7 @@ namespace geofrenzy
     struct EigenSurface
     {
       unsigned int  m_num;        ///< surface number in scene object
+      // RDK EigenPoint3List m_vertices;
       EigenPoint3   m_pt0;        ///< planar surface base point 0
       EigenPoint3   m_pt1;        ///< planar surface base point 1
       EigenPoint3   m_pt2;        ///< planar surface upper point 2
@@ -798,6 +814,20 @@ namespace geofrenzy
        */
       ScanOptionAlphaBlend = 0x04
     };
+
+    ///@{
+    /*!
+     * \brief Useful scan option macros.
+     *
+     * \param _opt  Option bits
+     *
+     * \return Boolean
+     */
+#define SCANOPT_2D(_opt)            ((_opt) & ScanOption2D)
+#define SCANOPT_ALPHA_BLEND(_opt)   ((_opt) & ScanOptionAlphaBlend)
+#define SCANOPT_NEAREST_ONLY(_opt)  ((_opt) & ScanOptionNearest)
+#define SCANOPT_XRAY_VIS(_opt)      !SCANOPT_NEAREST_ONLY(_opt)
+    ///@}
 
     /*! \} */ // gfmath_scene
 
@@ -884,27 +914,6 @@ namespace geofrenzy
                    const EigenScene       &scene,
                    EigenXYZRGBAList       &intersects,
                    uint32_t               options = ScanOptionDft);
-
-    /*!
-     * \brief Trace ray through virtual scene to generate a list of
-     * intersecting depth + color points.
-     *
-     * The Sperical coordinates are as used in mathematics.
-     *
-     * \param       theta       Ray's azimuthal angle from x+ axis (-pi, pi].
-     * \param       phi         Ray's polar angle from z+ [0, pi].
-     * \param       scene       The scene.
-     * \param[out]  intersects  List of intersecting points.
-     * \param       options     Options to control the trace.
-     *
-     * \return Number of intersections added.
-     */
-    size_t traceRay(const double     theta,
-                    const double     phi,
-                    const double     thetaNext,
-                    const EigenScene &scene,
-                    EigenXYZRGBAList &intersects,
-                    uint32_t         options = ScanOptionDft);
 
     /*! \} */ // gfmath_scene
 
