@@ -1,0 +1,42 @@
+{
+  "type": "FeatureCollection",
+  "features":
+  [
+    {
+      "type": "Feature",
+      "properties":
+      {
+        "class_metadata":
+        {
+          "entitlements":
+          [
+            {
+              "color_green": 5,
+              "color_blue": 255,
+              "ent_idx": 205,
+              "color_red": 14,
+              "color_alpha": 255,
+              "ent_base": "color"
+            }
+          ],
+          "class_idx": 168
+        },
+        "inout": "i"
+      },
+      "geometry":
+      {
+        "type": "Polygon",
+        "coordinates":
+        [
+          [
+            [-105.099170504, 40.3809009222],
+            [-105.099135176, 40.3809009222],
+            [-105.099135176, 40.380882911],
+            [-105.099170504, 40.380882911],
+            [-105.099170504, 40.3809009222]
+          ]
+        ]
+      }
+    }
+  ]
+}

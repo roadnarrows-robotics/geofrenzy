@@ -96,6 +96,50 @@ using namespace geofrenzy::gf_math;
 
 namespace geofrenzy
 {
+  static const map<int, string> NameOpMode = map_list_of
+    (CloudOpModeSensor, "sensor")
+    (CloudOpModeGrid,   "grid")
+  ;
+
+  static const map<int, string> NamePubFmt = map_list_of
+    (CloudFmtXYZ,     "xyz")
+    (CloudFmtXYZRGB,  "xyzrgb")
+    (CloudFmtXYZRGBA, "xyzrgba")
+  ;
+
+  typedef std::map<int, string>::const_iterator name_iter;
+  
+  static const string NoName("?");
+
+  static bool hasOpMode(int mode)
+  {
+    name_iter iter = NameOpMode.find(mode);
+
+    return iter != NameOpMode.end();
+  }
+
+  static const string nameOfOpMode(int mode)
+  {
+    name_iter iter = NameOpMode.find(mode);
+
+    return iter != NameOpMode.end()? iter->second: NoName;
+  }
+
+  static bool hasPubFmt(int fmt)
+  {
+    name_iter iter = NamePubFmt.find(fmt);
+
+    return iter != NameOpMode.end();
+  }
+
+  static const string nameOfPubFmt(int fmt)
+  {
+    name_iter iter = NamePubFmt.find(fmt);
+
+    return iter != NamePubFmt.end()? iter->second: NoName;
+  }
+
+
   //----------------------------------------------------------------------------
   // vSensorCloud Class
   //----------------------------------------------------------------------------
@@ -135,38 +179,180 @@ namespace geofrenzy
        */
       bool init()
       {
-        int       val;
+        string  name1, name2;   // working parameter names
+        int     val;            // working value
+        bool    tf;             // working boolean
 
-        // horizontal field of view parameter server values
-        m_nh.param(ParamNameCloudHFoVMin, m_fHFoVMin, CloudHFoVMinDft);
-        m_nh.param(ParamNameCloudHFoVMax, m_fHFoVMax, CloudHFoVMaxDft);
+        string  strInvalid("Invalid value: ");  // log string component
+        string  strSetTo("set to default=");    // log string component
 
-        // vertical field of view parameter server values
-        m_nh.param(ParamNameCloudVFoVMin, m_fVFoVMin, CloudVFoVMinDft);
-        m_nh.param(ParamNameCloudVFoVMax, m_fVFoVMax, CloudVFoVMaxDft);
+        //
+        // Operation mode parameter.
+        //
+        name1 = ParamNameCloudOpMode;
 
-        // resolution (note: no unsigned i/f to parameter server)
-        m_nh.param(ParamNameCloudWidth, val, CloudWidthDft);
+        m_nh.param(name1, m_eOpMode, CloudOpModeDft);
+
+        if( !hasOpMode(m_eOpMode) )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name1 << "=" << m_eOpMode << ", "
+              << strSetTo << CloudOpModeDft);
+          m_eOpMode = CloudOpModeDft;
+        }
+
+        //
+        // Horizontal field of view parameters.
+        //
+        name1 = ParamNameCloudHFoVMin;
+        name2 = ParamNameCloudHFoVMax;
+
+        m_nh.param(name1, m_fHFoVMin, CloudHFoVMinDft);
+        m_nh.param(name2, m_fHFoVMax, CloudHFoVMaxDft);
+
+        if( m_fHFoVMin < -M_PI )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name1 << "=" << m_fHFoVMin << ", "
+              << strSetTo << CloudHFoVMinDft);
+          m_fHFoVMin = CloudHFoVMinDft;
+        }
+        if( m_fHFoVMax > M_PI )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name2 << "=" << m_fHFoVMax << ", "
+              << strSetTo << CloudHFoVMaxDft);
+          m_fHFoVMax = CloudHFoVMaxDft;
+        }
+        if( m_fHFoVMin > m_fHFoVMax )
+        {
+          ROS_WARN_STREAM("Invalid range: "
+              << name1 << "=" << m_fHFoVMin << " > "
+              << name2 << "=" << m_fHFoVMax << ", "
+              << "set to defaults=[" << CloudHFoVMinDft << ", "
+              << CloudHFoVMaxDft << "]");
+          m_fHFoVMin = CloudHFoVMinDft;
+          m_fHFoVMax = CloudHFoVMaxDft;
+        }
+
+        //
+        // Verticl field of view parameters.
+        //
+        name1 = ParamNameCloudVFoVMin;
+        name2 = ParamNameCloudVFoVMax;
+
+        m_nh.param(name1, m_fVFoVMin, CloudVFoVMinDft);
+        m_nh.param(name2, m_fVFoVMax, CloudVFoVMaxDft);
+
+        if( m_fVFoVMin < -0.0 )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name1 << "=" << m_fVFoVMin << ", "
+              << strSetTo << CloudVFoVMinDft);
+          m_fVFoVMin = CloudVFoVMinDft;
+        }
+        if( m_fVFoVMax > M_PI )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name2 << "=" << m_fVFoVMax << ", "
+              << strSetTo << CloudVFoVMaxDft);
+          m_fVFoVMax = CloudVFoVMaxDft;
+        }
+        if( m_fVFoVMin > m_fVFoVMax )
+        {
+          ROS_WARN_STREAM("Invalid range: "
+              << name1 << "=" << m_fVFoVMin << " > "
+              << name2 << "=" << m_fVFoVMax << ", "
+              << "set to defaults=[" << CloudVFoVMinDft << ", "
+              << CloudVFoVMaxDft << "]");
+          m_fVFoVMin = CloudVFoVMinDft;
+          m_fVFoVMax = CloudVFoVMaxDft;
+        }
+
+        //
+        // Width resolution.
+        // (note: no unsigned i/f to parameter server)
+        //
+        name1 = ParamNameCloudWidth;
+
+        m_nh.param(name1, val, CloudWidthDft);
+
+        if( val < 2 )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name1 << "=" << val << ", "
+              << strSetTo << CloudWidthDft);
+          val = CloudWidthDft;
+        }
+
         m_uWidth = (size_t)val;
-        m_nh.param(ParamNameCloudHeight, val, CloudHeightDft);
+
+        //
+        // Height resolution.
+        // (note: no unsigned i/f to parameter server)
+        //
+        name1 = ParamNameCloudHeight;
+
+        m_nh.param(name1, val, CloudHeightDft);
+
+        if( val < 2 )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name1 << "=" << val << ", "
+              << strSetTo << CloudHeightDft);
+          val = CloudHeightDft;
+        }
+
         m_uHeight = (size_t)val;
 
-        // output format
-        m_nh.param(ParamNameCloudPublishFmt, m_ePublishFmt, CloudPublishFmtDft);
+        //
+        // Nearest Only Option.
+        // (note: no unsigned i/f to parameter server)
+        //
+        name1 = ParamNameCloudNearestOnly;
 
-        //global frame and robot frame used for transformation
+        m_nh.param(name1, tf, CloudNearestOnlyDft);
+
+        m_uOptions = tf? ScanOptionNearest: ScanOptionDft;
+
+        //
+        // Grid size.
+        //
+        name1 = ParamNameCloudGridSize;
+
+        m_nh.param(name1, m_fGridSize, CloudGridSizeDft);
+
+        if( m_fGridSize <= 0.0 )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name1 << "=" << m_fGridSize << ", "
+              << strSetTo << CloudGridSizeDft);
+          m_fGridSize = CloudGridSizeDft;
+        }
+
+        //
+        // Published output format
+        //
+        name1 = ParamNameCloudPublishFmt;
+
+        m_nh.param(name1, m_ePublishFmt, CloudPublishFmtDft);
+
+        if( !hasPubFmt(m_ePublishFmt) )
+        {
+          ROS_WARN_STREAM(strInvalid
+              << name1 << "=" << m_ePublishFmt << ", "
+              << strSetTo << CloudPublishFmtDft);
+          m_ePublishFmt = CloudPublishFmtDft;
+        }
+
+        //
+        // Global frame and robot frame used for transformation.
+        //
         m_nh.param(ParamNameGlobalFrame, m_globalFrame, GlobalFrameDft);
         m_nh.param(ParamNameRobotFrame, m_robotFrame, RobotFrameDft);
 
         initCloudMsgFmt(m_msgCloud);
 
-        ROS_INFO_STREAM("Cloud vSensor:" << endl
-            << "  resolution:     " << m_uWidth << "x" << m_uHeight << endl
-            << "  horizontal FoV: " << "[" << degrees(m_fHFoVMin) << ", "
-                                    << degrees(m_fHFoVMax) << "]" << endl
-            << "  vertical FoV:   " << "[" << degrees(m_fVFoVMin) << ", "
-                                    << degrees(m_fVFoVMax) << "]" << endl
-            << "  output format:  " << m_ePublishFmt);
 
         return true;
       }
@@ -239,8 +425,15 @@ namespace geofrenzy
 
           ROS_INFO_STREAM("Scan " << m_scene.size() << " fences.");
 
-          scanScene(m_fHFoVMin, m_fHFoVMax, m_fVFoVMin, m_fVFoVMax,
-                    m_uWidth, m_uHeight, m_scene, points, ScanOptionDft);
+          if( m_eOpMode == CloudOpModeSensor )
+          {
+            scanScene(m_fHFoVMin, m_fHFoVMax, m_fVFoVMin, m_fVFoVMax,
+                      m_uWidth, m_uHeight, m_scene, points, m_uOptions);
+          }
+          else if( m_eOpMode == CloudOpModeGrid )
+          {
+            gridScene(m_fGridSize, m_scene, points, m_uOptions);
+          }
 
           ROS_INFO_STREAM("Update and publish cloud message.");
 
@@ -250,6 +443,37 @@ namespace geofrenzy
 
           --m_nPublishCnt;
         }
+      }
+
+      /*!
+       * \brief Log information about operational parameters to the ROS
+       * logger (rosout).
+       */
+      void logOpParams()
+      {
+        ROS_INFO_STREAM(endl
+            << "Geofrenzy vCloud:" << endl
+            << "  Op Mode:        " << nameOfOpMode(m_eOpMode)
+              << "(" << m_eOpMode << ")" << endl
+
+            << "Sensor Mode Parameters:" << endl
+            << "  resolution:     " << m_uWidth << "x" << m_uHeight << endl
+            << "  horizontal FoV: " << "[" << degrees(m_fHFoVMin) << ", "
+                                    << degrees(m_fHFoVMax) << "]" << endl
+            << "  vertical FoV:   " << "[" << degrees(m_fVFoVMin) << ", "
+                                    << degrees(m_fVFoVMax) << "]" << endl
+            << "  nearest only:   " << (m_uOptions? "true": "false") << endl
+
+            << "Grid Mode Parameters:" << endl
+            << "  grid size:      " << m_fGridSize << endl
+
+            << "Transform Parameters:" << endl
+            << "  global frame:   " << m_globalFrame << endl
+            << "  robot frame:    " << m_robotFrame << endl
+
+            << "Publish Parameters:" << endl
+            << "  output format:  " << nameOfPubFmt(m_ePublishFmt)
+              << "(" << m_ePublishFmt << ")");
       }
 
     protected:
@@ -264,12 +488,15 @@ namespace geofrenzy
       MapSubscriptions  m_subscriptions;  ///< Geofrenzy server subscriptions
 
       // sensor properties
-      double  m_fHFoVMin;   ///< min horizontal fov (radians)
-      double  m_fHFoVMax;   ///< max horizontal fov (radians)
-      double  m_fVFoVMin;   ///< min vertical fov (radians)
-      double  m_fVFoVMax;   ///< max vertical fov (radians)
-      size_t  m_uWidth;     ///< num of steps between min,max HFoV
-      size_t  m_uHeight;    ///< num of steps between min,max VFoV
+      int       m_eOpMode;    ///< operation mode
+      double    m_fHFoVMin;   ///< min horizontal fov (radians)
+      double    m_fHFoVMax;   ///< max horizontal fov (radians)
+      double    m_fVFoVMin;   ///< min vertical fov (radians)
+      double    m_fVFoVMax;   ///< max vertical fov (radians)
+      size_t    m_uWidth;     ///< num of steps between min,max HFoV
+      size_t    m_uHeight;    ///< num of steps between min,max VFoV
+      double    m_fGridSize;  ///< grid size (meters)
+      uint32_t  m_uOptions;   ///< scanning control options
 
       // scene
       EigenScene  m_scene;  ///< scene of polygonal shapes with attributes
@@ -542,6 +769,8 @@ int main(int argc, char *argv[])
   }
 
   ROS_INFO_STREAM(nodeName << ": Node initialized.");
+
+  vSensor.logOpParams();
 
   //
   // Advertise services.

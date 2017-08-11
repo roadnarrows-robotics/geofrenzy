@@ -128,6 +128,9 @@ namespace geofrenzy
      * \{
      */
 
+    /*! tau is defined as 2 pi */
+    #define M_TAU (2.0 * M_PI)
+
     /*!
      * \brief Minimum and maximum indices.
      *
@@ -156,6 +159,28 @@ namespace geofrenzy
     const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
 
     /*!
+     * \brief X-Y plane quadrants.
+     */
+    const int _QNone  = 0;    ///< no quadrant - on an axis line
+    const int _QI     = 1;    ///< quadrant 1: x+, y+
+    const int _QII    = 2;    ///< quadrant 2: x-, y+
+    const int _QIII   = 3;    ///< quadrant 3: x-, y-
+    const int _QIV    = 4;    ///< quadrant 4: x+, y-
+
+    /*!
+     * \brief X-Y-Z solid octants.
+     */
+    const int _ONone  = 0;    ///< no octant - on an axis plane
+    const int _OI     = 1;    ///< octant 1: x+, y+, z+
+    const int _OII    = 2;    ///< octant 2: x-, y+, z+
+    const int _OIII   = 3;    ///< octant 3: x-, y-, z+
+    const int _OIV    = 4;    ///< octant 4: x+, y-, z+
+    const int _OV     = 5;    ///< octant 5: x+, y+, z-
+    const int _OVI    = 6;    ///< octant 6: x-, y+, z-
+    const int _OVII   = 7;    ///< octant 7: x-, y-, z-
+    const int _OVIII  = 8;    ///< octant 8: x+, y-, z-
+
+    /*!
      * \brief Infinity
      */
     const double Inf = std::numeric_limits<double>::infinity(); ///< infinity
@@ -174,6 +199,11 @@ namespace geofrenzy
      * \brief Minimum fence height (meters).
      */
     const double FenceMinHeight = 0.10;
+
+    /*!
+     * \brief Default precision.
+     */
+    const double PrecisionDft = 1.0e-10;
 
     /*! \} */ // gfmath_const
   
@@ -222,6 +252,116 @@ namespace geofrenzy
     }
 
     /*!
+     * \brief Determine sign of value.
+     *
+     * Zero is considered position.
+     *
+     * \param val   Value to test.
+     *
+     * \return Returns 1 or -1 if value is non-negative or negative,
+     * respectively.
+     */
+    inline int sign(const double val)
+    {
+      return val >= 0.0? 1: -1;
+    }
+
+    /*
+     * \brief Convert 3D point to x-y plane projected 2D point.
+     *
+     * \return Returns 2D point on x-y plane.
+     */
+    inline EigenPoint2 xy(const EigenPoint3 &pt)
+    {
+      return EigenPoint2(pt.x(), pt.y());
+    }
+
+    /*
+     * \brief Convert 3D point to x-z plane projected 2D point.
+     *
+     * \return Returns 2D point on x-z plane.
+     */
+    inline EigenPoint2 xz(const EigenPoint3 &pt)
+    {
+      return EigenPoint2(pt.x(), pt.z());
+    }
+
+    /*
+     * \brief Convert 3D point to y-z plane projected 2D point.
+     *
+     * \return Returns 2D point on y-z plane.
+     */
+    inline EigenPoint2 yz(const EigenPoint3 &pt)
+    {
+      return EigenPoint2(pt.y(), pt.z());
+    }
+
+    /*!
+     * \brief Test if values are approximately equal.
+     *
+     * \param val0      Value 0.
+     * \param val1      Value 1.
+     * \param precision Precision of equality.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApprox(const double val0,
+                         const double val1,
+                         const double precision = PrecisionDft)
+    {
+      return fabs(val1 - val0) <= precision;
+    }
+
+    /*!
+     * \brief Test if value are approximately equal to 0 (zero).
+     *
+     * \param val       Value to test.
+     * \param precision Precision of equality.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApproxZero(const double val,
+                             const double precision = PrecisionDft)
+    {
+      return fabs(val) <= precision;
+    }
+
+    /*!
+     * \brief Test if two points, within precision, are approximately equal.
+     *
+     * \param pt0         Point 0.
+     * \param pt1         Point 1.
+     * \param precesion   Precision of equality check.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApprox(const EigenPoint2 &pt0,
+                         const EigenPoint2 &pt1,
+                         const double      precision = PrecisionDft)
+    {
+      return  (fabs(pt1.x() - pt0.x()) <= precision) &&
+              (fabs(pt1.y() - pt0.y()) <= precision);
+    }
+
+    /*!
+     * \brief Test if two points, within precision, are approximately equal.
+     *
+     * \param pt0         Point 0.
+     * \param pt1         Point 1.
+     * \param precesion   Precision of equality check.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApprox(const EigenPoint3 &pt0,
+                         const EigenPoint3 &pt1,
+                         const double      precision = PrecisionDft)
+    {
+      return  (fabs(pt1.x() - pt0.x()) <= precision) &&
+              (fabs(pt1.y() - pt0.y()) <= precision) &&
+              (fabs(pt1.z() - pt0.z()) <= precision);
+    }
+
+    /*!
      * \brief Remap angle into equivalent (-pi, pi] range.
      *
      * \param a   Angle (radians).
@@ -232,11 +372,11 @@ namespace geofrenzy
     {
       if( a > M_PI )
       {
-        return a - 2.0 * M_PI;
+        return a - M_TAU;
       }
       else if( a <= -M_PI )
       {
-        return a + 2.0 * M_PI;
+        return a + M_TAU;
       }
       else
       {
@@ -253,7 +393,8 @@ namespace geofrenzy
      */
     inline double rot180if(const double a)
     {
-      return a >= 0.0? a: a + M_PI;
+      double b = pi2pi(a);
+      return b >= 0.0? b: b + M_PI;
     }
 
     /*!
@@ -266,6 +407,21 @@ namespace geofrenzy
     inline double rot180(const double a)
     {
       return pi2pi(a + M_PI);
+    }
+
+    /*!
+     * \brief Convert polar coordinate (r,theta) to Cartesion (x,y).
+     *
+     * The polar coordinates are as used in mathematics.
+     *
+     * \param r     Radial distance [0, inf).
+     * \param theta Azimuthal angle from x+ axis (-pi, pi].
+     *
+     * \return Cartesion (x,y) point.
+     */
+    inline EigenPoint2 polarToCartesian(const double r, const double theta)
+    {
+      return EigenPoint2(r * cos(theta), r * sin(theta));
     }
 
     /*!
@@ -339,33 +495,26 @@ namespace geofrenzy
     /*!
      * \brief Calculate the distance from the origin (0,0) to a line in 2D.
      *
-     * The 2D line is defined by the two points pt1 and pt2. Only the x and y
-     * components are used (z is ignored).
+     * The 2D line is defined by the two points pt1 and pt2.
      *
      * The projection point forms an orthogonal line between the origin and
-     * that projection point.
-     *
-     * The projection on the line pt1,pt2 of the point pt0 forms a point on the
-     * line that defines an orthogonal line between the projection and point
-     * pt0
+     * that projection point to the 2D line.
      *
      * \param pt1   Line point 1.
      * \param pt2   Line point 2.
      *
      * \return Projection distance >= 0.0
      */
-    inline double projection2(const EigenPoint3 &pt1, const EigenPoint3 &pt2)
+    inline double projection(const EigenPoint2 &pt1, const EigenPoint2 &pt2)
     {
       return fabs(pt2.x() * pt1.y() - pt2.y() * pt1.x()) /
               sqrt(pow(pt2.y() - pt1.y(), 2.0) + pow(pt2.x() - pt1.x(), 2.0));
     }
 
     /*!
-     * \brief Calculate the distance from a point pt0 to a line in 2D.
+     * \brief Calculate the distance from a point pt0 to a line in 2D
      *
-     * The 2D line is defined by the two points pt1 and pt2. Only the x and y
-     * components are used (z is ignored). Likewise only x and y components of
-     * pt0 are used.
+     * The 2D line is defined by the two points pt1 and pt2.
      *
      * The projection on the line pt1,pt2 of the point pt0 forms a point on the
      * line that defines an orthogonal line between the projection and point
@@ -377,9 +526,9 @@ namespace geofrenzy
      *
      * \return Projection distance >= 0.0
      */
-    inline double projection2(const EigenPoint3 &pt1,
-                              const EigenPoint3 &pt2,
-                              const EigenPoint3 &pt0)
+    inline double projection(const EigenPoint2 &pt1,
+                             const EigenPoint2 &pt2,
+                             const EigenPoint2 &pt0)
     {
       double dx = pt2.x() - pt1.x();
       double dy = pt2.y() - pt1.y();
@@ -391,22 +540,45 @@ namespace geofrenzy
     /*!
      * \brief Calculate the inclination angle of a line.
      *
-     * The 2D line is defined by the two points pt0 and pt1. Only the x and y
-     * components are used (z is ignored).
+     * The 2D line is defined by the two points pt0 and pt1.
      *
-     * The inclination is the angle to the x-axis in [0.0, pi].
+     * The inclination is the angle to the x-axis in [0.0, pi).
      *
      * \param pt0   Line point 1.
      * \param pt1   Line point 2.
      *
      * \return Inclination (radians).
      */
-    inline double inclination2(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
+    inline double inclination(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
     {
-      double alpha = atan2(pt1.y() - pt0.y(), pt1.x() - pt0.x());
-
-      return alpha >= 0.0? alpha: alpha + M_PI;
+      double alpha = rot180if(atan2(pt1.y() - pt0.y(), pt1.x() - pt0.x()));
+      return alpha < M_PI? alpha: 0.0;
     }
+
+    /*!
+     * \brief Find the intersection of two 2D parametric lines.
+     *
+     * \param line1   Parametric line 1 line1(t) = o1 + t * d1
+     * \param line2   Parametric line 2 line2(u) = o1 + u * d1
+     *
+     * \return
+     * If the lines intersect, then the intersection point is returned.
+     * If the lines are parallel, the (Inf, Inf) point is returned.
+     * If the lines are identical, any point on the line is returned.
+     */
+    EigenPoint2 intersection(const EigenLine2 &line1, const EigenLine2 &line2);
+
+    /*!
+     * \brief Find the t value for the parametric line at the given point.
+     *
+     * First x, then the y component is tried. No consistency check is made.
+     *
+     * \param line  Parametric line in 3D space.
+     * \param pt    Point in the x-y plane.
+     *
+     * \return Returns t or Inf.
+     */
+    double t_param(const EigenLine3 &line, const EigenPoint2 &pt);
 
     /*!
      * \brief Check if the value is within the min,max limits.
@@ -450,14 +622,39 @@ namespace geofrenzy
               ((val >= lim.m_min[2]) && (val <= lim.m_max[2]));
     }
 
-    int quadrant(const EigenPoint2 &pt);
+    /*!
+     * \brief Determine the x-y plane quadrant the point lies within.
+     *
+     * \param pt        2D point.
+     * \param precision Precision of position.
+     *
+     * \return Returns 1-4 for quadrants QI - QIV, respectively. Returns 0
+     * if point lies on or is sufficiently close to an axis.
+     */
+    int quadrant(const EigenPoint2 &pt, const double precision = PrecisionDft);
 
-    inline int quadrant(const EigenPoint3 &pt)
-    {
-      return quadrant(EigenPoint2(pt.x(), pt.y()));
-    }
+    /*!
+     * \brief Determine the x-y plane quadrant the angle from origin projects
+     * into.
+     *
+     * \param theta     Angle in the x-y plane (radians).
+     * \param precision Precision of angle.
+     *
+     * \return Returns 1-4 for quadrants QI - QIV, respectively. Returns 0
+     * if angle lies on or is sufficiently close to an axis.
+     */
+    int quadrant(const double theta, const double precision = PrecisionDft);
 
-    int quadrant(const double theta);
+    /*!
+     * \brief Determine the x-y-z actant the point lies within.
+     *
+     * \param pt        3D point.
+     * \param precision Precision of position.
+     *
+     * \return Returns 1-8 for octants OI - OVII, respectively. Returns 0
+     * if point lies on or is sufficiently close to an axis plane.
+     */
+    int octant(const EigenPoint3 &pt, const double precision = PrecisionDft);
 
     /*!
      * \brief Test if point is contained within a rectangular cuboid bounding
@@ -733,19 +930,16 @@ namespace geofrenzy
      */
     struct EigenSurface
     {
-      unsigned int  m_num;        ///< surface number in scene object
-      // RDK EigenPoint3List m_vertices;
-      EigenPoint3   m_pt0;        ///< planar surface base point 0
-      EigenPoint3   m_pt1;        ///< planar surface base point 1
-      EigenPoint3   m_pt2;        ///< planar surface upper point 2
-      EigenPlane3   m_plane;      ///< infinite plane
-      double        m_length;     ///< surface length
-      double        m_height;     ///< surface height
-      double        m_inclination;///< surface inclination angle from x-axis
-      double        m_projection; ///< project origin (distance) on base 2D line
-      EigenBBox3    m_bbox;       ///< clipping bounding box
-      EigenMinMax2  m_thetas;     ///< horizontal apparent theta surface limits
-      double        m_subtended;  ///< subtended angle of surface from viewer
+      unsigned int    m_num;        ///< surface number in scene object
+      EigenPoint3List m_vertices;   ///< surface vertices
+      EigenPlane3     m_plane;      ///< infinite plane
+      double          m_length;     ///< surface length
+      double          m_height;     ///< surface height
+      double          m_inclination;///< surface inclination angle from x-axis
+      double          m_projection; ///< project origin on base 2D line
+      EigenBBox3      m_bbox;       ///< clipping bounding box
+      EigenMinMax2    m_thetas;     ///< horizontal apparent theta limits
+      double          m_subtended;  ///< subtended angle of surface from viewer
     };
 
     /*!
@@ -823,10 +1017,10 @@ namespace geofrenzy
      *
      * \return Boolean
      */
-#define SCANOPT_2D(_opt)            ((_opt) & ScanOption2D)
-#define SCANOPT_ALPHA_BLEND(_opt)   ((_opt) & ScanOptionAlphaBlend)
-#define SCANOPT_NEAREST_ONLY(_opt)  ((_opt) & ScanOptionNearest)
-#define SCANOPT_XRAY_VIS(_opt)      !SCANOPT_NEAREST_ONLY(_opt)
+    #define SCANOPT_2D(_opt)            ((_opt) & ScanOption2D)
+    #define SCANOPT_ALPHA_BLEND(_opt)   ((_opt) & ScanOptionAlphaBlend)
+    #define SCANOPT_NEAREST_ONLY(_opt)  ((_opt) & ScanOptionNearest)
+    #define SCANOPT_XRAY_VIS(_opt)      !SCANOPT_NEAREST_ONLY(_opt)
     ///@}
 
     /*! \} */ // gfmath_scene
@@ -893,6 +1087,9 @@ namespace geofrenzy
      * \brief Scan virtual scene to generate a list of intersecting depth +
      * color points.
      *
+     * In this operation mode, the scene is a posteriori detected by a virtual
+     * scanning sensor.
+     *
      * Scanning proceeds from the minimum to maximum phi in height steps, with
      * each step sweeping from the minimum to maximum theta in width steps.
      *
@@ -914,6 +1111,23 @@ namespace geofrenzy
                    const EigenScene       &scene,
                    EigenXYZRGBAList       &intersects,
                    uint32_t               options = ScanOptionDft);
+
+    /*!
+     * \brief Grid virtual scene fences to generate a list of depth + color
+     * points.
+     *
+     * In this operation mode, the scene is a priori known and a fast grid
+     * of the fences is performed.
+     *
+     * \param       gridSize    Grid size.
+     * \param       scene       The scene to scan.
+     * \param[out]  intersects  List of intersecting points.
+     * \param       options     Options to control the grid generations.
+     */
+    void gridScene(const double       gridSize,
+                   const EigenScene   &scene,
+                   EigenXYZRGBAList   &intersects,
+                   uint32_t           options = ScanOptionDft);
 
     /*! \} */ // gfmath_scene
 
