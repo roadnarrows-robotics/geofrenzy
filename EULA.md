@@ -1,4 +1,4 @@
-# GeoFrenzy appkit Package End User License Agreement
+# GeoFrenzy Package End User License Agreement
 
 Copyright [2017] [GeoNetwork]
 [geo.network](http://geo.network)
@@ -19,5 +19,3 @@ Unless otherwise noted, all materials contained are copyrighted and may not
 be used except as provided in these terms and conditions or in the copyright
 notice (documents and software ) or other proprietary notice provided with
 the relevant materials.
-
-
