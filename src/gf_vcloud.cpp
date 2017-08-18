@@ -22,7 +22,7 @@
  * \n All Rights Reserved
  *
  * \par License
- * MIT
+ * Apache 2.0
  * 
  * EULA:
  * See EULA.md

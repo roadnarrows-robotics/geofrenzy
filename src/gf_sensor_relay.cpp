@@ -1,5 +1,39 @@
-// GEOFRENZY FILE HEADER HERE
+////////////////////////////////////////////////////////////////////////////////
+//
+// Package:   Geofrenzy Robot ROS Package
+//
+// Link:      https://github.com/roadnarrows-robotics/geofrenzy
+//
+// File:      gf_sensor_relay.cpp
+//
+/*! \file
+ *
+ * \brief The Geofrenzy ROS sensor relay node source.
+ *
+ * \author Bill Coon (bill@roadnarrows.com)
+ * \author Robin Knight (robin.knight@roadnarrows.com)
+ *
+ * \par Maintainer:
+ * Chris Stradtman (chris.stradtman@geo.network)
+ *
+ * \par Copyright:
+ * (C) 2017  GeoNetwork
+ * (http://www.geo.network)
+ * \n All Rights Reserved
+ *
+ * \par License
+ * Apache 2.0
+ * 
+ * EULA:
+ * See EULA.md
+ */
+////////////////////////////////////////////////////////////////////////////////
 
+//
+// System
+//
+#include <sstream>
+#include <string>
 
 //
 // ROS
@@ -23,6 +57,7 @@
 //
 // Geofrenzy
 //
+#include "gf_types.h"
 #include "gf_ros.h"
 
 /*!
@@ -89,19 +124,26 @@ class SensorRelay
  *
  */
 void SensorRelay::initSensorRelayProperties(){
+    std::stringstream ss;
+
     /*!
      * This should check param server and args for values
      */
 
     //Topic in message type should be resolved as well
-    m_topicIn = "/laelaps/laelaps_camera/image_raw";
+    m_topicIn = "camera_in/image_raw";
     m_msgType = MsgTypeImage;
 
     //Topic out should come from param server, topic type same as topicIn
     m_topicOut = "/geofrenzy/image_raw";
 
     //Dwell topic type needs to be resolved as well
-    m_dwellTopic = "/gf_server_168/gf_server_168/geofrenzy/209/dwell/boolset";
+    ss << "/gf_server_" << geofrenzy::GciRoadNarrowsLLC
+      << "/gf_server_" << geofrenzy::GciRoadNarrowsLLC
+      << "/geofrenzy/" << geofrenzy::GeiNoCameras
+      << "/dwell/boolset";
+    m_dwellTopic = ss.str();
+    //m_dwellTopic = "/gf_server_168/gf_server_168/geofrenzy/209/dwell/boolset";
     m_entDataType = EntDataTypeBoolset;
 
     //Turn local image into ros message to publish

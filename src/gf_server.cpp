@@ -1,4 +1,34 @@
-// GEOFRENZY FILE HEADER HERE
+////////////////////////////////////////////////////////////////////////////////
+//
+// Package:   Geofrenzy Robot ROS Package
+//
+// Link:      https://github.com/roadnarrows-robotics/geofrenzy
+//
+// File:      gf_server.cpp
+//
+/*! \file
+ *
+ * \brief The Geofrenzy ROS node source bridge server between the Geofrenzy
+ * Portal and ROS.
+ *
+ * \author Bill Coon (bill@roadnarrows.com)
+ * \author Robin Knight (robin.knight@roadnarrows.com)
+ *
+ * \par Maintainer:
+ * Chris Stradtman (chris.stradtman@geo.network)
+ *
+ * \par Copyright:
+ * (C) 2017  GeoNetwork
+ * (http://www.geo.network)
+ * \n All Rights Reserved
+ *
+ * \par License
+ * Apache 2.0
+ * 
+ * EULA:
+ * See EULA.md
+ */
+////////////////////////////////////////////////////////////////////////////////
 
 //
 // System

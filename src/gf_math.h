@@ -1,4 +1,33 @@
-// GEOFRENZY FILE HEADER HERE
+////////////////////////////////////////////////////////////////////////////////
+//
+// Package:   Geofrenzy Robot ROS Package
+//
+// Link:      https://github.com/roadnarrows-robotics/geofrenzy
+//
+// File:      gf_math.h
+//
+/*! \file
+ *
+ * \brief The Geofrenzy math declarations.
+ *
+ * \author Bill Coon (bill@roadnarrows.com)
+ * \author Robin Knight (robin.knight@roadnarrows.com)
+ *
+ * \par Maintainer:
+ * Chris Stradtman (chris.stradtman@geo.network)
+ *
+ * \par Copyright:
+ * (C) 2017  GeoNetwork
+ * (http://www.geo.network)
+ * \n All Rights Reserved
+ *
+ * \par License
+ * Apache 2.0
+ * 
+ * EULA:
+ * See EULA.md
+ */
+////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _GF_MATH_H
 #define _GF_MATH_H

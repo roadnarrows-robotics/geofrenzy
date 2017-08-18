@@ -1,11 +1,43 @@
-// GEOFRENZY FILE HEADER HERE
+////////////////////////////////////////////////////////////////////////////////
+//
+// Package:   Geofrenzy Robot ROS Package
+//
+// Link:      https://github.com/roadnarrows-robotics/geofrenzy
+//
+// File:      gf_ros.h
+//
+/*! \file
+ *
+ * \brief The Geofrenzy ROS top-level interface declaraions.
+ *
+ * \author Bill Coon (bill@roadnarrows.com)
+ * \author Robin Knight (robin.knight@roadnarrows.com)
+ *
+ * \par Maintainer:
+ * Chris Stradtman (chris.stradtman@geo.network)
+ *
+ * \par Copyright:
+ * (C) 2017  GeoNetwork
+ * (http://www.geo.network)
+ * \n All Rights Reserved
+ *
+ * \par License
+ * Apache 2.0
+ * 
+ * EULA:
+ * See EULA.md
+ */
+////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _GF_ROS_H
 #define _GF_ROS_H
 
 #include <math.h>
 #include <string>
+
 #include "ros/ros.h"
+
+#include "gf_types.h"
 
 namespace geofrenzy
 {
@@ -459,7 +491,7 @@ namespace geofrenzy
      *
      * \return Geofrenzy class index.
      */
-    uint64_t paramClassIndex(int argc, char *argv[], uint64_t dft=1);
+    uint64_t paramClassIndex(int argc, char *argv[], uint64_t dft=GciGuestAcct);
  
     /*!
      * \brief Make an unique Geofrenzy node from the class index.
