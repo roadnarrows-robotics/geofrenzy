@@ -49,6 +49,19 @@ namespace geofrenzy
   typedef int64_t GfClassIndex;         ///< Geofrenzy class index
   typedef int64_t GfEntitlementIndex;   ///< Geofrenzy entitlement index
 
+  /*!
+   * \breif Entitlement base data type enumeration.
+   */
+  enum GfEntDataType
+  {
+    GfEntDataTypeUndef,     // undefined or unknown
+    GfEntDataTypeBoolset,   // boolean bit set
+    GfEntDataTypeColor,     // red-green-blue-alpha
+    GfEntDataTypeJson,      // json encoded string
+    GfEntDataTypeProfile,   // profile number
+    GfEntDataTypeThreshold  // threshold fpn triple
+  };
+
   typedef uint32_t GfEntBaseBoolset;    ///< set of boolean bits base data type
 
   /*!
@@ -62,7 +75,7 @@ namespace geofrenzy
     uint8_t m_alpha;    ///< alpha channel with 0 = fully transparent
   };
 
-  typedef uint64_t GfEntBaseProfile;  ///< numeric profile number base data type
+  typedef uint64_t GfEntBaseProfile;  ///< numeric profile base data type
 
   /*!
    * \brief Threshold base data type.
@@ -79,8 +92,9 @@ namespace geofrenzy
   // Fixed Geofrenzy Class Indices
   // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-  const GfClassIndex GciGeoNetwork     = 0;    ///< Geofrenzy
+  const GfClassIndex GciUndef          = 0;    ///< undefined
   const GfClassIndex GciGuestAcct      = 1;    ///< guest account
+  const GfClassIndex GciGeoNetwork     = 2;    ///< Geofrenzy
   const GfClassIndex GciRoadNarrowsLLC = 168;  ///< RoadNarrows - all things ROS
   const GfClassIndex GciAcmeCorp       = 1920; ///< beep, beep
 
@@ -90,13 +104,18 @@ namespace geofrenzy
   // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
   /*!
+   * \brief Undefined
+   */
+  const GfEntitlementIndex GeiUndef = 0;
+
+  /*!
    * \brief Fence Color.
    *
    * Color is an attribute the may be used for augumented or virtual realities.
    *
    * Base Type: color
    */
-  const GfEntitlementIndex GeiFenceColor        = 205;  ///< fence color
+  const GfEntitlementIndex GeiFenceColor = 205;
 
   /*!
    * \brief No exit.
@@ -138,7 +157,7 @@ namespace geofrenzy
    *
    * Base Type: boolset
    */
-  const GfEntitlementIndex GeiNoEntry           = 210;  ///< no entry allowed
+  const GfEntitlementIndex GeiNoEntry = 210;
 
   /*!
    * \brief Flight altitudes.
@@ -153,7 +172,7 @@ namespace geofrenzy
    *
    * Base Type: threshold
    */
-  const GfEntitlementIndex GeiFlightAltitudes   = 211;  ///< keep between alts.
+  const GfEntitlementIndex GeiFlightAltitudes = 211;
 
   /*!
    * \brief Issuing authority.
@@ -163,7 +182,7 @@ namespace geofrenzy
    *
    * Base Type: profile
    */
-  const GfEntitlementIndex GeiIssuingAuthority  = 218;  ///< by whose authority
+  const GfEntitlementIndex GeiIssuingAuthority = 218;
 
 } // namespace geofrenzy
 

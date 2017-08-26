@@ -32,15 +32,22 @@
 //
 // System
 //
-#include <sstream>
 #include <string>
+#include <vector>
 
 //
 // ROS
 //
 #include "ros/ros.h"
-#include "sensor_msgs/Image.h"
-#include "sensor_msgs/image_encodings.h"
+#include "ros/console.h"
+
+//
+// ROS generated core messages
+//
+
+//
+// mavros
+//
 
 //
 // ROS generated Geofrenzy messages
@@ -48,188 +55,187 @@
 #include "geofrenzy/GfDwellBoolset.h"
 
 //
-// OpenCV
-//
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <cv_bridge/cv_bridge.h>
-
-//
 // Geofrenzy
 //
 #include "gf_types.h"
 #include "gf_ros.h"
+#include "gf_sentinel.h"
 
-/*!
- * \brief Entitlement data type enumeration.
- */
-enum EntDataType
-{
-  EntDataTypeUndef,     // undefined or unknown
-  EntDataTypeBoolset,   // boolean bit set
-  EntDataTypeColor,     // red-green-blue-alpha
-  EntDataTypeProfile,   // profile number
-  EntDataTypeThreshold  // threshold fpn triple
-};
+using namespace geofrenzy::gf_ros;
 
-/*!
- * \brief Message type enumeration.
- */
-enum MsgType
+namespace geofrenzy
 {
-  MsgTypeUndef,         // undefined or unknown
-  MsgTypeImage          // boolean bit set
-};
+  typedef std::vector<GfSentinel*>      SentinelList;
+  typedef SentinelList::iterator        SentinelIter;
+  typedef SentinelList::const_iterator  SentinelCIter;
 
-class SensorRelay
-{
+  class SensorRelay
+  {
     /*!
     * This class is responsible for registering incoming/outgoing
     * ros topics that are controlled by geofrenzy entitlements.
     */
     public:
-        void sensorCallbackImage(const sensor_msgs::Image img);
-        void dwellCallbackBoolset(const geofrenzy::GfDwellBoolset dwell);
+        void dwellCallbackBoolset(const GfDwellBoolset &dwell);
         void advertisePublishers(int nQueueDepth=1);
         void subscribeToTopics(int nQueueDepth=5);
         void initSensorRelayProperties();
 
         SensorRelay(ros::NodeHandle &nh) : m_nh(nh){}
 
+        ~SensorRelay();
+
     private:
 
         ros::NodeHandle &m_nh;      ///< node handle
 
-        bool m_sensorPermitted;     ///< Sensor permission value
+        GfClassIndex m_gciServer;   ///< geofrenzy server node class index
 
-        //Messaging parameters
-        std::string m_topicIn;      ///< Topic sensor publishes to
-        std::string m_topicOut;     ///< Topic consumers subscribe to
-        std::string m_dwellTopic;   ///< Topic for dwell message
-        EntDataType m_entDataType;  ///< Data type for dwell message
-        MsgType     m_msgType;      ///< Message type for relay topic
+        //
+        // Built-in breaches
+        //
+        SentinelList  m_breaches;
 
         //ROS publishers/subscribers
-        geofrenzy::gf_ros::MapPublishers     m_publishers;     ///< Geofrenzy map server publishers
-        geofrenzy::gf_ros::MapSubscriptions  m_subscriptions;  ///< Geofrenzy map server subscriptions
+        gf_ros::MapPublishers     m_publishers;     ///< topic publishers
+        gf_ros::MapSubscriptions  m_subscriptions;  ///< topic subscriptions
 
-        //Image to publish when camera not permitted
-        sensor_msgs::Image m_defaultImage;
+  };
 
-
-};
-
-/*!
- * \brief Init properties. Check for topic names on param server.
- *
- */
-void SensorRelay::initSensorRelayProperties(){
-    std::stringstream ss;
-
-    /*!
-     * This should check param server and args for values
-     */
-
-    //Topic in message type should be resolved as well
-    m_topicIn = "camera_in/image_raw";
-    m_msgType = MsgTypeImage;
-
-    //Topic out should come from param server, topic type same as topicIn
-    m_topicOut = "/geofrenzy/image_raw";
-
-    //Dwell topic type needs to be resolved as well
-    ss << "/gf_server_" << geofrenzy::GciRoadNarrowsLLC
-      << "/gf_server_" << geofrenzy::GciRoadNarrowsLLC
-      << "/geofrenzy/" << geofrenzy::GeiNoCameras
-      << "/dwell/boolset";
-    m_dwellTopic = ss.str();
-    //m_dwellTopic = "/gf_server_168/gf_server_168/geofrenzy/209/dwell/boolset";
-    m_entDataType = EntDataTypeBoolset;
-
-    //Turn local image into ros message to publish
-    std_msgs::Header header;
-    cv::Mat img = cv::imread("/home/woundzoom/catkin_ws/src/geofrenzy/images/default.png", CV_LOAD_IMAGE_COLOR);
-    cv_bridge::CvImage img_bridge;
-    img_bridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::RGB8, img);
-    img_bridge.toImageMsg(m_defaultImage);
-    //sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img).toImageMsg();
-}
-
-/*!
- * \brief Subscribe to all topics.
- *
- * \param nQueueDepth   Maximum queue depth.
- */
-void SensorRelay::subscribeToTopics(int nQueueDepth)
-{
-    //Use topic message type to assign the appropriate sensor callback
-    switch( m_msgType )
+  SensorRelay::~SensorRelay()
+  {
+    for(size_t i = 0; i < m_breaches.size(); ++i)
     {
-        case MsgTypeImage:
-            m_subscriptions[m_topicIn] = m_nh.subscribe(m_topicIn, nQueueDepth,
-                                                        &SensorRelay::sensorCallbackImage, &(*this));
-            break;
-        case MsgTypeUndef:
-            ROS_INFO("Unknown message type. Not subscribing to topic");
-            break;
-        default:
-            break;
+      delete m_breaches[i];
+      m_breaches[i] = NULL;
     }
+    m_breaches.clear();
+  }
 
-    //Use entitlement data type to assign appropriate dwell callback
-    switch( m_entDataType )
+  /*!
+   * \brief Init properties. Check for topic names on param server.
+   *
+   */
+  void SensorRelay::initSensorRelayProperties()
+  {
+    int32_t   val;
+    int32_t   dft = (int32_t)GciGuestAcct;
+    GfSentinel  *p;
+
+    //
+    // Get the gefrenzy portal server class index.
+    // 
+    // Note: no 64-bit types in parameter server
+    //
+    m_nh.param(ParamNameSrServerGci, val, dft);
+
+    m_gciServer = (GfClassIndex)val;
+
+    //
+    // Built-in breaches
+    //
+    m_breaches.push_back(new GfSentinelCam());
+
+    //
+    // Initialize properties of all built-in breaches
+    for(size_t i = 0; i < m_breaches.size(); ++i)
     {
-        case EntDataTypeBoolset:
-            m_subscriptions[m_dwellTopic] = m_nh.subscribe(m_dwellTopic, nQueueDepth,
-                                                        &SensorRelay::dwellCallbackBoolset, &(*this));
-            break;
-        case MsgTypeUndef:
-            ROS_INFO("Unknown message type. Not subscribing to topic");
-            break;
-        default:
-            break;
+      m_breaches[i]->initProperties(m_nh, m_gciServer);
     }
+  }
 
-}
 
-/*!
- * \brief Advertise all publishers.
- *
- * \param nQueueDepth   Maximum queue depth.
- */
-void SensorRelay::advertisePublishers(int nQueueDepth)
-{
-    //Use topic message type to advertise appropriate message
-    switch( m_msgType )
+  /*!
+   * \brief Subscribe to all topics.
+   *
+   * \param nQueueDepth   Maximum queue depth.
+   */
+  void SensorRelay::subscribeToTopics(int nQueueDepth)
+  {
+    size_t  i;
+
+    //
+    // Sentinel specific topic subscriptions
+    //
+    for(i = 0; i < m_breaches.size(); ++i)
     {
-        case MsgTypeImage:
-            m_publishers[m_topicOut] = m_nh.advertise<sensor_msgs::Image>(m_topicOut, nQueueDepth, true);
-            break;
-        case MsgTypeUndef:
-            ROS_INFO("Unknown message type. Not subscribing to topic");
-            break;
-        default:
-            break;
-    }
-}
-
-void SensorRelay::sensorCallbackImage(const sensor_msgs::Image img)
-{
-    if(m_sensorPermitted){
-        m_publishers[m_topicOut].publish(img);
-    }else{
-        m_publishers[m_topicOut].publish(m_defaultImage);
-    }
-}
-
-void SensorRelay::dwellCallbackBoolset(const geofrenzy::GfDwellBoolset dwellMsg){
-    if((dwellMsg.entitlement.bitset_num == 0) && (dwellMsg.entitlement.ent_header.dwell)){
-        m_sensorPermitted = false;
-    }else{
-        m_sensorPermitted = true;
+      m_breaches[i]->subscribeToTopics(m_nh);
     }
 
-}
+    //
+    // Geofrenzy dwell topic subscriptions
+    //
+    for(i = 0; i < m_breaches.size(); ++i)
+    {
+      std::string &topic = m_breaches[i]->m_topicDwell;
+
+      // nothing to subscribe
+      if( topic.empty() )
+      {
+        continue;
+      }
+
+      // already subscribed
+      else if( m_subscriptions.find(topic) != m_subscriptions.end() )
+      {
+        continue;
+      }
+
+      // subscribe
+      else
+      {
+        switch( m_breaches[i]->m_entDataType )
+        {
+          case GfEntDataTypeBoolset:
+            m_subscriptions[topic] = m_nh.subscribe(topic,
+                                            nQueueDepth,
+                                            &SensorRelay::dwellCallbackBoolset,
+                                            &(*this));
+            break;
+          case GfEntDataTypeUndef:
+            ROS_INFO("Undefined entitiy data type. Not subscribing to topic");
+            break;
+          default:
+            ROS_ERROR_STREAM("Unknnown entitiy data type = "
+                << m_breaches[i]->m_entDataType << ".");
+            break;
+        }
+      }
+    }
+  }
+
+  /*!
+   * \brief Advertise all publishers.
+   *
+   * \param nQueueDepth   Maximum queue depth.
+   */
+  void SensorRelay::advertisePublishers(int nQueueDepth)
+  {
+    //
+    // Sentinel specific published topics
+    //
+    for(size_t i = 0; i < m_breaches.size(); ++i)
+    {
+      m_breaches[i]->advertisePublishers(m_nh);
+    }
+  }
+
+  void SensorRelay::dwellCallbackBoolset(const GfDwellBoolset &dwellMsg)
+  {
+    for(size_t i = 0; i < m_breaches.size(); ++i)
+    {
+      GfSentinel *b = m_breaches[i];
+
+      if( (dwellMsg.entitlement.ent_header.gf_class_idx == b->m_gci) &&
+          (dwellMsg.entitlement.ent_header.gf_ent_idx   == b->m_gei) &&
+          (b->m_entDataType == GfEntDataTypeBoolset) )
+      {
+        b->cbWatchForBreach(dwellMsg.entitlement.ent_header.dwell);
+      }
+    }
+  }
+
+} // namespace geofrenzy
 
 
 /**
@@ -241,11 +247,11 @@ void SensorRelay::dwellCallbackBoolset(const geofrenzy::GfDwellBoolset dwellMsg)
  */
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "gf_sensor_relay");
+    ros::init(argc, argv, NodeRootSensorRelay);
 
     ros::NodeHandle nh;
 
-    SensorRelay sr(nh);
+    geofrenzy::SensorRelay sr(nh);
     sr.initSensorRelayProperties();
     sr.advertisePublishers();
     sr.subscribeToTopics();

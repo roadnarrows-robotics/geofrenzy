@@ -34,6 +34,7 @@
 
 #include <math.h>
 #include <string>
+#include <vector>
 
 #include "ros/ros.h"
 
@@ -210,19 +211,24 @@ namespace geofrenzy
      */
     const int CloudPublishFmtDft = CloudFmtXYZRGB;
 
-    /*!
-     * \brief Default global frame for transformations
-     *
-     *
-     */
-    const std::string GlobalFrameDft = "map";   ///< default global frame
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Geofrenzy Node Shared Defaults
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
     /*!
      * \brief Default global frame for transformations
      *
      *
      */
-    const std::string RobotFrameDft = "base_footprint";   ///< default global frame
+    const std::string GlobalFrameDft = "map";
+
+    /*!
+     * \brief Default global frame for transformations
+     *
+     *
+     */
+    const std::string RobotFrameDft = "base_footprint";
 
 
     // -------------------------------------------------------------------------
@@ -377,6 +383,38 @@ namespace geofrenzy
      */
     const char *const ParamNameCloudPublishFmt = "geofrenzy_cloud_out_fmt";
 
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Geofrenzy Sensor Relay Node gf_sensor_relay Parameters
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*!
+     * \brief Sensor relay entitlement index.
+     *
+     * If the value is not set, then GciGuestAcct is used.
+     */
+    const char *const ParamNameSrServerGci = "geofrenzy_sr_server_gci";
+
+    /*!
+     * \brief Camera sensor relay entitlement index.
+     *
+     * If the value is not set, then GeiNoCameras is used.
+     */
+    const char *const ParamNameSrCamGei = "geofrenzy_sr_cam_gei";
+
+    /*!
+     * \brief Sensor relay censored image filename.
+     *
+     * If the value is not set, the default is set to:
+     *  ${ROS_WORKSPACE}/${ROS_DISTRO}/src/goefrenzy/samples/censored.img
+     */
+    const char *const ParamNameSrCensoredImg = "geofrenzy_sr_censored_img";
+
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Geofrenzy Node Shared Parameters
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
     /*!
      * \brief Global Frame parameter name.
      *
@@ -435,7 +473,12 @@ namespace geofrenzy
      * <root>_<gf_class_idx>
      * ~~~
      */
-    const char *const NodeRootVCloud   = "gf_vcloud";
+    const char *const NodeRootVCloud = "gf_vcloud";
+
+    /*!
+     * \brief The Geofrenzy ROS sensor relay node.
+     */
+    const char *const NodeRootSensorRelay  = "gf_sensor_relay";
 
   
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -510,16 +553,51 @@ namespace geofrenzy
      * ```
      * <node_name>/geofrenzy/<ent_idx>/dwell/<ent_base>
      * ```
-     * \param gf_class_idx    Geofrenzy class index.
-     * \param gf_ent_idx      Geofrenzy entitlement index.
-     * \param gf_ent_subtype  Geofrenzy entitlement subtype (base or json).
+     * \param gf_class_idx  Geofrenzy class index.
+     * \param gf_ent_idx    Geofrenzy entitlement index.
+     * \param gf_ent_base   Geofrenzy entitlement base name string.
      *
      * \return String.
      */
-    std::string makeDwellTopicName(uint64_t          gf_class_idx,
-                                   uint64_t          gf_ent_idx,
-                                   const std::string gf_ent_subtype);
+    std::string makeDwellTopicName(const uint64_t    gf_class_idx,
+                                   const uint64_t    gf_ent_idx,
+                                   const std::string gf_ent_base);
 
+    /*!
+     * \brief Make a gf_server dwell topic name.
+     *
+     * Output:
+     * ```
+     * <node_name>/geofrenzy/<ent_idx>/dwell/<ent_base>
+     * ```
+     * \param gf_class_idx  Geofrenzy class index.
+     * \param gf_ent_idx    Geofrenzy entitlement index.
+     * \param gf_ent_type   Geofrenzy entitlement type enumeration.
+     *
+     * \return String.
+     */
+    std::string makeDwellTopicName(const uint64_t      gf_class_idx,
+                                   const uint64_t      gf_ent_idx,
+                                   const GfEntDataType gf_ent_type);
+
+    /*!
+     * \brief Convert entitlement base type name to enum.
+     *
+     * \param gf_ent_base   Geofrenzy entitlement base name string.
+     *
+     * \return Return enum.
+     */
+    GfEntDataType entBaseToType(const std::string gf_ent_base);
+
+    /*!
+     * \brief Convert entitlement enum to base name string.
+     *
+     * \param gf_ent_type   Geofrenzy entitlement type enumeration.
+     *
+     * \return Return string.
+     */
+    std::string entTypeToBase(const GfEntDataType gf_ent_type);
+    
     /*!
      * \brief Fill in ROS standard message header.
      *
@@ -544,7 +622,28 @@ namespace geofrenzy
                      const int32_t     nSeqNum = 0,
                      const std::string strFrameId = "geofrenzy");
 
+    /*!
+     * \brief Split ROS package search path into a vector of paths.
+     *
+     * Environment Variable: ROS_PACKAGE_PATH
+     *
+     * All found paths are appended to the paths vector.
+     *
+     * \param [out] paths Vector of split paths.
+     */
+    void splitRosPackagePath(std::vector<std::string> &paths);
  
+    /*!
+     * \brief Split search path into a vector of paths.
+     *
+     * All found paths are appended to the paths vector.
+     *
+     * \param [in]  searchPath  String of paths separated by ':'.
+     * \param [out] paths       Vector of split paths.
+     */
+    void splitSearchPath(const std::string        &searchPath,
+                         std::vector<std::string> &paths);
+    
   } // namespace gf_ros
 } // namespace geofrenzy
 

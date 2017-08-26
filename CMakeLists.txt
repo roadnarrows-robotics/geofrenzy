@@ -263,6 +263,7 @@ target_link_libraries(gf_vcloud
 # geofrenzy sensor relay
 add_executable(gf_sensor_relay
   src/gf_ros.cpp
+  src/gf_sentinel.cpp
   src/gf_sensor_relay.cpp)
 target_link_libraries(gf_sensor_relay ${catkin_LIBRARIES})
 

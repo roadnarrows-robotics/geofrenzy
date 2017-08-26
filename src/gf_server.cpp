@@ -48,7 +48,6 @@
 #include "jsoncpp/json/reader.h"
 #include "geodesy/wgs84.h"
 #include "swri_transform_util/transform_util.h"
-#include "boost/assign.hpp"
 #include "boost/bind.hpp"
 
 //
@@ -102,10 +101,10 @@ extern "C"
   char *class_entitlements_properties_json(int myclass);
 }
 
+#include "gf_types.h"
 #include "gf_ros.h"
 
 
-using namespace boost::assign;
 using namespace geofrenzy::gf_ros;
 
 namespace geofrenzy
@@ -114,29 +113,6 @@ namespace geofrenzy
   //
   // Constants
   //
-
-  /*!
-   * \breif Entitlement data type enumeration.
-   */
-  enum EntDataType
-  {
-    EntDataTypeUndef,     // undefined or unknown
-    EntDataTypeBoolset,   // boolean bit set
-    EntDataTypeColor,     // red-green-blue-alpha
-    EntDataTypeProfile,   // profile number
-    EntDataTypeThreshold  // threshold fpn triple
-  };
-
-  /*!
-   * \breif Entitlement data type enumeration base on the entitlement base
-   * string.
-   */
-  std::map<std::string, EntDataType> EntBaseToType = map_list_of
-    ("?",         EntDataTypeUndef)
-    ("boolset",   EntDataTypeBoolset)
-    ("color",     EntDataTypeColor)
-    ("profile",   EntDataTypeProfile)
-    ("threshold", EntDataTypeThreshold);
 
 
   //----------------------------------------------------------------------------
@@ -165,22 +141,9 @@ namespace geofrenzy
           m_ent_base(gf_ent_base),
           m_atime(0.0)
       {
-        //
-        // Map entitlement base type to data type.
-        //
-        if( EntBaseToType.find(gf_ent_base) != EntBaseToType.end() )
-        {
-          m_eEntDataType = EntBaseToType[gf_ent_base];
-        }
-        else
-        {
-          m_eEntDataType = EntDataTypeUndef;
-        }
-
-        m_bDwell = false;
-
-        // nothing to publish yet
-        m_nPublishCnt = 0;
+        m_eEntDataType  = entBaseToType(gf_ent_base); // entitlement type enum
+        m_bDwell        = false;                      // not within geofence
+        m_nPublishCnt   = 0;                          // nothing to publish yet
 
         ROS_DEBUG_STREAM("Constructed Entitlement " << m_ent_idx);
       };
@@ -218,23 +181,23 @@ namespace geofrenzy
 
         switch( m_eEntDataType )
         {
-          case EntDataTypeBoolset:
+          case GfEntDataTypeBoolset:
             m_publishers[m_strTopicDwellX] =
               nh.advertise<GfDwellBoolset>(m_strTopicDwellX, 1, true);
             break;
-          case EntDataTypeColor:
+          case GfEntDataTypeColor:
             m_publishers[m_strTopicDwellX] =
               nh.advertise<GfDwellColor>(m_strTopicDwellX, 1, true);
             break;
-          case EntDataTypeProfile:
+          case GfEntDataTypeProfile:
             m_publishers[m_strTopicDwellX] =
               nh.advertise<GfDwellProfile>(m_strTopicDwellX, 1, true);
             break;
-          case EntDataTypeThreshold:
+          case GfEntDataTypeThreshold:
             m_publishers[m_strTopicDwellX] =
               nh.advertise<GfDwellThreshold>(m_strTopicDwellX, 1, true);
             break;
-          case EntDataTypeUndef:
+          case GfEntDataTypeUndef:
           default:
             ROS_WARN_STREAM("Unknown entitlement base data type = "
               << m_ent_base);
@@ -282,19 +245,19 @@ namespace geofrenzy
         //
         switch( m_eEntDataType )
         {
-          case EntDataTypeBoolset:
+          case GfEntDataTypeBoolset:
             updateDwellBoolsetMsg(jvEntitlement, m_msgDwellBoolset);
             break;
-          case EntDataTypeColor:
+          case GfEntDataTypeColor:
             updateDwellColorMsg(jvEntitlement, m_msgDwellColor);
             break;
-          case EntDataTypeProfile:
+          case GfEntDataTypeProfile:
             updateDwellProfileMsg(jvEntitlement, m_msgDwellProfile);
             break;
-          case EntDataTypeThreshold:
+          case GfEntDataTypeThreshold:
             updateDwellThresholdMsg(jvEntitlement, m_msgDwellThreshold);
             break;
-          case EntDataTypeUndef:
+          case GfEntDataTypeUndef:
           default:
             //ROS_WARN_STREAM("Unknown entitlement base data type = "
             //  << m_ent_base);
@@ -361,19 +324,19 @@ namespace geofrenzy
           //
           switch( m_eEntDataType )
           {
-            case EntDataTypeBoolset:
+            case GfEntDataTypeBoolset:
               m_publishers[m_strTopicDwellX].publish(m_msgDwellBoolset);
               break;
-            case EntDataTypeColor:
+            case GfEntDataTypeColor:
               m_publishers[m_strTopicDwellX].publish(m_msgDwellColor);
               break;
-            case EntDataTypeProfile:
+            case GfEntDataTypeProfile:
               m_publishers[m_strTopicDwellX].publish(m_msgDwellProfile);
               break;
-            case EntDataTypeThreshold:
+            case GfEntDataTypeThreshold:
               m_publishers[m_strTopicDwellX].publish(m_msgDwellThreshold);
               break;
-            case EntDataTypeUndef:
+            case GfEntDataTypeUndef:
             default:
               //ROS_WARN_STREAM("Unknown entitlement base data type = "
               //  << m_ent_base);
@@ -411,19 +374,19 @@ namespace geofrenzy
       MapPublishers   m_publishers;     ///< Geofrenzy entitlement publishers
 
       // Messaging processing overhead
-      EntDataType m_eEntDataType;       ///< derived entitlement data type
-      std::string m_strTopicDwellX;     ///< data-specific dwell topic name
-      std::string m_strTopicDwellJson;  ///< json dwell topic name
-      ros::Time   m_atime;              ///< last portal access time
-      bool        m_bDwell;             ///< [not] within a fence
-      int         m_nPublishCnt;        ///< publish counter
+      GfEntDataType m_eEntDataType;       ///< derived entitlement data type
+      std::string   m_strTopicDwellX;     ///< data-specific dwell topic name
+      std::string   m_strTopicDwellJson;  ///< json dwell topic name
+      ros::Time     m_atime;              ///< last portal access time
+      bool          m_bDwell;             ///< [not] within a fence
+      int           m_nPublishCnt;        ///< publish counter
 
       // publishing messages
       GfDwellBoolset    m_msgDwellBoolset;    ///< boolset dwell message
       GfDwellColor      m_msgDwellColor;      ///< color dwell message
       GfDwellProfile    m_msgDwellProfile;    ///< profile dwell message
       GfDwellThreshold  m_msgDwellThreshold;  ///< threshold dwell message
-      GfDwellJson       m_msgDwellJson;         ///< json entitlement message
+      GfDwellJson       m_msgDwellJson;       ///< json entitlement message
 
       /*!
        * \brief Update ROS boolset dwell message from Json entitlement value.

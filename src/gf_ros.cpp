@@ -29,8 +29,13 @@
  */
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <stdlib.h>
 #include <stdio.h>
+
 #include <string>
+#include <vector>
+
+#include "boost/assign.hpp"
 
 #include "std_msgs/Header.h"
 
@@ -38,9 +43,22 @@
 #include "gf_ros.h"
 
 using namespace std;
+using namespace boost::assign;
 
 namespace geofrenzy
 {
+  /*!
+   * \breif Entitlement data type enumeration base on the entitlement base
+   * string.
+   */
+  std::map<std::string, GfEntDataType> EntBaseToType = map_list_of
+    ("",          GfEntDataTypeUndef)
+    ("boolset",   GfEntDataTypeBoolset)
+    ("color",     GfEntDataTypeColor)
+    ("json",      GfEntDataTypeJson)
+    ("profile",   GfEntDataTypeProfile)
+    ("threshold", GfEntDataTypeThreshold);
+
   namespace gf_ros
   {
     uint64_t paramClassIndex(int argc, char *argv[], uint64_t dft)
@@ -81,7 +99,7 @@ namespace geofrenzy
       
     string makeDwellTopicName(const uint64_t gf_class_idx,
                               const uint64_t gf_ent_idx,
-                              const string   gf_ent_subtype)
+                              const string   gf_ent_base)
     {
       stringstream  ss;
     
@@ -89,11 +107,53 @@ namespace geofrenzy
           << "/geofrenzy/"
           << gf_ent_idx
           << "/dwell/"
-          << gf_ent_subtype;
+          << gf_ent_base;
     
       return ss.str();
     }
     
+    string makeDwellTopicName(const uint64_t      gf_class_idx,
+                              const uint64_t      gf_ent_idx,
+                              const GfEntDataType gf_ent_type)     
+    {
+      stringstream   ss;
+
+      ss << makeNodeName(NodeRootFenceServer, gf_class_idx)
+          << "/geofrenzy/"
+          << gf_ent_idx
+          << "/dwell/"
+          << entTypeToBase(gf_ent_type);
+
+      return ss.str();
+    }
+
+    GfEntDataType entBaseToType(const std::string gf_ent_base)
+    {
+      if( EntBaseToType.find(gf_ent_base) != EntBaseToType.end() )
+      {
+        return EntBaseToType[gf_ent_base];
+      }
+      else
+      {
+        return GfEntDataTypeUndef;
+      }
+    }
+
+    std::string entTypeToBase(const GfEntDataType gf_ent_type)
+    {
+      std::map<std::string, GfEntDataType>::const_iterator iter;
+
+      for(iter = EntBaseToType.begin(); iter != EntBaseToType.end(); ++iter)
+      {
+        if( iter->second == gf_ent_type )
+        {
+          return iter->first;
+        }
+      }
+
+      return "";
+    }
+
     void stampHeader(std_msgs::Header &header,
                      const int32_t    nSeqNum,
                      const string     strFrameId)
@@ -112,5 +172,39 @@ namespace geofrenzy
       header.stamp    = ros::Time::now();
       header.frame_id = strFrameId;
     }
+
+    void splitRosPackagePath(vector<string> &paths)
+    {
+      char *s = getenv("ROS_PACKAGE_PATH");
+
+      // environment variable not set
+      if( s == NULL )
+      {
+        return;
+      }
+
+      string  pkgpath(s);
+
+      splitSearchPath(pkgpath, paths);
+    }
+
+    void splitSearchPath(const string &searchPath, vector<string> &paths)
+    {
+      size_t  m = 0;
+      size_t  n;
+
+      while( (n = searchPath.find(":", m)) != string::npos )
+      {
+        paths.push_back(searchPath.substr(m, n-m));
+        m = n + 1;
+      }
+
+      if( m < searchPath.length() )
+      {
+        paths.push_back(searchPath.substr(m));
+      }
+    }
+
   } // namespace gf_ros
+
 } // namespace geofrenzy
