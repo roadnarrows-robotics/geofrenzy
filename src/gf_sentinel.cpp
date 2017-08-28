@@ -36,9 +36,15 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stddef.h>
 
 #include <string>
 #include <map>
+#include <ostream>
+
+// uncomment to disable assert()
+// #define NDEBUG
+#include <cassert>
 
 //
 // ROS
@@ -104,20 +110,90 @@ void GfSentinel::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
 {
 }
 
-void GfSentinel::cbWatchForBreach(bool isInFence)
+void GfSentinel::cbWatchForBreach(const GfEntitlementIndex gei,
+                                  const bool               isInFence,
+                                  const GfEntBaseBoolset   &data)
 {
-  m_isInFence = isInFence;
+  setBreachState(isInFence);
+}
+
+void GfSentinel::cbWatchForBreach(const GfEntitlementIndex gei,
+                                  const bool               isInFence,
+                                  const GfEntBaseProfile   &data)
+{
+  setBreachState(isInFence);
+}
+
+void GfSentinel::cbWatchForBreach(const GfEntitlementIndex gei,
+                                  const bool               isInFence,
+                                  const GfEntBaseThreshold &data)
+{
+  setBreachState(isInFence);
 }
 
 void GfSentinel::clear()
 {
   m_gci           = GciUndef;
-  m_gei           = GeiUndef;
-  m_entDataType   = GfEntDataTypeUndef;
   m_mep           = MepUndef;
+  m_breachTrigger = BreachTriggerUndef;
   m_breachAction  = BreachActionUndef;
+  m_listEoI.clear();
+
   m_isInFence     = false;
   m_isInBreach    = false;
+}
+
+bool GfSentinel::setBreachState(const bool isInFence)
+{
+
+  m_isInFence = isInFence;
+
+  if( m_isInFence && (m_breachTrigger == BreachTriggerEnter) )
+  {
+    m_isInBreach = true;
+  }
+  else if( !m_isInFence && (m_breachTrigger == BreachTriggerExit) )
+  {
+    m_isInBreach = true;
+  }
+  else
+  {
+    m_isInBreach = false;
+  }
+
+  return m_isInBreach;
+}
+
+bool GfSentinel::eoiMatch(const GfClassIndex       gci,
+                          const GfEntitlementIndex gei,
+                          const GfEntDataType      entDataType) const
+{
+  return (gci == m_gci) && (eoiFind(gei, entDataType) >= 0);
+}
+
+size_t GfSentinel::eoiSize() const
+{
+  return m_listEoI.size();
+}
+
+const GfSentinel::EoI &GfSentinel::eoiAt(const size_t i)
+{
+  assert(i < m_listEoI.size());
+  return m_listEoI[i];
+}
+
+ssize_t GfSentinel::eoiFind(const GfEntitlementIndex gei,
+                            const GfEntDataType      entDataType) const
+{
+  for(size_t i = 0; i < m_listEoI.size(); ++i)
+  {
+    if( (m_listEoI[i].m_gei == gei) &&
+        (m_listEoI[i].m_entDataType == entDataType) )
+    {
+      return i;
+    }
+  }
+  return -1;
 }
 
 
@@ -135,9 +211,12 @@ GfSentinelCam::~GfSentinelCam()
 
 void GfSentinelCam::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
 {
+  GfEntitlementIndex  gei;
+  GfSentinel::EoI     eoi;
+
   m_gci           = gci;
-  m_entDataType   = GfEntDataTypeBoolset;
   m_mep           = MepSubPub;
+  m_breachTrigger = BreachTriggerEnter;
   m_breachAction  = BreachActionCensor;
 
   //
@@ -150,12 +229,21 @@ void GfSentinelCam::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
 
   nh.param(ParamNameSrCamGei, val, dft);
 
-  m_gei = (GfEntitlementIndex)val;
+  gei = (GfEntitlementIndex)val;
 
-  // topics
-  m_topicIn     = "camera_in/image_raw";
-  m_topicOut    = "/geofrenzy/image_raw";
-  m_topicDwell  = makeDwellTopicName(m_gci, m_gei, m_entDataType);
+  //
+  // nannied topics
+  //
+  m_topicIn  = "camera_in/image_raw";
+  m_topicOut = "/geofrenzy/image_raw";
+
+  //
+  // Only watch for a bool dwell topic associated with camera entitlements.
+  //
+  eoi.m_gei         = gei;
+  eoi.m_entDataType = GfEntDataTypeBoolset;
+  eoi.m_topicDwell  = makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
+  m_listEoI.push_back(eoi);
 
   // Turn local image into ros message to publish
   makeCensoredImage(nh);
@@ -192,13 +280,18 @@ void GfSentinelCam::makeCensoredImage(ros::NodeHandle &nh)
 
   cv::Mat img;
 
+  // load image from file
   if( !filename.empty() && access(filename.c_str(), R_OK) )
   {
     img = cv::imread(filename, CV_LOAD_IMAGE_COLOR);
   }
+
+  // create an image
   else
   {
-    // TODO make a darkblue image
+    // B,G,R
+    cv::Mat imgDarkBlue(640, 480, CV_8UC3, cv::Scalar(64, 0, 0));
+    img = imgDarkBlue;
   }
 
   cv_bridge::CvImage  img_bridge;
@@ -226,18 +319,12 @@ void GfSentinelCam::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
                                                               true);
 }
 
-void GfSentinelCam::cbWatchForBreach(bool isInFence)
-{
-  m_isInFence   = isInFence;
-  m_isInBreach  = !m_isInFence;
-}
-
 void GfSentinelCam::cbImage(const sensor_msgs::Image &img)
 {
   // censor images
   if( m_isInBreach )
   {
-    // TODO fixup header
+    m_imgCensored.header = img.header;
     m_publishers[m_topicOut].publish(m_imgCensored);
   }
       

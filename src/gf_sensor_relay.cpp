@@ -53,6 +53,9 @@
 // ROS generated Geofrenzy messages
 //
 #include "geofrenzy/GfDwellBoolset.h"
+#include "geofrenzy/GfDwellProfile.h"
+#include "geofrenzy/GfDwellThreshold.h"
+#include "geofrenzy/GfDwellJson.h"
 
 //
 // Geofrenzy
@@ -76,7 +79,9 @@ namespace geofrenzy
     * ros topics that are controlled by geofrenzy entitlements.
     */
     public:
-        void dwellCallbackBoolset(const GfDwellBoolset &dwell);
+        void dwellCallbackBoolset(const GfDwellBoolset  &dwellMsg);
+        void dwellCallbackProfile(const GfDwellProfile  &dwellMsg);
+        void dwellCallbackThreshold(const GfDwellThreshold &dwellMsg);
         void advertisePublishers(int nQueueDepth=1);
         void subscribeToTopics(int nQueueDepth=5);
         void initSensorRelayProperties();
@@ -86,30 +91,27 @@ namespace geofrenzy
         ~SensorRelay();
 
     private:
-
-        ros::NodeHandle &m_nh;      ///< node handle
-
-        GfClassIndex m_gciServer;   ///< geofrenzy server node class index
+        ros::NodeHandle &m_nh;    ///< node handle
+        GfClassIndex m_gciServer; ///< geofrenzy portal server node class index
 
         //
-        // Built-in breaches
+        // Embedded sentinels
         //
-        SentinelList  m_breaches;
+        SentinelList  m_sentinels;
 
         //ROS publishers/subscribers
         gf_ros::MapPublishers     m_publishers;     ///< topic publishers
         gf_ros::MapSubscriptions  m_subscriptions;  ///< topic subscriptions
-
   };
 
   SensorRelay::~SensorRelay()
   {
-    for(size_t i = 0; i < m_breaches.size(); ++i)
+    for(size_t i = 0; i < m_sentinels.size(); ++i)
     {
-      delete m_breaches[i];
-      m_breaches[i] = NULL;
+      delete m_sentinels[i];
+      m_sentinels[i] = NULL;
     }
-    m_breaches.clear();
+    m_sentinels.clear();
   }
 
   /*!
@@ -118,8 +120,6 @@ namespace geofrenzy
    */
   void SensorRelay::initSensorRelayProperties()
   {
-    int32_t   val;
-    int32_t   dft = (int32_t)GciGuestAcct;
     GfSentinel  *p;
 
     //
@@ -127,20 +127,27 @@ namespace geofrenzy
     // 
     // Note: no 64-bit types in parameter server
     //
+    int32_t   val;
+    int32_t   dft = (int32_t)GciGuestAcct;
+
     m_nh.param(ParamNameSrServerGci, val, dft);
 
     m_gciServer = (GfClassIndex)val;
 
     //
-    // Built-in breaches
+    // Built-in sentinels
     //
-    m_breaches.push_back(new GfSentinelCam());
+    m_sentinels.push_back(new GfSentinelCam());
+    //m_sentinels.push_back(new GfSentinelStopVel());
+    //m_sentinels.push_back(new GfSentinelSpeedLimitVel());
+    //m_sentinels.push_back(new GfSentinelRtlx());
 
     //
-    // Initialize properties of all built-in breaches
-    for(size_t i = 0; i < m_breaches.size(); ++i)
+    // Initialize properties of all built-in sentinels
+    //
+    for(size_t i = 0; i < m_sentinels.size(); ++i)
     {
-      m_breaches[i]->initProperties(m_nh, m_gciServer);
+      m_sentinels[i]->initProperties(m_nh, m_gciServer);
     }
   }
 
@@ -152,52 +159,65 @@ namespace geofrenzy
    */
   void SensorRelay::subscribeToTopics(int nQueueDepth)
   {
-    size_t  i;
+    size_t  i, j;
 
     //
     // Sentinel specific topic subscriptions
     //
-    for(i = 0; i < m_breaches.size(); ++i)
+    for(i = 0; i < m_sentinels.size(); ++i)
     {
-      m_breaches[i]->subscribeToTopics(m_nh);
+      m_sentinels[i]->subscribeToTopics(m_nh);
     }
 
     //
-    // Geofrenzy dwell topic subscriptions
+    // Geofrenzy dwell topic subscriptions. Driven by sentinel needs.
     //
-    for(i = 0; i < m_breaches.size(); ++i)
+    for(i = 0; i < m_sentinels.size(); ++i)
     {
-      std::string &topic = m_breaches[i]->m_topicDwell;
-
-      // nothing to subscribe
-      if( topic.empty() )
+      for(j = 0; j < m_sentinels[i]->eoiSize(); ++j)
       {
-        continue;
-      }
+        const GfSentinel::EoI &eoi = m_sentinels[i]->eoiAt(j);
 
-      // already subscribed
-      else if( m_subscriptions.find(topic) != m_subscriptions.end() )
-      {
-        continue;
-      }
+        // already subscribed
+        if( m_subscriptions.find(eoi.m_topicDwell) != m_subscriptions.end() )
+        {
+          continue;
+        }
 
-      // subscribe
-      else
-      {
-        switch( m_breaches[i]->m_entDataType )
+        // subscribe
+        switch( eoi.m_entDataType )
         {
           case GfEntDataTypeBoolset:
-            m_subscriptions[topic] = m_nh.subscribe(topic,
-                                            nQueueDepth,
-                                            &SensorRelay::dwellCallbackBoolset,
-                                            &(*this));
+            m_subscriptions[eoi.m_topicDwell] = m_nh.subscribe(
+                                          eoi.m_topicDwell,
+                                          nQueueDepth,
+                                          &SensorRelay::dwellCallbackBoolset,
+                                          &(*this));
+            break;
+          case GfEntDataTypeJson:
+            ROS_WARN("Json dwell topic not supported yet.");
+            break;
+          case GfEntDataTypeProfile:
+            m_subscriptions[eoi.m_topicDwell] = m_nh.subscribe(
+                                          eoi.m_topicDwell,
+                                          nQueueDepth,
+                                          &SensorRelay::dwellCallbackProfile,
+                                          &(*this));
+            break;
+          case GfEntDataTypeThreshold:
+            m_subscriptions[eoi.m_topicDwell] = m_nh.subscribe(
+                                          eoi.m_topicDwell,
+                                          nQueueDepth,
+                                          &SensorRelay::dwellCallbackThreshold,
+                                          &(*this));
             break;
           case GfEntDataTypeUndef:
-            ROS_INFO("Undefined entitiy data type. Not subscribing to topic");
+            ROS_WARN("Undefined entitlement data type. "
+                     "Not subscribing to topic.");
             break;
           default:
-            ROS_ERROR_STREAM("Unknnown entitiy data type = "
-                << m_breaches[i]->m_entDataType << ".");
+            ROS_ERROR_STREAM("Unknnown entitlement data type = "
+                << eoi.m_entDataType << ".");
             break;
         }
       }
@@ -214,23 +234,67 @@ namespace geofrenzy
     //
     // Sentinel specific published topics
     //
-    for(size_t i = 0; i < m_breaches.size(); ++i)
+    for(size_t i = 0; i < m_sentinels.size(); ++i)
     {
-      m_breaches[i]->advertisePublishers(m_nh);
+      m_sentinels[i]->advertisePublishers(m_nh);
     }
   }
 
   void SensorRelay::dwellCallbackBoolset(const GfDwellBoolset &dwellMsg)
   {
-    for(size_t i = 0; i < m_breaches.size(); ++i)
-    {
-      GfSentinel *b = m_breaches[i];
+    const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
 
-      if( (dwellMsg.entitlement.ent_header.gf_class_idx == b->m_gci) &&
-          (dwellMsg.entitlement.ent_header.gf_ent_idx   == b->m_gei) &&
-          (b->m_entDataType == GfEntDataTypeBoolset) )
+    GfEntDataType     t = GfEntDataTypeBoolset;
+    GfEntBaseBoolset  d = dwellMsg.entitlement.bitset_num;
+
+    SentinelIter  iter;
+
+    for(iter = m_sentinels.begin(); iter != m_sentinels.end(); ++iter)
+    {
+      if( (*iter)->eoiMatch(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
       {
-        b->cbWatchForBreach(dwellMsg.entitlement.ent_header.dwell);
+        (*iter)->cbWatchForBreach(hdr.gf_ent_idx, hdr.dwell, d);
+      }
+    }
+  }
+
+  void SensorRelay::dwellCallbackProfile(const GfDwellProfile &dwellMsg)
+  {
+    const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
+
+
+    GfEntDataType     t = GfEntDataTypeProfile;
+    GfEntBaseProfile  d = dwellMsg.entitlement.gf_profile_num;
+
+    SentinelIter  iter;
+
+    for(iter = m_sentinels.begin(); iter != m_sentinels.end(); ++iter)
+    {
+      if( (*iter)->eoiMatch(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
+      {
+        (*iter)->cbWatchForBreach(hdr.gf_ent_idx, hdr.dwell, d);
+      }
+    }
+  }
+
+  void SensorRelay::dwellCallbackThreshold(const GfDwellThreshold &dwellMsg)
+  {
+    const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
+
+    GfEntDataType       t = GfEntDataTypeThreshold;
+    GfEntBaseThreshold  d;
+
+    d.m_upper = dwellMsg.entitlement.threshold_lower;
+    d.m_lower = dwellMsg.entitlement.threshold_upper;
+    d.m_units = dwellMsg.entitlement.threshold_unit;
+
+    SentinelIter  iter;
+
+    for(iter = m_sentinels.begin(); iter != m_sentinels.end(); ++iter)
+    {
+      if( (*iter)->eoiMatch(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
+      {
+        (*iter)->cbWatchForBreach(hdr.gf_ent_idx, hdr.dwell, d);
       }
     }
   }
