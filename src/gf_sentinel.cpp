@@ -46,6 +46,8 @@
 // #define NDEBUG
 #include <cassert>
 
+#include "boost/assign.hpp"
+
 //
 // ROS
 //
@@ -81,8 +83,47 @@
 #include "gf_ros.h"
 #include "gf_sentinel.h"
 
+using namespace boost::assign;
 using namespace geofrenzy;
 using namespace geofrenzy::gf_ros;
+
+
+// -----------------------------------------------------------------------------
+// Local Private
+// -----------------------------------------------------------------------------
+
+/*!
+ * \breif Message Exchange Pattern names.
+ */
+static std::map<std::string, GfSentinel::Mep> GfMepNames =
+  map_list_of
+    ("undef",             GfSentinel::MepUndef)
+    ("subscribe-publish", GfSentinel::MepSubPub)
+    ("subscribe-service", GfSentinel::MepSubSvc)
+    ("service-service",   GfSentinel::MepSvcSvc)
+    ("service",           GfSentinel::MepSvc)
+    ("api callback",      GfSentinel::MepCall);
+
+/*!
+ * \breif Breach trigger type names.
+ */
+static std::map<std::string, GfSentinel::BreachTrigger> GfTriggerNames =
+  map_list_of
+    ("undef",     GfSentinel::BreachTriggerUndef)
+    ("on-entry",  GfSentinel::BreachTriggerEntry)
+    ("on-exit",   GfSentinel::BreachTriggerExit);
+
+/*!
+ * \breif Breach action category names.
+ */
+static std::map<std::string, GfSentinel::BreachAction> GfActionNames =
+  map_list_of
+    ("undef",             GfSentinel::BreachActionUndef)
+    ("censor",            GfSentinel::BreachActionCensor)
+    ("return-to-landing", GfSentinel::BreachActionRtl)
+    ("all-stop",          GfSentinel::BreachActionStop)
+    ("limit-speed",       GfSentinel::BreachActionLimitSpeed);
+
 
 // -----------------------------------------------------------------------------
 // GfSentinel Base Class
@@ -143,12 +184,19 @@ void GfSentinel::clear()
   m_isInBreach    = false;
 }
 
+GfSentinel::BreachTrigger GfSentinel::setTriggerType(
+                                        const GfSentinel::BreachTrigger trigger)
+{
+  m_breachTrigger = trigger;
+  setBreachState(m_isInFence);
+  return m_breachTrigger;
+}
+
 bool GfSentinel::setBreachState(const bool isInFence)
 {
-
   m_isInFence = isInFence;
 
-  if( m_isInFence && (m_breachTrigger == BreachTriggerEnter) )
+  if( m_isInFence && (m_breachTrigger == BreachTriggerEntry) )
   {
     m_isInBreach = true;
   }
@@ -164,7 +212,7 @@ bool GfSentinel::setBreachState(const bool isInFence)
   return m_isInBreach;
 }
 
-bool GfSentinel::eoiMatch(const GfClassIndex       gci,
+bool GfSentinel::eoiCheck(const GfClassIndex       gci,
                           const GfEntitlementIndex gei,
                           const GfEntDataType      entDataType) const
 {
@@ -176,7 +224,7 @@ size_t GfSentinel::eoiSize() const
   return m_listEoI.size();
 }
 
-const GfSentinel::EoI &GfSentinel::eoiAt(const size_t i)
+const GfSentinel::EoI &GfSentinel::eoiAt(const size_t i) const
 {
   assert(i < m_listEoI.size());
   return m_listEoI[i];
@@ -196,6 +244,119 @@ ssize_t GfSentinel::eoiFind(const GfEntitlementIndex gei,
   return -1;
 }
 
+uint64_t GfSentinel::paramU64(ros::NodeHandle   &nh, 
+                              const std::string &paramName,
+                              const uint64_t    dftVal)
+{
+  int32_t val;
+  int32_t dft = (int32_t)dftVal;
+
+  nh.param(paramName, val, dft);
+
+  return (uint64_t)val;
+}
+
+int64_t GfSentinel::paramS64(ros::NodeHandle   &nh, 
+                             const std::string &paramName,
+                             const int64_t    dftVal)
+{
+  int32_t val;
+  int32_t dft = (int32_t)dftVal;
+
+  nh.param(paramName, val, dft);
+
+  return (int64_t)val;
+}
+
+std::string GfSentinel::mepName(const GfSentinel::Mep mep)
+{
+  std::map<std::string, GfSentinel::Mep>::const_iterator iter;
+
+  for(iter = GfMepNames.begin(); iter != GfMepNames.end(); ++iter)
+  {
+    if( iter->second == mep )
+    {
+      return iter->first;
+    }
+  }
+
+  return GfMepNames.begin()->first;
+}
+
+std::string GfSentinel::triggerName(const GfSentinel::BreachTrigger trigger)
+{
+  std::map<std::string, GfSentinel::BreachTrigger>::const_iterator iter;
+
+  for(iter = GfTriggerNames.begin(); iter != GfTriggerNames.end(); ++iter)
+  {
+    if( iter->second == trigger )
+    {
+      return iter->first;
+    }
+  }
+
+  return GfTriggerNames.begin()->first;
+}
+
+std::string GfSentinel::actionName(const GfSentinel::BreachAction action)
+{
+  std::map<std::string, GfSentinel::BreachAction>::const_iterator iter;
+
+  for(iter = GfActionNames.begin(); iter != GfActionNames.end(); ++iter)
+  {
+    if( iter->second == action )
+    {
+      return iter->first;
+    }
+  }
+
+  return GfActionNames.begin()->first;
+}
+
+void GfSentinel::print(std::ostream &os) const
+{
+  os  << "GfSentinel" << std::endl
+      << "{" << std::endl
+      << "  gci          = " << gci() << std::endl
+      << "  mep          = "
+        << GfSentinel::mepName(mep())
+        << "(" << mep() << ")" << std::endl
+      << "  trigger      = "
+        << GfSentinel::triggerName(triggerType())
+        << "(" << triggerType() << ")" << std::endl
+      << "  action       = "
+        << GfSentinel::actionName(actionCategory())
+        << "(" << actionCategory() << ")" << std::endl
+      << "  eoi[" << eoiSize() << "] =" << std::endl
+      << "  {" << std::endl;
+  for(size_t i = 0; i < eoiSize(); ++i)
+  {
+    const GfSentinel::EoI &eoi = eoiAt(i);
+    os  << "    {" << std::endl
+        << "      gei   = " << eoi.m_gei << std::endl
+        << "      type  = "
+          << entTypeToBase(eoi.m_entDataType)
+          << "(" << eoi.m_entDataType << ")" << std::endl
+        << "      topic = '" << eoi.m_topicDwell << "'" << std::endl
+        << "    }" << std::endl;
+  }
+  os  << "  }" << std::endl;
+  os  << "  isInFence  = " << isInFence() << std::endl
+      << "  isInBreach = " << isInBreach() << std::endl;
+  os  << "  topicIn    = '" << m_topicIn << "'" << std::endl
+      << "  topicOut   = '" << m_topicOut << "'" << std::endl
+      << "  serviceIn  = '" << m_serviceIn << "'" << std::endl
+      << "  serviceOut = '" << m_serviceOut << "'" << std::endl;
+  os  << "}" << std::endl;
+}
+
+std::ostream &geofrenzy::operator<<(std::ostream &os, const GfSentinel &obj)
+{
+  obj.print(os);
+
+  return os;
+}
+
 
 // -----------------------------------------------------------------------------
 // GfSentinelCam Derived Class
@@ -211,36 +372,23 @@ GfSentinelCam::~GfSentinelCam()
 
 void GfSentinelCam::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
 {
-  GfEntitlementIndex  gei;
-  GfSentinel::EoI     eoi;
+  GfSentinel::EoI eoi;
 
   m_gci           = gci;
   m_mep           = MepSubPub;
-  m_breachTrigger = BreachTriggerEnter;
+  m_breachTrigger = BreachTriggerEntry;
   m_breachAction  = BreachActionCensor;
 
   //
-  // Get "no cameras allowed" entitlement index.
-  // 
-  // Note: no 64-bit types in parameter server
+  // Nannied topics.
   //
-  int32_t val;
-  int32_t dft = (int32_t)GeiNoCameras;
-
-  nh.param(ParamNameSrCamGei, val, dft);
-
-  gei = (GfEntitlementIndex)val;
-
-  //
-  // nannied topics
-  //
-  m_topicIn  = "camera_in/image_raw";
-  m_topicOut = "/geofrenzy/image_raw";
+  m_topicIn  = "watch//image_raw";
+  m_topicOut = "geofrenzy/image_raw";
 
   //
   // Only watch for a bool dwell topic associated with camera entitlements.
   //
-  eoi.m_gei         = gei;
+  eoi.m_gei         = paramS64(nh, ParamNameSrCamGei, GeiNoCameras);
   eoi.m_entDataType = GfEntDataTypeBoolset;
   eoi.m_topicDwell  = makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
   m_listEoI.push_back(eoi);
@@ -267,7 +415,7 @@ void GfSentinelCam::makeCensoredImage(ros::NodeHandle &nh)
     for(size_t i = 0; i < paths.size(); ++i)
     {
       filename = paths[i] + "/geofrenzy/images/censored.png";
-      if( access(filename.c_str(), R_OK) )
+      if( access(filename.c_str(), R_OK) == 0 )
       {
         break;
       }
@@ -281,17 +429,18 @@ void GfSentinelCam::makeCensoredImage(ros::NodeHandle &nh)
   cv::Mat img;
 
   // load image from file
-  if( !filename.empty() && access(filename.c_str(), R_OK) )
+  if( !filename.empty() && (access(filename.c_str(), R_OK) == 0) )
   {
-    img = cv::imread(filename, CV_LOAD_IMAGE_COLOR);
+    m_imgFilename = filename;
+    img = cv::imread(m_imgFilename, CV_LOAD_IMAGE_COLOR);
   }
 
   // create an image
   else
   {
-    // B,G,R
-    cv::Mat imgDarkBlue(640, 480, CV_8UC3, cv::Scalar(64, 0, 0));
-    img = imgDarkBlue;
+    // VGA dark blue (B,G,R)
+    m_imgFilename = "the dark blue yonder";
+    img = cv::Mat(640, 480, CV_8UC3, cv::Scalar(64, 0, 0));
   }
 
   cv_bridge::CvImage  img_bridge;
@@ -333,4 +482,334 @@ void GfSentinelCam::cbImage(const sensor_msgs::Image &img)
   {
     m_publishers[m_topicOut].publish(img);
   }
+}
+
+void GfSentinelCam::print(std::ostream &os) const
+{
+  os  << "GfSentinelCam::";
+  GfSentinel::print(os);
+
+  os  << "GfSentinelCam" << std::endl
+      << "{" << std::endl
+      << "  censorFilename = '" << m_imgFilename << "'" << std::endl
+      << "}" << std::endl;
+}
+
+std::ostream &geofrenzy::operator<<(std::ostream &os, const GfSentinelCam &obj)
+{
+  obj.print(os);
+
+  return os;
+}
+
+
+// -----------------------------------------------------------------------------
+// GfSentinelStop Derived Class
+// -----------------------------------------------------------------------------
+
+GfSentinelStop::GfSentinelStop()
+{
+}
+
+GfSentinelStop::~GfSentinelStop()
+{
+}
+
+void GfSentinelStop::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
+{
+  GfSentinel::EoI eoi;
+
+  m_gci           = gci;
+  m_mep           = MepSubPub;
+  m_breachTrigger = BreachTriggerEntry;
+  m_breachAction  = BreachActionStop;
+
+  //
+  // Nannied topics.
+  //
+  m_topicIn  = "watch/cmd_vel";
+  m_topicOut = "geofrenzy/cmd_vel";
+
+  //
+  // Only watch for a bool dwell topic associated with stop entitlements.
+  //
+  eoi.m_gei         = paramS64(nh, ParamNameSrStopGei, GeiNoEntry);
+  eoi.m_entDataType = GfEntDataTypeBoolset;
+  eoi.m_topicDwell  = makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
+  m_listEoI.push_back(eoi);
+
+  //
+  // Messages set to zero on construction
+  //
+}
+
+void GfSentinelStop::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
+{
+  m_subscriptions[m_topicIn] = nh.subscribe(m_topicIn,
+                                            1,
+                                            &GfSentinelStop::cbVel,
+                                            &(*this));
+}
+
+void GfSentinelStop::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
+{
+  m_publishers[m_topicOut] = nh.advertise<geometry_msgs::Twist>(m_topicOut,
+                                                                2,
+                                                                true);
+}
+
+void GfSentinelStop::cbVel(const geometry_msgs::Twist &msgTwist)
+{
+  if( !m_isInBreach )
+  {
+    m_msgTwistOut = m_msgTwistStop;
+  }
+
+  // move as will
+  else
+  {
+    m_msgTwistOut = msgTwist;
+  }
+      
+  m_publishers[m_topicOut].publish(m_msgTwistOut);
+}
+
+void GfSentinelStop::print(std::ostream &os) const
+{
+  os  << "GfSentinelStop::";
+  GfSentinel::print(os);
+
+  os  << "GfSentinelStop" << std::endl
+      << "{" << std::endl
+      << "  vel_out = " << std::endl
+      << "  {" << std::endl
+      << m_msgTwistOut
+      << "  }" << std::endl
+      << "}" << std::endl;
+}
+
+std::ostream &geofrenzy::operator<<(std::ostream &os, const GfSentinelStop &obj)
+{
+  obj.print(os);
+
+  return os;
+}
+
+
+// -----------------------------------------------------------------------------
+// GfSentinelMavRtl Derived Class
+// -----------------------------------------------------------------------------
+
+GfSentinelMavRtl::GfSentinelMavRtl()
+{
+}
+
+GfSentinelMavRtl::~GfSentinelMavRtl()
+{
+}
+
+void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
+{
+  GfSentinel::EoI eoi;
+
+  m_gci           = gci;
+  m_mep           = MepSubSvc;
+  m_breachTrigger = BreachTriggerExit;
+  m_breachAction  = BreachActionRtl;
+
+  //
+  // Nannied topics
+  //
+  m_topicIn     = "watch/setpoint_velocity/cmd_vel";
+  m_topicOut    = "geofrenzy/setpoint_velocity/cmd_vel";
+
+  //
+  // Support topics
+  //
+  m_topicHomePos    = "/mavros/home_position/home";
+  m_topicGlobalPos  = "/mavros/global_position/global";
+
+  // force return-to-landing service
+  m_serviceOut  = "/mavros/cmd/land";
+
+  m_clientServices[m_serviceOut] =
+    nh.serviceClient<mavros_msgs::CommandTOL>(m_serviceOut);
+
+  //
+  // Watch for a bool dwell topic associated with rtl entitlement.
+  //
+  eoi.m_gei         = paramS64(nh, ParamNameSrRtlGei, GeiNoExit);
+  eoi.m_entDataType = GfEntDataTypeBoolset;
+  eoi.m_topicDwell  = makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
+  m_listEoI.push_back(eoi);
+
+  //
+  // Watch for an altitude threshold dwell topic associated with rtl
+  // entitlement.
+  //
+  eoi.m_gei         = paramS64(nh, ParamNameSrAltitudeGei, GeiFlightAltitudes);
+  eoi.m_entDataType = GfEntDataTypeThreshold;
+  eoi.m_topicDwell  = makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
+  m_listEoI.push_back(eoi);
+
+  //
+  // Extended state
+  //
+  m_hasLandingPos = false;
+  m_isLanding     = false;
+}
+
+void GfSentinelMavRtl::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
+{
+  m_subscriptions[m_topicIn] = nh.subscribe(m_topicIn,
+                                            1,
+                                            &GfSentinelMavRtl::cbVel,
+                                            &(*this));
+
+  m_subscriptions[m_topicHomePos] = nh.subscribe(
+                                            m_topicHomePos,
+                                            1,
+                                            &GfSentinelMavRtl::cbHomePos,
+                                            &(*this));
+
+  m_subscriptions[m_topicGlobalPos] = nh.subscribe(
+                                            m_topicGlobalPos,
+                                            1,
+                                            &GfSentinelMavRtl::cbGlobalPos,
+                                            &(*this));
+}
+
+void GfSentinelMavRtl::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
+{
+  m_publishers[m_topicOut] = nh.advertise<geometry_msgs::Twist>(m_topicOut,
+                                                                2,
+                                                                true);
+}
+
+bool GfSentinelMavRtl::setBreachState(const bool isInFence)
+{
+  m_isInFence = isInFence;
+
+  // don't clear any breach until safely landed within valid area
+  if( m_isLanding )
+  {
+    m_isInBreach = true;
+  }
+  else if( m_isInFence && (m_breachTrigger == BreachTriggerEntry) )
+  {
+    m_isInBreach = true;
+  }
+  else if( !m_isInFence && (m_breachTrigger == BreachTriggerExit) )
+  {
+    m_isInBreach = true;
+  }
+  else
+  {
+    m_isInBreach = false;
+  }
+
+  return m_isInBreach;
+}
+
+void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
+                                        const bool               isInFence,
+                                        const GfEntBaseBoolset   &data)
+{
+  setBreachState(isInFence);
+
+  if( m_isInBreach )
+  {
+    if( !m_isLanding )
+    {
+      m_isLanding = returnToHome();
+    }
+  }
+}
+
+void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
+                                        const bool               isInFence,
+                                        const GfEntBaseThreshold &data)
+{
+  setBreachState(isInFence);
+
+  if( m_isInBreach )
+  {
+    if( !m_isLanding )
+    {
+      m_isLanding = returnToHome();
+    }
+  }
+}
+
+void GfSentinelMavRtl::cbVel(const geometry_msgs::Twist &msgTwistStamped)
+{
+  // blacklist if UAS is in-breach
+  if( !m_isInBreach )
+  {
+    m_publishers[m_topicOut].publish(msgTwistStamped);
+  }
+}
+
+void GfSentinelMavRtl::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
+{
+  m_posHome.m_latitude  = msgHomePos.latitude;
+  m_posHome.m_longitude = msgHomePos.longitude;
+  m_posHome.m_altitude  = msgHomePos.altitude;
+
+  m_hasLandingPos = true;
+}
+void GfSentinelMavRtl::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
+{
+  m_posCur.m_latitude  = msgFix.latitude;
+  m_posCur.m_longitude = msgFix.longitude;
+  m_posCur.m_altitude  = msgFix.altitude;
+}
+
+bool GfSentinelMavRtl::returnToHome()
+{
+  m_svcTOL.request.min_pitch = 0.0; // only used by takeoff
+  m_svcTOL.request.yaw       = 0.0; // may fix later to home position yaw
+  m_svcTOL.request.latitude  = m_posHome.m_latitude;
+  m_svcTOL.request.longitude = m_posHome.m_longitude;
+  m_svcTOL.request.altitude  = m_posHome.m_altitude;
+
+  if( !m_hasLandingPos )
+  {
+    ROS_ERROR("No landing position known - cannot return!!!");
+    return false;
+  }
+
+  else if( m_clientServices[m_serviceOut].call(m_svcTOL) )
+  {
+    ROS_DEBUG("RTL");
+    return m_svcTOL.response.success;
+  }
+  else
+  {
+    ROS_ERROR("Failed RTL.");
+    return false;
+  }
+}
+
+bool GfSentinelMavRtl::onTheGround()
+{
+  return false;
+}
+
+void GfSentinelMavRtl::print(std::ostream &os) const
+{
+  os  << "GfSentinelMavRtl::";
+  GfSentinel::print(os);
+
+  os  << "GfSentinelMavRtl" << std::endl
+      << "{" << std::endl
+      << "}" << std::endl;
+}
+
+std::ostream &geofrenzy::operator<<(std::ostream           &os,
+                                    const GfSentinelMavRtl &obj)
+{
+  obj.print(os);
+
+  return os;
 }

@@ -138,9 +138,9 @@ namespace geofrenzy
     // Built-in sentinels
     //
     m_sentinels.push_back(new GfSentinelCam());
-    //m_sentinels.push_back(new GfSentinelStopVel());
+    m_sentinels.push_back(new GfSentinelStop());
     //m_sentinels.push_back(new GfSentinelSpeedLimitVel());
-    //m_sentinels.push_back(new GfSentinelRtlx());
+    m_sentinels.push_back(new GfSentinelMavRtl());
 
     //
     // Initialize properties of all built-in sentinels
@@ -148,6 +148,7 @@ namespace geofrenzy
     for(size_t i = 0; i < m_sentinels.size(); ++i)
     {
       m_sentinels[i]->initProperties(m_nh, m_gciServer);
+      std::cerr << *m_sentinels[i];
     }
   }
 
@@ -251,7 +252,7 @@ namespace geofrenzy
 
     for(iter = m_sentinels.begin(); iter != m_sentinels.end(); ++iter)
     {
-      if( (*iter)->eoiMatch(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
+      if( (*iter)->eoiCheck(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
       {
         (*iter)->cbWatchForBreach(hdr.gf_ent_idx, hdr.dwell, d);
       }
@@ -270,7 +271,7 @@ namespace geofrenzy
 
     for(iter = m_sentinels.begin(); iter != m_sentinels.end(); ++iter)
     {
-      if( (*iter)->eoiMatch(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
+      if( (*iter)->eoiCheck(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
       {
         (*iter)->cbWatchForBreach(hdr.gf_ent_idx, hdr.dwell, d);
       }
@@ -292,7 +293,7 @@ namespace geofrenzy
 
     for(iter = m_sentinels.begin(); iter != m_sentinels.end(); ++iter)
     {
-      if( (*iter)->eoiMatch(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
+      if( (*iter)->eoiCheck(hdr.gf_class_idx, hdr.gf_ent_idx, t) )
       {
         (*iter)->cbWatchForBreach(hdr.gf_ent_idx, hdr.dwell, d);
       }
@@ -313,7 +314,7 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, NodeRootSensorRelay);
 
-    ros::NodeHandle nh;
+    ros::NodeHandle nh(NodeRootSensorRelay);
 
     geofrenzy::SensorRelay sr(nh);
     sr.initSensorRelayProperties();

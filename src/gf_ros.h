@@ -396,7 +396,7 @@ namespace geofrenzy
     const char *const ParamNameSrServerGci = "geofrenzy_sr_server_gci";
 
     /*!
-     * \brief Camera sensor relay entitlement index.
+     * \brief Sensor relay camera entitlement index.
      *
      * If the value is not set, then GeiNoCameras is used.
      */
@@ -405,10 +405,31 @@ namespace geofrenzy
     /*!
      * \brief Sensor relay censored image filename.
      *
-     * If the value is not set, the default is set to:
-     *  ${ROS_WORKSPACE}/${ROS_DISTRO}/src/goefrenzy/samples/censored.img
+     * If the value is not set, the default is set to 'censored.png'
+     * found by searching locations in ROS_PACKAGE_PATH.
      */
     const char *const ParamNameSrCensoredImg = "geofrenzy_sr_censored_img";
+
+    /*!
+     * \brief Sensor relay stop entitlement index.
+     *
+     * If the value is not set, then GeiNoEntry is used.
+     */
+    const char *const ParamNameSrStopGei = "geofrenzy_sr_stop_gei";
+
+    /*!
+     * \brief Sensor relay return-to-landing entitlement index.
+     *
+     * If the value is not set, then GeiNoExit is used.
+     */
+    const char *const ParamNameSrRtlGei = "geofrenzy_sr_rtl_gei";
+
+    /*!
+     * \brief Sensor relay allowed altitudes entitlement index.
+     *
+     * If the value is not set, then GeiFlightAltitudes is used.
+     */
+    const char *const ParamNameSrAltitudeGei = "geofrenzy_sr_altitude_gei";
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .

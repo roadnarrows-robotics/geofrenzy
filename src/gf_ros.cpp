@@ -51,7 +51,7 @@ namespace geofrenzy
    * \breif Entitlement data type enumeration base on the entitlement base
    * string.
    */
-  std::map<std::string, GfEntDataType> EntBaseToType = map_list_of
+  std::map<std::string, GfEntDataType> GfEntBaseToType = map_list_of
     ("",          GfEntDataTypeUndef)
     ("boolset",   GfEntDataTypeBoolset)
     ("color",     GfEntDataTypeColor)
@@ -129,9 +129,9 @@ namespace geofrenzy
 
     GfEntDataType entBaseToType(const std::string gf_ent_base)
     {
-      if( EntBaseToType.find(gf_ent_base) != EntBaseToType.end() )
+      if( GfEntBaseToType.find(gf_ent_base) != GfEntBaseToType.end() )
       {
-        return EntBaseToType[gf_ent_base];
+        return GfEntBaseToType[gf_ent_base];
       }
       else
       {
@@ -143,7 +143,7 @@ namespace geofrenzy
     {
       std::map<std::string, GfEntDataType>::const_iterator iter;
 
-      for(iter = EntBaseToType.begin(); iter != EntBaseToType.end(); ++iter)
+      for(iter = GfEntBaseToType.begin(); iter != GfEntBaseToType.end(); ++iter)
       {
         if( iter->second == gf_ent_type )
         {

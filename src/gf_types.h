@@ -175,6 +175,21 @@ namespace geofrenzy
   const GfEntitlementIndex GeiFlightAltitudes = 211;
 
   /*!
+   * \brief Speed limits.
+   *
+   * The mobile system must remain between these absolute speed limits while
+   * in the defined fence.
+   *
+   * A speed limit violation event should trigger an override action that
+   * preempts any current user or autonomous behavior.
+   *
+   * A 'speed governor' action is an example override.
+   *
+   * Base Type: threshold
+   */
+  const GfEntitlementIndex GeiFlightSpeedLimit = 212;
+
+  /*!
    * \brief Issuing authority.
    *
    * All entitlements associated with a fence have the weight of the issuing

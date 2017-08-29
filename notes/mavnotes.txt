@@ -1,0 +1,132 @@
+------------------------------------------------------------------------------
+Home Office at Kim's Desk: lat 40.364826, long -105.100857, alt 1554.578979
+Home Office Deck:          lat 40.364826, long -105.100857, alt 1554.578979
+
+--------------------------------------------------------------------------------
+Node [/mavros]
+Publications: 
+ * /mavros/manual_control/control [mavros_msgs/ManualControl]
+ * /tf [tf2_msgs/TFMessage]
+ * /mavros/wind_estimation [geometry_msgs/TwistStamped]
+ * /mavros/radio_status [mavros_msgs/RadioStatus]
+ * /mavros/setpoint_raw/target_local [mavros_msgs/PositionTarget]
+ * /mavros/vfr_hud [mavros_msgs/VFR_HUD]
+ * /mavros/altitude [mavros_msgs/Altitude]
+ * /mavros/mission/waypoints [mavros_msgs/WaypointList]
+ * /mavros/global_position/compass_hdg [std_msgs/Float64]
+ * /mavros/local_position/velocity [geometry_msgs/TwistStamped]
+ * /mavros/global_position/global [sensor_msgs/NavSatFix]
+ * /mavlink/from [mavros_msgs/Mavlink]
+ * /mavros/local_position/pose [geometry_msgs/PoseStamped]
+ * /mavros/imu/data [sensor_msgs/Imu]
+ * /mavros/global_position/raw/gps_vel [geometry_msgs/TwistStamped]
+ * /mavros/global_position/local [nav_msgs/Odometry]
+ * /mavros/setpoint_raw/target_global [mavros_msgs/GlobalPositionTarget]
+ * /mavros/imu/temperature [sensor_msgs/Temperature]
+ * /diagnostics [diagnostic_msgs/DiagnosticArray]
+ * /mavros/global_position/raw/fix [sensor_msgs/NavSatFix]
+ * /mavros/battery [sensor_msgs/BatteryState]
+ * /mavros/setpoint_raw/target_attitude [mavros_msgs/AttitudeTarget]
+ * /mavros/imu/data_raw [sensor_msgs/Imu]
+ * /mavros/rc/in [mavros_msgs/RCIn]
+ * /rosout [rosgraph_msgs/Log]
+ * /mavros/global_position/rel_alt [std_msgs/Float64]
+ * /mavros/state [mavros_msgs/State]
+ * /mavros/safety_area/get [geometry_msgs/PolygonStamped]
+ * /mavros/hil_controls/hil_controls [mavros_msgs/HilControls]
+ * /mavros/imu/mag [sensor_msgs/MagneticField]
+ * /mavros/local_position/odom [nav_msgs/Odometry]
+ * /mavros/extended_state [mavros_msgs/ExtendedState]
+ * /mavros/imu/atm_pressure [sensor_msgs/FluidPressure]
+ * /mavros/hil_actuator_controls [mavros_msgs/HilActuatorControls]
+ * /mavros/rc/out [mavros_msgs/RCOut]
+ * /mavros/home_position/home [mavros_msgs/HomePosition]
+ * /mavros/time_reference [sensor_msgs/TimeReference]
+
+Subscriptions: 
+ * /mavros/safety_area/set [unknown type]
+ * /mavros/actuator_control [unknown type]
+ * /mavros/setpoint_raw/global [unknown type]
+ * /mavros/setpoint_attitude/att_throttle [unknown type]
+ * /mavros/setpoint_attitude/cmd_vel [unknown type]
+ * /tf [tf2_msgs/TFMessage]
+ * /mavros/setpoint_raw/attitude [unknown type]
+ * /mavros/setpoint_velocity/cmd_vel [unknown type]
+ * /mavros/setpoint_position/local [unknown type]
+ * /mavros/setpoint_accel/accel [unknown type]
+ * /tf_static [tf2_msgs/TFMessage]
+ * /mavlink/to [unknown type]
+ * /mavros/rc/override [unknown type]
+ * /mavros/setpoint_raw/local [unknown type]
+ * /mavros/setpoint_attitude/attitude [unknown type]
+ * /mavros/setpoint_velocity/cmd_vel_unstamped [unknown type]
+ * /clock [rosgraph_msgs/Clock]
+ * /mavros/home_position/set [unknown type]
+
+Services: 
+ * /mavros/param/push
+ * /mavros/cmd/command_int
+ * /mavros/mission/clear
+ * /mavros/param/pull
+ * /mavros/cmd/trigger_control
+ * /mavros/set_logger_level
+ * /mavros/cmd/set_home
+ * /mavros/ftp/mkdir
+ * /mavros/cmd/command
+ * /mavros/ftp/rename
+ * /mavros/mission/pull
+ * /mavros/cmd/arming
+ * /mavros/cmd/land
+ * /mavros/ftp/close
+ * /mavros/ftp/rmdir
+ * /mavros/cmd/takeoff
+ * /mavros/get_loggers
+ * /mavros/home_position/req_update
+ * /mavros/ftp/read
+ * /mavros/set_stream_rate
+ * /mavros/param/get
+ * /mavros/ftp/checksum
+ * /mavros/mission/push
+ * /mavros/ftp/list
+ * /mavros/param/set
+ * /mavros/ftp/truncate
+ * /mavros/ftp/open
+ * /mavros/ftp/remove
+ * /mavros/ftp/reset
+ * /mavros/set_mode
+ * /mavros/mission/set_current
+ * /mavros/ftp/write
+
+
+contacting node http://sharetheroad:44683/ ...
+Pid: 25423
+Connections:
+ * topic: /rosout
+    * to: /rosout
+    * direction: outbound
+    * transport: TCPROS
+ * topic: /tf
+    * to: /mavros
+    * direction: outbound
+    * transport: INTRAPROCESS
+ * topic: /clock
+    * to: /gazebo (http://sharetheroad:34157/)
+    * direction: inbound
+    * transport: TCPROS
+ * topic: /tf
+    * to: /mavros (http://sharetheroad:44683/)
+    * direction: inbound
+    * transport: INTRAPROCESS
+ * topic: /tf
+    * to: /robot_state_publisher (http://sharetheroad:38814/)
+    * direction: inbound
+    * transport: TCPROS
+ * topic: /tf
+    * to: /gazebo (http://sharetheroad:34157/)
+    * direction: inbound
+    * transport: TCPROS
+ * topic: /tf_static
+    * to: /robot_state_publisher (http://sharetheroad:38814/)
+    * direction: inbound
+    * transport: TCPROS
+
