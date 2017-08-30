@@ -34,6 +34,7 @@
 //
 #include <string>
 #include <vector>
+#include <ostream>
 
 //
 // ROS
@@ -82,13 +83,20 @@ namespace geofrenzy
         void dwellCallbackBoolset(const GfDwellBoolset  &dwellMsg);
         void dwellCallbackProfile(const GfDwellProfile  &dwellMsg);
         void dwellCallbackThreshold(const GfDwellThreshold &dwellMsg);
+
         void advertisePublishers(int nQueueDepth=1);
         void subscribeToTopics(int nQueueDepth=5);
+        void advertiseServices();
+        void clientServices();
+
         void initSensorRelayProperties();
 
         SensorRelay(ros::NodeHandle &nh) : m_nh(nh){}
 
         ~SensorRelay();
+
+        friend std::ostream &operator<<(std::ostream &os,
+                                        const SensorRelay &sr);
 
     private:
         ros::NodeHandle &m_nh;    ///< node handle
@@ -148,7 +156,6 @@ namespace geofrenzy
     for(size_t i = 0; i < m_sentinels.size(); ++i)
     {
       m_sentinels[i]->initProperties(m_nh, m_gciServer);
-      std::cerr << *m_sentinels[i];
     }
   }
 
@@ -241,6 +248,34 @@ namespace geofrenzy
     }
   }
 
+  /*!
+   * \brief Advertise all services.
+   */
+  void SensorRelay::advertiseServices()
+  {
+    //
+    // Sentinel specific services
+    //
+    for(size_t i = 0; i < m_sentinels.size(); ++i)
+    {
+      m_sentinels[i]->advertiseServices(m_nh);
+    }
+  }
+
+  /*!
+   * \brief Intialize all client services.
+   */
+  void SensorRelay::clientServices()
+  {
+    //
+    // Sentinel specific client services
+    //
+    for(size_t i = 0; i < m_sentinels.size(); ++i)
+    {
+      m_sentinels[i]->clientServices(m_nh);
+    }
+  }
+
   void SensorRelay::dwellCallbackBoolset(const GfDwellBoolset &dwellMsg)
   {
     const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
@@ -300,6 +335,18 @@ namespace geofrenzy
     }
   }
 
+  std::ostream &operator<<(std::ostream &os, const SensorRelay &sr)
+  {
+    os << "SensorRelay:" << std::endl;
+
+    for(size_t i = 0; i < sr.m_sentinels.size(); ++i)
+    {
+      os << *(sr.m_sentinels[i]) << std::endl;
+    }
+
+    return os;
+  }
+
 } // namespace geofrenzy
 
 
@@ -320,6 +367,10 @@ int main(int argc, char **argv)
     sr.initSensorRelayProperties();
     sr.advertisePublishers();
     sr.subscribeToTopics();
+    sr.advertiseServices();
+    sr.clientServices();
+
+    std::cerr << sr << std::endl;
 
     while(ros::ok()){
         ros::spin();

@@ -58,14 +58,17 @@
 //
 // mavros
 //
+#include "mavros_msgs/State.h"
+#include "mavros_msgs/ExtendedState.h"
 #include "mavros_msgs/HomePosition.h"
-#include "mavros_msgs/CommandHome.h"
-#include "mavros_msgs/CommandTOL.h"
 
 //
 // ROS generated Geofrenzy messages
 //
 #include "geofrenzy/GfDwellBoolset.h"
+#include "geofrenzy/GfDwellProfile.h"
+#include "geofrenzy/GfDwellThreshold.h"
+#include "geofrenzy/GfDwellJson.h"
 
 //
 // Geofrenzy
@@ -169,7 +172,10 @@ namespace geofrenzy
      * \param nh          Relay ROS node handle of the embedded sentinel.
      * \param nQueueDepth Maximum receive queue depth.
      */
-    virtual void subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth=1);
+    virtual void subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth=1)
+    {
+      // no base topic subscriptions
+    }
 
     /*!
      * \brief Advertise all publishers.
@@ -177,7 +183,28 @@ namespace geofrenzy
      * \param nh          Relay ROS node handle of the embedded sentinel.
      * \param nQueueDepth Maximum dsend queue depth.
      */
-    virtual void advertisePublishers(ros::NodeHandle &nh, int nQueueDepth=1);
+    virtual void advertisePublishers(ros::NodeHandle &nh, int nQueueDepth=1)
+    {
+      // no base topic publishers
+    }
+
+    /*!
+     * \brief Advertise all server services.
+     *
+     * \param nh          Relay ROS node handle of the embedded sentinel.
+     */
+    virtual void advertiseServices(ros::NodeHandle &nh)
+    {
+      // no base node services
+    }
+
+    /*!
+     * \brief Initialize client services.
+     */
+    virtual void clientServices(ros::NodeHandle &nh)
+    {
+      // no base client services
+    }
 
     /*!
      * \@{
@@ -359,7 +386,7 @@ namespace geofrenzy
     //
     gf_ros::MapPublishers     m_publishers;     ///< topic publishers
     gf_ros::MapSubscriptions  m_subscriptions;  ///< topic subscriptions
-    gf_ros::MapServices       m_services;       ///< advertised server services
+    gf_ros::MapServices       m_services;       ///< advertise services
     gf_ros::MapClientServices m_clientServices; ///< client services
 
     /*!
@@ -629,6 +656,11 @@ namespace geofrenzy
     virtual void advertisePublishers(ros::NodeHandle &nh, int nQueueDepth=1);
 
     /*!
+     * \brief Initialize client services.
+     */
+    virtual void clientServices(ros::NodeHandle &nh);
+
+    /*!
      * \brief Set in-breach boolean state given the current geofence position.
      *
      * \param isInFence The current location is currently [not] inside a 
@@ -673,25 +705,40 @@ namespace geofrenzy
      *
      * \param Returns reference to stream.
      */
-    friend std::ostream &operator<<(std::ostream         &os,
+    friend std::ostream &operator<<(std::ostream &os,
                                     const GfSentinelMavRtl &obj);
+
+    friend std::ostream &operator<<(std::ostream &os,
+                                    const GfSentinelMavRtl::GeoPos &obj);
 
   protected:
     //
     // State
     //
-    bool    m_hasLandingPos;  ///< UAS does [not] have a landing position
-    bool    m_isLanding;      ///< UAS is [not] in the process of landing
-    double  m_flightCeiling;  ///< absolute flight ceiling (meters)
-    GeoPos  m_posHome;        ///< home (landing) geographic position
-    GeoPos  m_posCur;         ///< current geographic position
+    bool        m_hasLandingPos;  ///< UAS does [not] have a landing position
+    bool        m_isLanding;      ///< UAS is [not] in the process of landing
+    bool        m_isOnTheGround;  ///< UAS is [not] on the ground
+    double      m_flightCeiling;  ///< absolute flight ceiling (meters)
+    bool        m_isArmed;        ///< UAS is [not] armed
+    std::string m_flightMode;     ///< UAS mode (e.g. MANUAL, AUTO-RTL, etc)
+    GeoPos      m_posHome;        ///< home (landing) geographic position
+    GeoPos      m_posCur;         ///< current geographic position
 
+    //
+    // Support topics
+    //
+    std::string m_topicState;     ///< state topic
+    std::string m_topicExState;   ///< extended state topic
+    std::string m_topicHomePos;   ///< home position topic
+    std::string m_topicGlobalPos; ///< global position topic
 
-    std::string             m_topicHomePos;   ///< home position topic
-    std::string             m_topicGlobalPos; ///< global position topic
-
-    mavros_msgs::CommandTOL m_svcTOL;
-
+    //
+    // Support client services
+    //
+    std::string m_serviceLandNow;   ///< land immediately
+    std::string m_serviceSetMode;   ///< set operational mode
+    std::string m_serviceSetHome;   ///< set home geographic position
+    
     /*!
      * \brief Received subscribed twist velocity message callback.
      *
@@ -699,13 +746,21 @@ namespace geofrenzy
      */
     virtual void cbVel(const geometry_msgs::Twist &msgTwistStamped);
 
+    virtual void cbState(const mavros_msgs::State &msgState);
+
+    virtual void cbExState(const mavros_msgs::ExtendedState &msgExState);
+
     virtual void cbHomePos(const mavros_msgs::HomePosition &msgHomePos);
 
     virtual void cbGlobalPos(const sensor_msgs::NavSatFix &msgFix);
 
     virtual bool returnToHome();
 
-    virtual bool onTheGround();
+    virtual bool landNow();
+
+    virtual bool setOpMode();
+
+    virtual bool setHomePos();
 
   }; // class GfSentinelMavRtl
 

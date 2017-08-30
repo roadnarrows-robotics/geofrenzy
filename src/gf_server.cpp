@@ -109,12 +109,6 @@ using namespace geofrenzy::gf_ros;
 
 namespace geofrenzy
 {
-
-  //
-  // Constants
-  //
-
-
   //----------------------------------------------------------------------------
   // Geofrenzy Entitlement
   //----------------------------------------------------------------------------
@@ -125,7 +119,6 @@ namespace geofrenzy
   class Entitlement
   {
     public:
-  
       /*!
        * \brief Default initialization constructor.
        *
@@ -176,8 +169,7 @@ namespace geofrenzy
         //
         // Data-specific dwell topic.
         //
-        m_strTopicDwellX =
-                        makeDwellTopicName(m_class_idx, m_ent_idx, m_ent_base);
+        m_strTopicDwellX = makeDwellTopicName(m_ent_idx, m_ent_base);
 
         switch( m_eEntDataType )
         {
@@ -207,8 +199,7 @@ namespace geofrenzy
         //
         // Json encoded string dwell topic.
         //
-        m_strTopicDwellJson =
-                            makeDwellTopicName(m_class_idx, m_ent_idx, "json");
+        m_strTopicDwellJson = makeDwellTopicName(m_ent_idx, "json");
 
         m_publishers[m_strTopicDwellJson] =
           nh.advertise<GfDwellJson>(m_strTopicDwellJson, 1, true);
@@ -507,6 +498,24 @@ namespace geofrenzy
         header.gf_ent_idx   = m_ent_idx;
         header.gf_ent_base  = m_ent_base;
         header.dwell        = m_bDwell;
+      }
+
+      /*!
+       * \brief Make dwell topic name.
+       *
+       * Note: Server name is automatically prepended.
+       *
+       * \param gf_ent_idx    Geofrenzy entitlement index.
+       * \param gf_ent_base   Geofrenzy entitlement base.
+       */
+      std::string makeDwellTopicName(const uint64_t    gf_ent_idx,
+                                     const std::string gf_ent_base)
+      {
+        std::stringstream  ss;
+    
+        ss << "geofrenzy/" << gf_ent_idx << "/dwell/" << gf_ent_base;
+    
+        return ss.str();
       }
 
   }; // class Entitlement

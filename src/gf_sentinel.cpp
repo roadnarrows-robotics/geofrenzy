@@ -59,15 +59,25 @@
 //
 #include "sensor_msgs/Image.h"
 #include "sensor_msgs/image_encodings.h"
+#include "sensor_msgs/NavSatFix.h"
 
 //
 // mavros
 //
+#include "mavros_msgs/ExtendedState.h"
+#include "mavros_msgs/HomePosition.h"
+#include "mavros_msgs/CommandLong.h"
+#include "mavros_msgs/CommandTOL.h"
+#include "mavros_msgs/SetMode.h"
+#include "mavros_msgs/CommandHome.h"
 
 //
 // ROS generated Geofrenzy messages
 //
 #include "geofrenzy/GfDwellBoolset.h"
+#include "geofrenzy/GfDwellProfile.h"
+#include "geofrenzy/GfDwellThreshold.h"
+#include "geofrenzy/GfDwellJson.h"
 
 //
 // OpenCV
@@ -141,14 +151,6 @@ GfSentinel::~GfSentinel()
 void GfSentinel::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
 {
   m_gci = gci;
-}
-
-void GfSentinel::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
-{
-}
-
-void GfSentinel::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
-{
 }
 
 void GfSentinel::cbWatchForBreach(const GfEntitlementIndex gei,
@@ -316,7 +318,9 @@ std::string GfSentinel::actionName(const GfSentinel::BreachAction action)
 void GfSentinel::print(std::ostream &os) const
 {
   os  << "GfSentinel" << std::endl
-      << "{" << std::endl
+      << "{" << std::endl;
+
+  os  << "meta-data:" << std::endl
       << "  gci          = " << gci() << std::endl
       << "  mep          = "
         << GfSentinel::mepName(mep())
@@ -326,9 +330,11 @@ void GfSentinel::print(std::ostream &os) const
         << "(" << triggerType() << ")" << std::endl
       << "  action       = "
         << GfSentinel::actionName(actionCategory())
-        << "(" << actionCategory() << ")" << std::endl
-      << "  eoi[" << eoiSize() << "] =" << std::endl
-      << "  {" << std::endl;
+        << "(" << actionCategory() << ")" << std::endl;
+
+  os  << "entitlements-of-interest:" << std::endl
+        << "  eoi[" << eoiSize() << "] =" << std::endl
+        << "  {" << std::endl;
   for(size_t i = 0; i < eoiSize(); ++i)
   {
     const GfSentinel::EoI &eoi = eoiAt(i);
@@ -341,12 +347,75 @@ void GfSentinel::print(std::ostream &os) const
         << "    }" << std::endl;
   }
   os  << "  }" << std::endl;
-  os  << "  isInFence  = " << isInFence() << std::endl
+
+  os  << "state:" << std::endl
+      << "  isInFence  = " << isInFence() << std::endl
       << "  isInBreach = " << isInBreach() << std::endl;
-  os  << "  topicIn    = '" << m_topicIn << "'" << std::endl
-      << "  topicOut   = '" << m_topicOut << "'" << std::endl
-      << "  serviceIn  = '" << m_serviceIn << "'" << std::endl
-      << "  serviceOut = '" << m_serviceOut << "'" << std::endl;
+
+  os  << "subscriptions:" << std::endl
+        << "  topics[" << m_subscriptions.size() << "] =" << std::endl
+        << "  {" << std::endl;
+  for(MapSubscriptions::const_iterator iter = m_subscriptions.begin();
+      iter != m_subscriptions.end();
+      ++iter)
+  {
+    os << "    " << iter->first;
+    if( iter->first == m_topicIn )
+    {
+      os << "(*)";
+    }
+    os << std::endl;
+  }
+  os  << "  }" << std::endl;
+
+  os  << "publishers:" << std::endl
+        << "  topics[" << m_publishers.size() << "] =" << std::endl
+        << "  {" << std::endl;
+  for(MapPublishers::const_iterator iter = m_publishers.begin();
+      iter != m_publishers.end();
+      ++iter)
+  {
+    os << "    " << iter->first;
+    if( iter->first == m_topicOut )
+    {
+      os << "(*)";
+    }
+    os << std::endl;
+  }
+  os  << "  }" << std::endl;
+
+  os  << "node-services:" << std::endl
+        << "  services[" << m_services.size() << "] =" << std::endl
+        << "  {" << std::endl;
+  for(MapServices::const_iterator iter = m_services.begin();
+      iter != m_services.end();
+      ++iter)
+  {
+    os << "    " << iter->first;
+    if( iter->first == m_serviceIn )
+    {
+      os << "(*)";
+    }
+    os << std::endl;
+  }
+  os  << "  }" << std::endl;
+
+  os  << "client-services:" << std::endl
+        << "  services[" << m_clientServices.size() << "] =" << std::endl
+        << "  {" << std::endl;
+  for(MapClientServices::const_iterator iter = m_clientServices.begin();
+      iter != m_clientServices.end();
+      ++iter)
+  {
+    os << "    " << iter->first;
+    if( iter->first == m_serviceOut )
+    {
+      os << "(*)";
+    }
+    os << std::endl;
+  }
+  os  << "  }" << std::endl;
+
   os  << "}" << std::endl;
 }
 
@@ -382,7 +451,7 @@ void GfSentinelCam::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   //
   // Nannied topics.
   //
-  m_topicIn  = "watch//image_raw";
+  m_topicIn  = "watch/image_raw";
   m_topicOut = "geofrenzy/image_raw";
 
   //
@@ -455,17 +524,14 @@ void GfSentinelCam::makeCensoredImage(ros::NodeHandle &nh)
 
 void GfSentinelCam::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
 {
-  m_subscriptions[m_topicIn] = nh.subscribe(m_topicIn,
-                                            nQueueDepth,
-                                            &GfSentinelCam::cbImage,
-                                            &(*this));
+  m_subscriptions[m_topicIn] =
+      nh.subscribe(m_topicIn, nQueueDepth, &GfSentinelCam::cbImage, &(*this));
 }
 
 void GfSentinelCam::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
 {
-  m_publishers[m_topicOut] = nh.advertise<sensor_msgs::Image>(m_topicOut,
-                                                              nQueueDepth,
-                                                              true);
+  m_publishers[m_topicOut] =
+      nh.advertise<sensor_msgs::Image>(m_topicOut, nQueueDepth, true);
 }
 
 void GfSentinelCam::cbImage(const sensor_msgs::Image &img)
@@ -545,17 +611,14 @@ void GfSentinelStop::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
 
 void GfSentinelStop::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
 {
-  m_subscriptions[m_topicIn] = nh.subscribe(m_topicIn,
-                                            1,
-                                            &GfSentinelStop::cbVel,
-                                            &(*this));
+  m_subscriptions[m_topicIn] =
+      nh.subscribe(m_topicIn, 1, &GfSentinelStop::cbVel, &(*this));
 }
 
 void GfSentinelStop::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
 {
-  m_publishers[m_topicOut] = nh.advertise<geometry_msgs::Twist>(m_topicOut,
-                                                                2,
-                                                                true);
+  m_publishers[m_topicOut] =
+      nh.advertise<geometry_msgs::Twist>(m_topicOut, 2, true);
 }
 
 void GfSentinelStop::cbVel(const geometry_msgs::Twist &msgTwist)
@@ -613,28 +676,36 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   GfSentinel::EoI eoi;
 
   m_gci           = gci;
-  m_mep           = MepSubSvc;
+  m_mep           = MepSvc;
   m_breachTrigger = BreachTriggerExit;
   m_breachAction  = BreachActionRtl;
 
   //
-  // Nannied topics
+  // Nannied topics and services
   //
-  m_topicIn     = "watch/setpoint_velocity/cmd_vel";
-  m_topicOut    = "geofrenzy/setpoint_velocity/cmd_vel";
+  // Note:  Not need. When RTL is issued, the UAS takes control.
+  //
+  //m_topicIn     = "watch/setpoint_velocity/cmd_vel";
+  //m_topicOut    = "geofrenzy/setpoint_velocity/cmd_vel";
+
+  // force return-to-landing service
+  m_serviceOut  = "/mavros/cmd/command";
 
   //
   // Support topics
   //
+  m_topicState      = "/mavros/state";
+  m_topicExState    = "/mavros/extended_state";
   m_topicHomePos    = "/mavros/home_position/home";
   m_topicGlobalPos  = "/mavros/global_position/global";
 
-  // force return-to-landing service
-  m_serviceOut  = "/mavros/cmd/land";
-
-  m_clientServices[m_serviceOut] =
-    nh.serviceClient<mavros_msgs::CommandTOL>(m_serviceOut);
-
+  //
+  // Support services
+  //
+  m_serviceLandNow  = "/mavros/cmd/land";
+  m_serviceSetMode  = "/mavros/set_mode";
+  m_serviceSetHome  = "/mavros/set_home";
+ 
   //
   // Watch for a bool dwell topic associated with rtl entitlement.
   //
@@ -657,52 +728,91 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   //
   m_hasLandingPos = false;
   m_isLanding     = false;
+  m_isOnTheGround = true;
+  m_flightCeiling = 0.0;
+  m_isArmed       = false;
 }
 
 void GfSentinelMavRtl::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
 {
-  m_subscriptions[m_topicIn] = nh.subscribe(m_topicIn,
-                                            1,
-                                            &GfSentinelMavRtl::cbVel,
-                                            &(*this));
+  //m_subscriptions[m_topicIn] =
+  //    nh.subscribe(m_topicIn, 1, &GfSentinelMavRtl::cbVel, &(*this));
 
-  m_subscriptions[m_topicHomePos] = nh.subscribe(
-                                            m_topicHomePos,
-                                            1,
-                                            &GfSentinelMavRtl::cbHomePos,
-                                            &(*this));
+  m_subscriptions[m_topicState] =
+      nh.subscribe(m_topicState, nQueueDepth,
+                  &GfSentinelMavRtl::cbState, &(*this));
 
-  m_subscriptions[m_topicGlobalPos] = nh.subscribe(
-                                            m_topicGlobalPos,
-                                            1,
-                                            &GfSentinelMavRtl::cbGlobalPos,
-                                            &(*this));
+  m_subscriptions[m_topicExState] =
+      nh.subscribe(m_topicExState, nQueueDepth,
+                  &GfSentinelMavRtl::cbExState, &(*this));
+
+  m_subscriptions[m_topicHomePos] =
+      nh.subscribe(m_topicHomePos, 1, &GfSentinelMavRtl::cbHomePos, &(*this));
+
+  m_subscriptions[m_topicGlobalPos] =
+    nh.subscribe(m_topicGlobalPos, 1, &GfSentinelMavRtl::cbGlobalPos, &(*this));
 }
 
 void GfSentinelMavRtl::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
 {
-  m_publishers[m_topicOut] = nh.advertise<geometry_msgs::Twist>(m_topicOut,
-                                                                2,
-                                                                true);
+  //m_publishers[m_topicOut] =
+  //  nh.advertise<geometry_msgs::Twist>(m_topicOut, 2, true);
+}
+
+void GfSentinelMavRtl::clientServices(ros::NodeHandle &nh)
+{
+  // autonomous return-to-landing
+  m_clientServices[m_serviceOut] =
+    nh.serviceClient<mavros_msgs::CommandLong>(m_serviceOut);
+
+  // land immediately
+  m_clientServices[m_serviceLandNow] =
+    nh.serviceClient<mavros_msgs::CommandTOL>(m_serviceLandNow);
+
+  // set operational mode
+  m_clientServices[m_serviceSetMode] =
+    nh.serviceClient<mavros_msgs::SetMode>(m_serviceSetMode);
+
+  // set home geographic position
+  m_clientServices[m_serviceSetHome] =
+    nh.serviceClient<mavros_msgs::CommandHome>(m_serviceSetHome);
 }
 
 bool GfSentinelMavRtl::setBreachState(const bool isInFence)
 {
   m_isInFence = isInFence;
 
+  // if on the ground, then clear any landing state
+  if( m_isOnTheGround )
+  {
+    m_isLanding = false;
+  }
+
   // don't clear any breach until safely landed within valid area
   if( m_isLanding )
   {
     m_isInBreach = true;
   }
+
+  // inside the fence and a breach is triggered on entry
   else if( m_isInFence && (m_breachTrigger == BreachTriggerEntry) )
   {
     m_isInBreach = true;
   }
+
+  // outside the fence and a breach triggered on exit
   else if( !m_isInFence && (m_breachTrigger == BreachTriggerExit) )
   {
     m_isInBreach = true;
   }
+
+  // flying too high
+  else if( (m_flightCeiling > 0.0) && (m_posCur.m_altitude > m_flightCeiling) )
+  {
+    m_isInBreach = true;
+  }
+
+  // good to go
   else
   {
     m_isInBreach = false;
@@ -717,12 +827,9 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
 {
   setBreachState(isInFence);
 
-  if( m_isInBreach )
+  if( m_isInBreach && !m_isLanding )
   {
-    if( !m_isLanding )
-    {
-      m_isLanding = returnToHome();
-    }
+    m_isLanding = returnToHome();
   }
 }
 
@@ -730,14 +837,16 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
                                         const bool               isInFence,
                                         const GfEntBaseThreshold &data)
 {
+  if( m_hasLandingPos )
+  {
+    m_flightCeiling = m_posHome.m_altitude + data.m_upper;
+  }
+
   setBreachState(isInFence);
 
-  if( m_isInBreach )
+  if( m_isInBreach && !m_isLanding )
   {
-    if( !m_isLanding )
-    {
-      m_isLanding = returnToHome();
-    }
+    m_isLanding = returnToHome();
   }
 }
 
@@ -750,6 +859,28 @@ void GfSentinelMavRtl::cbVel(const geometry_msgs::Twist &msgTwistStamped)
   }
 }
 
+void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
+{
+  m_isArmed    = msgState.armed;
+  m_flightMode = msgState.mode;
+}
+
+void GfSentinelMavRtl::cbExState(const mavros_msgs::ExtendedState &msgExState)
+{
+  switch( msgExState.landed_state )
+  {
+    case mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND:
+      m_isOnTheGround = true;
+      break;
+    case mavros_msgs::ExtendedState::LANDED_STATE_IN_AIR:
+      m_isOnTheGround = false;
+      break;
+    case mavros_msgs::ExtendedState::LANDED_STATE_UNDEFINED:
+    default:
+      break;
+  }
+}
+
 void GfSentinelMavRtl::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
 {
   m_posHome.m_latitude  = msgHomePos.latitude;
@@ -758,6 +889,7 @@ void GfSentinelMavRtl::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
 
   m_hasLandingPos = true;
 }
+
 void GfSentinelMavRtl::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
 {
   m_posCur.m_latitude  = msgFix.latitude;
@@ -767,33 +899,97 @@ void GfSentinelMavRtl::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
 
 bool GfSentinelMavRtl::returnToHome()
 {
-  m_svcTOL.request.min_pitch = 0.0; // only used by takeoff
-  m_svcTOL.request.yaw       = 0.0; // may fix later to home position yaw
-  m_svcTOL.request.latitude  = m_posHome.m_latitude;
-  m_svcTOL.request.longitude = m_posHome.m_longitude;
-  m_svcTOL.request.altitude  = m_posHome.m_altitude;
+  std::string               &name = m_serviceOut;
+  mavros_msgs::CommandLong  svc;
 
-  if( !m_hasLandingPos )
-  {
-    ROS_ERROR("No landing position known - cannot return!!!");
-    return false;
-  }
+  svc.request.broadcast     = false;
+  svc.request.command       = 20;
+  svc.request.confirmation  = true;
 
-  else if( m_clientServices[m_serviceOut].call(m_svcTOL) )
+  if( m_clientServices[name].call(svc) )
   {
-    ROS_DEBUG("RTL");
-    return m_svcTOL.response.success;
+    ROS_DEBUG_STREAM(name);
+    return svc.response.success;
   }
   else
   {
-    ROS_ERROR("Failed RTL.");
+    ROS_ERROR_STREAM("Failed " << name);
     return false;
   }
 }
 
-bool GfSentinelMavRtl::onTheGround()
+bool GfSentinelMavRtl::landNow()
 {
-  return false;
+  std::string             &name = m_serviceLandNow;
+  mavros_msgs::CommandTOL svc;
+  
+  //
+  // N.B. Current version mavros land command ignores all fields and
+  //      simply lands a current position.
+  //
+  svc.request.min_pitch = 0.0; // only used by takeoff
+  svc.request.yaw       = 0.0; // may fix later to home position yaw
+  svc.request.latitude  = m_posHome.m_latitude;
+  svc.request.longitude = m_posHome.m_longitude;
+  svc.request.altitude  = m_posHome.m_altitude;
+
+  if( m_clientServices[name].call(svc) )
+  {
+    ROS_DEBUG_STREAM(name);
+    return svc.response.success;
+  }
+  else
+  {
+    ROS_ERROR_STREAM("Failed" << name);
+    return false;
+  }
+}
+
+bool GfSentinelMavRtl::setOpMode()
+{
+  std::string           &name = m_serviceSetMode;
+  mavros_msgs::SetMode  svc;
+
+  svc.request.base_mode     = 192;
+  svc.request.custom_mode   = "MANUAL";
+
+  if( m_clientServices[name].call(svc) )
+  {
+    ROS_DEBUG_STREAM(name);
+    return svc.response.success;
+  }
+  else
+  {
+    ROS_ERROR_STREAM("Failed " << name);
+    return false;
+  }
+}
+
+bool GfSentinelMavRtl::setHomePos()
+{
+  std::string               &name = m_serviceSetHome;
+  mavros_msgs::CommandHome  svc;
+
+  if( !m_hasLandingPos )
+  {
+    ROS_ERROR_STREAM(name << ": No home position to set.");
+    return false;
+  }
+
+  svc.request.latitude  = m_posHome.m_latitude;
+  svc.request.longitude = m_posHome.m_longitude;
+  svc.request.altitude  = m_posHome.m_altitude;
+
+  if( m_clientServices[name].call(svc) )
+  {
+    ROS_DEBUG_STREAM(name);
+    return svc.response.success;
+  }
+  else
+  {
+    ROS_ERROR_STREAM("Failed " << name);
+    return false;
+  }
 }
 
 void GfSentinelMavRtl::print(std::ostream &os) const
@@ -803,13 +999,32 @@ void GfSentinelMavRtl::print(std::ostream &os) const
 
   os  << "GfSentinelMavRtl" << std::endl
       << "{" << std::endl
+      << "state:" << std::endl
+      << "  hasLandingPos  = " << m_hasLandingPos << std::endl
+      << "  isLanding      = " << m_isLanding << std::endl
+      << "  isOnTheGround  = " << m_isOnTheGround << std::endl
+      << "  flightCeiling  = " << m_flightCeiling << std::endl
+      << "  isArmed        = " << m_isArmed << std::endl
+      << "  flightMode     = " << m_flightMode << std::endl
+      << "  posHome        = " << m_posHome << std::endl
+      << "  posCur         = " << m_posCur << std::endl
       << "}" << std::endl;
 }
 
-std::ostream &geofrenzy::operator<<(std::ostream           &os,
+std::ostream &geofrenzy::operator<<(std::ostream &os,
                                     const GfSentinelMavRtl &obj)
 {
   obj.print(os);
+
+  return os;
+}
+
+std::ostream &geofrenzy::operator<<(std::ostream &os,
+                                    const GfSentinelMavRtl::GeoPos &obj)
+{
+  os  << "(lat=" << obj.m_latitude  << ", "
+      << "lon="  << obj.m_longitude << ", "
+      << "alt="  << obj.m_altitude  << ")";
 
   return os;
 }
