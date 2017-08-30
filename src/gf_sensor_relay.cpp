@@ -278,6 +278,8 @@ namespace geofrenzy
 
   void SensorRelay::dwellCallbackBoolset(const GfDwellBoolset &dwellMsg)
   {
+    ROS_INFO_STREAM("dwellCallbackBoolset = " << dwellMsg);
+
     const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
 
     GfEntDataType     t = GfEntDataTypeBoolset;
@@ -298,7 +300,6 @@ namespace geofrenzy
   {
     const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
 
-
     GfEntDataType     t = GfEntDataTypeProfile;
     GfEntBaseProfile  d = dwellMsg.entitlement.gf_profile_num;
 
@@ -315,13 +316,15 @@ namespace geofrenzy
 
   void SensorRelay::dwellCallbackThreshold(const GfDwellThreshold &dwellMsg)
   {
+    ROS_INFO_STREAM("dwellCallbackThreshold = " << dwellMsg);
+
     const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
 
     GfEntDataType       t = GfEntDataTypeThreshold;
     GfEntBaseThreshold  d;
 
-    d.m_upper = dwellMsg.entitlement.threshold_lower;
-    d.m_lower = dwellMsg.entitlement.threshold_upper;
+    d.m_lower = dwellMsg.entitlement.threshold_lower;
+    d.m_upper = dwellMsg.entitlement.threshold_upper;
     d.m_units = dwellMsg.entitlement.threshold_unit;
 
     SentinelIter  iter;

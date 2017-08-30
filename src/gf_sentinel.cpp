@@ -706,12 +706,13 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   m_serviceSetMode  = "/mavros/set_mode";
   m_serviceSetHome  = "/mavros/set_home";
  
+  std::string slash("/");
   //
   // Watch for a bool dwell topic associated with rtl entitlement.
   //
-  eoi.m_gei         = paramS64(nh, ParamNameSrRtlGei, GeiNoExit);
+  eoi.m_gei         = paramS64(nh, ParamNameSrRtlGei, 209); //GeiNoExit);
   eoi.m_entDataType = GfEntDataTypeBoolset;
-  eoi.m_topicDwell  = makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
+  eoi.m_topicDwell  = slash + makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
   m_listEoI.push_back(eoi);
 
   //
@@ -720,7 +721,7 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   //
   eoi.m_gei         = paramS64(nh, ParamNameSrAltitudeGei, GeiFlightAltitudes);
   eoi.m_entDataType = GfEntDataTypeThreshold;
-  eoi.m_topicDwell  = makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
+  eoi.m_topicDwell  = slash + makeDwellTopicName(m_gci, eoi.m_gei, eoi.m_entDataType);
   m_listEoI.push_back(eoi);
 
   //
@@ -825,6 +826,8 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
                                         const bool               isInFence,
                                         const GfEntBaseBoolset   &data)
 {
+  ROS_INFO("watchForBreach: boolset");
+
   setBreachState(isInFence);
 
   if( m_isInBreach && !m_isLanding )
@@ -837,9 +840,17 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
                                         const bool               isInFence,
                                         const GfEntBaseThreshold &data)
 {
+  ROS_INFO_STREAM("watchForBreach: threshold: "
+            << "threshold.upper = " << data.m_upper);
+
+  double  upper = data.m_upper >= 2.5? data.m_upper: 2.5;
+
   if( m_hasLandingPos )
   {
-    m_flightCeiling = m_posHome.m_altitude + data.m_upper;
+    m_flightCeiling = m_posHome.m_altitude + upper;
+    ROS_INFO_STREAM("homeAlt=" << m_posHome.m_altitude
+                    << ", curAlt=" << m_posCur.m_altitude
+                    << ", flightCeiling = " << m_flightCeiling);
   }
 
   setBreachState(isInFence);

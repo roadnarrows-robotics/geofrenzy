@@ -6,20 +6,24 @@
       "type": "Feature",
       "properties":
       {
+        "class_idx": 168,
         "class_metadata":
         {
           "entitlements":
           [
             {
-              "color_green": 5,
-              "color_blue": 255,
-              "ent_idx": 205,
-              "color_red": 14,
-              "color_alpha": 255,
-              "ent_base": "color"
+              "ent_idx": 211,
+              "ent_base": "threshold",
+              "threshold_lower": 0,
+              "threshold_upper": 3.0,
+              "threshold_unit": 1
+            },
+            {
+              "ent_idx": 209,
+              "ent_base": "boolset",
+              "bitset_num": 0
             }
-          ],
-          "class_idx": 168
+          ]
         },
         "inout": "i"
       },

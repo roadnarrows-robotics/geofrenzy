@@ -772,7 +772,7 @@ namespace geofrenzy
         //
         if( m_nh.getParam(ParamNameFenceFilename, filename) )
         {
-          ROS_DEBUG_STREAM("Reading file " << filename);
+          ROS_INFO_STREAM("Reading file " << filename);
 
           std::ifstream in(filename.c_str());
           std::string message;
@@ -783,7 +783,7 @@ namespace geofrenzy
           }
           in.close();
           strJson = message;
-          ROS_DEBUG_STREAM("Done reading file.");
+          ROS_INFO_STREAM("Done reading file.");
         }
 
         //
