@@ -361,6 +361,7 @@ namespace geofrenzy
     //
     // Sentinel meta-data
     //
+    std::string         m_nameOf;       ///< readable name of sentinel
     GfClassIndex        m_gci;          ///< geofrenzy portal server class index
     Mep                 m_mep;          ///< message exchange pattern
     BreachTrigger       m_breachTrigger; ///< breach trigger event type
@@ -734,11 +735,13 @@ namespace geofrenzy
     bool        m_hasLandingPos;  ///< UAS does [not] have a landing position
     bool        m_isLanding;      ///< UAS is [not] in the process of landing
     bool        m_isOnTheGround;  ///< UAS is [not] on the ground
+    double      m_deltaCeiling;   ///< delta flight ceiling from home (meters)
     double      m_flightCeiling;  ///< absolute flight ceiling (meters)
     bool        m_isArmed;        ///< UAS is [not] armed
     std::string m_flightMode;     ///< UAS mode (e.g. MANUAL, AUTO-RTL, etc)
     GeoPos      m_posHome;        ///< home (landing) geographic position
     GeoPos      m_posCur;         ///< current geographic position
+    bool        m_autoManual;     ///< do [not] automatically return to MANUAL
 
     //
     // Support topics
@@ -751,9 +754,10 @@ namespace geofrenzy
     //
     // Support client services
     //
-    std::string m_serviceLandNow;   ///< land immediately
-    std::string m_serviceSetMode;   ///< set operational mode
-    std::string m_serviceSetHome;   ///< set home geographic position
+    std::string m_serviceLandNow;     ///< land immediately
+    std::string m_serviceSetMode;     ///< set operational mode
+    std::string m_serviceSetHomePos;  ///< set home geographic position
+    std::string m_serviceReqHomePos;  ///< request home geographic position
     
     /*!
      * \brief Subscribed twist velocity message callback.
@@ -835,6 +839,13 @@ namespace geofrenzy
      * \return Returns true on success, false otherwise.
      */
     virtual bool reqSetHomePos();
+
+    /*!
+     * \brief Request the UAS to send home position.
+     *
+     * \return Returns true on success, false otherwise.
+     */
+    virtual bool reqReqHomePos();
 
   }; // class GfSentinelMavRtl
 

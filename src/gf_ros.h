@@ -431,6 +431,13 @@ namespace geofrenzy
      */
     const char *const ParamNameSrAltitudeGei = "geofrenzy_sr_altitude_gei";
 
+    /*!
+     * \brief Sensor relay automatically return to MANUAL operation mode
+     * after disarming.
+     *
+     * The default is false;
+     */
+    const char *const ParamNameSrAutoManual = "geofrenzy_sr_auto_manual";
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Geofrenzy Node Shared Parameters

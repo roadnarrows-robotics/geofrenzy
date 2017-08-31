@@ -17,7 +17,8 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
 )
 
-if(NOT ${EIGEN3_FOUND})
+# docker ros cannot find eigen3 
+if(NOT EIGEN3_FOUND)
   message(STATUS "Eigen3 not found - hardcode directory")
   set(Eigen3_DIR /usr/lib/cmake/eigen3)
   find_package(Eigen3 REQUIRED)
@@ -234,6 +235,7 @@ if(NOT FALIB)
 	message(FATAL_ERROR "fa library not found")
 endif()
 #message( STATUS ${FALIB})
+
 include_directories(
   src
   include
@@ -250,6 +252,7 @@ add_executable(gf_map_server
   src/gf_ros.cpp
   src/gf_map_server.cpp)
 target_link_libraries(gf_map_server  ${catkin_LIBRARIES})
+add_dependencies(gf_map_server geofrenzy_gencpp)
 
 # geofrenzy portal server
 add_executable(gf_server
@@ -258,6 +261,7 @@ add_executable(gf_server
 target_link_libraries(gf_server ${catkin_LIBRARIES})
 target_link_libraries(gf_server jsoncpp)
 target_link_libraries(gf_server ${FALIB} agent)
+add_dependencies(gf_server geofrenzy_gencpp)
 
 # geofrenzy RGBD virtual sensor
 add_executable(gf_vcloud
@@ -268,6 +272,7 @@ target_link_libraries(gf_vcloud
   ${GPROF_OPTS}
   ${catkin_LIBRARIES})
 #target_compile_options(gf_vcloud ${GPROF_OPTS})
+add_dependencies(gf_vcloud geofrenzy_gencpp)
 
 # geofrenzy sensor relay
 add_executable(gf_sensor_relay
@@ -275,6 +280,7 @@ add_executable(gf_sensor_relay
   src/gf_sentinel.cpp
   src/gf_sensor_relay.cpp)
 target_link_libraries(gf_sensor_relay ${catkin_LIBRARIES})
+add_dependencies(gf_sensor_relay geofrenzy_gencpp)
 
 install(
   PROGRAMS 

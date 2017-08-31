@@ -278,7 +278,7 @@ namespace geofrenzy
 
   void SensorRelay::dwellCallbackBoolset(const GfDwellBoolset &dwellMsg)
   {
-    ROS_INFO_STREAM("dwellCallbackBoolset = " << dwellMsg);
+    //ROS_INFO_STREAM("dwellCallbackBoolset = " << dwellMsg);
 
     const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
 
@@ -316,7 +316,7 @@ namespace geofrenzy
 
   void SensorRelay::dwellCallbackThreshold(const GfDwellThreshold &dwellMsg)
   {
-    ROS_INFO_STREAM("dwellCallbackThreshold = " << dwellMsg);
+    //ROS_INFO_STREAM("dwellCallbackThreshold = " << dwellMsg);
 
     const GfEntHeader &hdr = dwellMsg.entitlement.ent_header;
 
