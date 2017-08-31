@@ -1,0 +1,59 @@
+<launch>
+  <arg name="gf_class_idx" default="168" />
+  <arg name="geofrenzy_fence_filename"
+        default="$(find laelaps_2dnav)/samplefences/shape_fences.json" />
+
+  <!-- Start Geofrenzy Node -->
+  <node name="gf_server_$(arg gf_class_idx)" pkg="geofrenzy" type="gf_server" args="_gf_class_idx:=$(arg gf_class_idx)"/>
+  <param name="gf_server_$(arg gf_class_idx)/geofrenzy_fence_filename" type="str" value="$(arg geofrenzy_fence_filename)" />
+
+  <!-- Start Geofrenzy Map Server -->
+  <node name="gf_map_server_$(arg gf_class_idx)" pkg="geofrenzy" type="gf_map_server" args="_gf_class_idx:=$(arg gf_class_idx)">
+    <remap from="gf_map_server_$(arg gf_class_idx)/geofrenzy/map" to="/map"/>
+    <remap from="gf_map_server_$(arg gf_class_idx)/geofrenzy/map_metadata" to="/map_metadata"/>
+  </node>
+
+  <!-- Run TF broadcaster -->
+  <node name="laelaps_tf_broadcaster" pkg="laelaps_2dnav" type="laelaps_tf_broadcaster"/>
+
+  <!-- Start Pointcloud to Laser node -->
+  <node name="pointcloud_to_laserscan_node" pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node">
+    <remap from="scan" to="scan_from_pointcloud"/>
+    <param name="use_inf" type="boolean" value="false"/>
+    <param name="target_frame" type="str" value="laser_0" />
+    <param name="range_min" type="double" value="0.0" />
+    <param name="range_max" type="double" value="5.0" /> 
+  </node>
+
+  <!-- Start pointcloud publisher for testing only -->
+  <!--<node name="pub_pcl" pkg="laelaps_2dnav" type="pcl_publisher"/>-->
+
+  <!-- Start VCloud sensor node -->
+  <node name="gf_vcloud_$(arg gf_class_idx)" pkg="geofrenzy" type="gf_vcloud" args="_gf_class_idx:=$(arg gf_class_idx)">
+    <remap from="gf_vcloud_$(arg gf_class_idx)/geofrenzy/cloud" to="/cloud_in"/>
+    <param name="geofrenzy_cloud_hfov_min" type="double" value="-3.14159" /> 
+    <param name="geofrenzy_cloud_hfov_max" type="double" value="3.14159" /> 
+  </node>
+
+  <!-- Start Sensor Relay Node -->
+  <node name="gf_sensor_relay" pkg="geofrenzy" type="gf_sensor_relay">
+    <remap from="gf_sensor_relay/camera_in/image_raw"
+      to="/laelaps/laelaps_camera/image_raw"/>
+  </node>
+
+  <!-- Run AMCL -->
+  <!-- <include file="$(find amcl)/examples/amcl_diff.launch" /> -->
+
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <rosparam file="$(find laelaps_2dnav)/params/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find laelaps_2dnav)/params/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find laelaps_2dnav)/params/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find laelaps_2dnav)/params/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find laelaps_2dnav)/params/base_local_planner_params.yaml" command="load" />
+    <rosparam file="$(find laelaps_2dnav)/params/base_global_planner_params.yaml" command="load" />
+    <param name="controller_frequency" value="10.0" />
+  </node>
+  
+  <!-- Launch RVIZ -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find laelaps_2dnav)/launch/laelaps_2dnav.rviz"/>
+</launch>

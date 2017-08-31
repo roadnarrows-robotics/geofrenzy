@@ -84,26 +84,9 @@
 //
 // Geofrenzy
 //
-
-// Note: should be in a geofrenzy header file
-extern "C" 
-{
-  char *ambient_fences_geojson_zoom(double lng,
-                                    double lat,
-                                    int lvl,
-                                    int myclass);
-
-  char *ambient_fences_geojson_roi(double lng,
-                                   double lat,
-                                   int lvl,
-                                   int myclass);
-
-  char *class_entitlements_properties_json(int myclass);
-}
-
+#include "geofrenzy.h"
 #include "gf_types.h"
 #include "gf_ros.h"
-
 
 using namespace geofrenzy::gf_ros;
 
@@ -587,32 +570,66 @@ namespace geofrenzy
        */
       bool initGfClassProperties()
       {
-        Json::Reader  reader;   // json reader
-        Json::Value   root;     // json parsed string root
-        bool          bSuccess; // [not] successful
+        std::string   filename;     // test filename
+        bool          bFromFile;
+        std::string   strJson;      // json string
+        Json::Value   entitlements; // list of class entitlements
+        Json::Reader  reader;       // json reader
+        Json::Value   root;         // json parsed string root
+        bool          bSuccess;     // [not] successful
 
-        ROS_INFO_STREAM(ros::this_node::getName()
+        //
+        // Read from file. Great for testing.
+        //
+        if( (bFromFile = m_nh.getParam(ParamNameFenceFilename, filename)) )
+        {
+          ROS_INFO_STREAM(ros::this_node::getName()
+            << ": Retrieving Geofrenzy properties for fence class "
+            << m_fenceClass
+            << " from file "
+            << filename
+            << ".");
+
+          std::ifstream in(filename.c_str());
+          std::string message;
+  
+          while(!in.eof())
+          {
+            message.push_back(in.get());
+          }
+          in.close();
+          strJson = message;
+          ROS_INFO_STREAM("Done reading file.");
+        }
+
+        else
+        {
+          ROS_INFO_STREAM(ros::this_node::getName()
             << ": Retrieving Geofrenzy properties for fence class "
             << m_fenceClass
             << ".");
 
-        // retrieve the class properties
-        char *td = class_entitlements_properties_json(m_fenceClass);
+          // retrieve the class properties
+          char *td = class_entitlements_properties_json(m_fenceClass);
 
-        if( td == NULL )
-        {
-          ROS_ERROR_STREAM(
+          if( td == NULL )
+          {
+            ROS_ERROR_STREAM(
               "Failed to retrieve class properties for class index "
               << m_fenceClass);
-          return false;
+            return false;
+          }
+          else
+          {
+            strJson  = "{";
+            strJson += td;
+            strJson += "}";
+            //std::cerr << strJson << std::endl;
+          }
         }
 
         ROS_INFO_STREAM(ros::this_node::getName()
             << ": Initializing Geofrenzy properties.");
-
-        std::string strJson("{");
-        strJson += td;
-        strJson += "}";
 
         bSuccess = reader.parse(strJson, root);
 
@@ -628,8 +645,19 @@ namespace geofrenzy
         // RDK. Should this always equal the node's class index?
         int gf_class_idx = root["class_metadata"]["class_idx"].asUInt64();
 
-        // list of entitlements
-        Json::Value entitlements = root["class_metadata"]["entitlements"];
+        //
+        // List of entitlements
+        //
+        if( bFromFile )
+        {
+          // get entitlements from first feature in collection
+          entitlements =
+            root["features"][0]["properties"]["class_metadata"]["entitlements"];
+        }
+        else
+        {
+          entitlements = root["class_metadata"]["entitlements"];
+        }
 
         //
         // Add entitlements to fence server.
@@ -638,7 +666,10 @@ namespace geofrenzy
         {
           uint64_t    gf_ent_idx  = entitlements[i]["ent_idx"].asUInt64();
           std::string gf_ent_base = entitlements[i]["ent_base"].asString();
-          ROS_INFO_STREAM("New Entitlement: " << gf_ent_idx << " : " << gf_ent_base);
+
+          ROS_INFO_STREAM("New Entitlement: "
+              << gf_ent_idx << " : " << gf_ent_base);
+
           // new
           if( m_entitlements.find(gf_ent_idx) == m_entitlements.end() )
           {

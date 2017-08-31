@@ -390,6 +390,19 @@ namespace geofrenzy
     gf_ros::MapClientServices m_clientServices; ///< client services
 
     /*!
+     * \brief Make a gf_server dwell topic name.
+     *
+     * Output:
+     * ```
+     * /gf_server_<gci>/geofrenzy/<gei>/dwell/<basetype>
+     * ```
+     * \param eoi Geofrenzy entitlement of interest.
+     *
+     * \return String.
+     */
+    std::string makeDwellTopicName(const EoI &eoi);
+
+    /*!
      * \brief Get unsigned 64-bit value from parameter server.
      *
      * Note: no 64-bit types supported parameter server
@@ -608,6 +621,9 @@ namespace geofrenzy
   class GfSentinelMavRtl : public GfSentinel
   {
   public:
+    static const double MinDeltaCeiling = 2.5;
+                                    ///< min delta from home altitide (meters)
+
     /*!
      * \brief Geographic position base on WGS 84 ellipsoid.
      */
@@ -740,27 +756,85 @@ namespace geofrenzy
     std::string m_serviceSetHome;   ///< set home geographic position
     
     /*!
-     * \brief Received subscribed twist velocity message callback.
+     * \brief Subscribed twist velocity message callback.
+     *
+     * Not needed as yet.
      *
      * \param msgTwistStamped   ROS message.
      */
     virtual void cbVel(const geometry_msgs::Twist &msgTwistStamped);
 
+    /*!
+     * \brief Subscribed state message callback.
+     *
+     * \param msgState  ROS message.
+     */
     virtual void cbState(const mavros_msgs::State &msgState);
 
+    /*!
+     * \brief Subscribed extended state message callback.
+     *
+     * \param msgExState  ROS message.
+     */
     virtual void cbExState(const mavros_msgs::ExtendedState &msgExState);
 
+    /*!
+     * \brief Subscribed home geographic position message callback.
+     *
+     * \param msgHomePos  ROS message.
+     */
     virtual void cbHomePos(const mavros_msgs::HomePosition &msgHomePos);
 
+    /*!
+     * \brief Subscribed current global geographic position message callback.
+     *
+     * \param msgFix  ROS message.
+     */
     virtual void cbGlobalPos(const sensor_msgs::NavSatFix &msgFix);
 
-    virtual bool returnToHome();
+    /*!
+     * \brief Request the UAS to return to home.
+     *
+     * The drone will execute its Return To Launch (RTL) algorithm to safely
+     * return to the last launched position. The launch position (home) is
+     * the location of the drone when the most recently 'Arm Drone' event 
+     * occurred.
+     *
+     * \return Returns true on success, false otherwise.
+     */
+    virtual bool reqReturnToHome();
 
-    virtual bool landNow();
+    /*!
+     * \brief Request the UAS to immediately land.
+     *
+     * The drone will execute its Land algorithm to safely land at the current
+     * ground position.
+     *
+     * \return Returns true on success, false otherwise.
+     */
+    virtual bool reqLandNow();
 
-    virtual bool setOpMode();
+    /*!
+     * \brief Request the UAS to set its operation mode.
+     *
+     * The drone will execute its operation mode. 
+     *
+     * WARNING: If issued with armed field set to false, and while flying,
+     *          the UAS will drop from the sky like a big, fat pig. Bacon
+     *          anyone?
+     *
+     * \return Returns true on success, false otherwise.
+     */
+    virtual bool reqSetOpMode();
 
-    virtual bool setHomePos();
+    /*!
+     * \brief Request the UAS to set its home position.
+     *
+     * The new home position is also the RTL landing position.
+     *
+     * \return Returns true on success, false otherwise.
+     */
+    virtual bool reqSetHomePos();
 
   }; // class GfSentinelMavRtl
 

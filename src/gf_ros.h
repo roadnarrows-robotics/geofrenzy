@@ -572,7 +572,7 @@ namespace geofrenzy
      *
      * Output:
      * ```
-     * <node_name>/geofrenzy/<ent_idx>/dwell/<ent_base>
+     * gf_server_<class_idx>/geofrenzy/<ent_idx>/dwell/<ent_base>
      * ```
      * \param gf_class_idx  Geofrenzy class index.
      * \param gf_ent_idx    Geofrenzy entitlement index.
@@ -589,7 +589,7 @@ namespace geofrenzy
      *
      * Output:
      * ```
-     * <node_name>/geofrenzy/<ent_idx>/dwell/<ent_base>
+     * gf_server_<class_idx>/geofrenzy/<ent_idx>/dwell/<ent_base>
      * ```
      * \param gf_class_idx  Geofrenzy class index.
      * \param gf_ent_idx    Geofrenzy entitlement index.

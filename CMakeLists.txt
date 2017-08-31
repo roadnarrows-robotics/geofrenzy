@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(geofrenzy)
 
-
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
@@ -14,10 +13,15 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   tf
   message_generation
-  occupancy_grid_utils
   swri_transform_util
   cv_bridge
 )
+
+if(NOT ${EIGEN3_FOUND})
+  message(STATUS "Eigen3 not found - hardcode directory")
+  set(Eigen3_DIR /usr/lib/cmake/eigen3)
+  find_package(Eigen3 REQUIRED)
+endif()
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -230,7 +234,12 @@ if(NOT FALIB)
 	message(FATAL_ERROR "fa library not found")
 endif()
 #message( STATUS ${FALIB})
-include_directories(src include $(catkin_INCLUDE_DIRS))
+include_directories(
+  src
+  include
+  ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
+)
 
 # gprof profiler compile and link options
 # Uncomment to use
