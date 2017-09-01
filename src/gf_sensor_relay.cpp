@@ -340,12 +340,25 @@ namespace geofrenzy
 
   std::ostream &operator<<(std::ostream &os, const SensorRelay &sr)
   {
-    os << "SensorRelay:" << std::endl;
+    os << "SensorRelay:" << std::endl
+      << "  gciServer = " << sr.m_gciServer << std::endl
+      << "  sentinels[" << sr.m_sentinels.size() << "] =" << std::endl;
 
     for(size_t i = 0; i < sr.m_sentinels.size(); ++i)
     {
       os << *(sr.m_sentinels[i]) << std::endl;
     }
+
+    os  << "dwellSubscriptions:" << std::endl
+        << "  topics[" << sr.m_subscriptions.size() << "] =" << std::endl
+        << "  {" << std::endl;
+    for(MapSubscriptions::const_iterator iter = sr.m_subscriptions.begin();
+        iter != sr.m_subscriptions.end();
+        ++iter)
+    {
+      os << "    " << iter->first << std::endl;
+    }
+    os  << "  }" << std::endl;
 
     return os;
   }

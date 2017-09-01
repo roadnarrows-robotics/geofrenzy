@@ -148,7 +148,7 @@ namespace geofrenzy
     /*!
      * \brief Default constructor.
      */
-    GfSentinel();
+    GfSentinel(std::string nameOfSentinel="GfSentinel");
 
     /*!
      * \brief Destructor.
@@ -238,6 +238,8 @@ namespace geofrenzy
      * \@{
      * \brief Attribute gets.
      */
+    std::string nameOf() const { return m_nameOf; }
+
     Mep mep() const { return m_mep; }
 
     GfClassIndex gci() const { return m_gci; }
@@ -622,17 +624,16 @@ namespace geofrenzy
   class GfSentinelMavRtl : public GfSentinel
   {
   public:
-    static const double MinDeltaCeiling = 2.5;
-                                    ///< min delta from home altitide (meters)
+    static const double MinRelCeiling = 2.5; ///< min relative altitide (meters)
 
     /*!
      * \brief Geographic position base on WGS 84 ellipsoid.
      */
     struct GeoPos
     {
-      double  m_latitude;   ///< + north of equator, - south (degrees)
-      double  m_longitude;  ///< + east of prime meridian, - west (degrees)
-      double  m_altitude;   ///< + above WGS 84 ellipsoid
+      double  m_latitude;   ///< +/- north/south of equator (degrees)
+      double  m_longitude;  ///< +/- east/west of prime meridian (degrees)
+      double  m_altitude;   ///< +/- above/below WGS 84 ellipsoid
     };
 
     /*!
@@ -732,10 +733,11 @@ namespace geofrenzy
     //
     // State
     //
-    bool        m_hasLandingPos;  ///< UAS does [not] have a landing position
+    bool        m_hasLandingPos;  ///< UAS does [not] have the landing position
+    bool        m_hasCurrentPos;  ///< UAS does [not] have the current position
     bool        m_isLanding;      ///< UAS is [not] in the process of landing
     bool        m_isOnTheGround;  ///< UAS is [not] on the ground
-    double      m_deltaCeiling;   ///< delta flight ceiling from home (meters)
+    double      m_relCeiling;     ///< relative flight ceiling from home (m)
     double      m_flightCeiling;  ///< absolute flight ceiling (meters)
     bool        m_isArmed;        ///< UAS is [not] armed
     std::string m_flightMode;     ///< UAS mode (e.g. MANUAL, AUTO-RTL, etc)
@@ -757,7 +759,6 @@ namespace geofrenzy
     std::string m_serviceLandNow;     ///< land immediately
     std::string m_serviceSetMode;     ///< set operational mode
     std::string m_serviceSetHomePos;  ///< set home geographic position
-    std::string m_serviceReqHomePos;  ///< request home geographic position
     
     /*!
      * \brief Subscribed twist velocity message callback.
@@ -839,13 +840,6 @@ namespace geofrenzy
      * \return Returns true on success, false otherwise.
      */
     virtual bool reqSetHomePos();
-
-    /*!
-     * \brief Request the UAS to send home position.
-     *
-     * \return Returns true on success, false otherwise.
-     */
-    virtual bool reqReqHomePos();
 
   }; // class GfSentinelMavRtl
 

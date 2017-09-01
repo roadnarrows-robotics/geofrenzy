@@ -67,6 +67,7 @@
 //
 #include "mavros_msgs/ExtendedState.h"
 #include "mavros_msgs/HomePosition.h"
+#include "mavros_msgs/CommandCode.h"
 #include "mavros_msgs/CommandLong.h"
 #include "mavros_msgs/CommandTOL.h"
 #include "mavros_msgs/SetMode.h"
@@ -140,7 +141,7 @@ static std::map<std::string, GfSentinel::BreachAction> GfActionNames =
 // GfSentinel Base Class
 // -----------------------------------------------------------------------------
 
-GfSentinel::GfSentinel()
+GfSentinel::GfSentinel(std::string nameOfSentinel) : m_nameOf(nameOfSentinel)
 {
   clear();
 }
@@ -330,6 +331,7 @@ void GfSentinel::print(std::ostream &os) const
       << "{" << std::endl;
 
   os  << "meta-data:" << std::endl
+      << "  nameOf       = " << nameOf() << std::endl
       << "  gci          = " << gci() << std::endl
       << "  mep          = "
         << GfSentinel::mepName(mep())
@@ -440,7 +442,7 @@ std::ostream &geofrenzy::operator<<(std::ostream &os, const GfSentinel &obj)
 // GfSentinelCam Derived Class
 // -----------------------------------------------------------------------------
 
-GfSentinelCam::GfSentinelCam()
+GfSentinelCam::GfSentinelCam() : GfSentinel("GfSentinelCam")
 {
 }
 
@@ -561,7 +563,7 @@ void GfSentinelCam::cbImage(const sensor_msgs::Image &img)
 
 void GfSentinelCam::print(std::ostream &os) const
 {
-  os  << "GfSentinelCam::";
+  os  << nameOf() << "::";
   GfSentinel::print(os);
 
   os  << "GfSentinelCam" << std::endl
@@ -582,7 +584,7 @@ std::ostream &geofrenzy::operator<<(std::ostream &os, const GfSentinelCam &obj)
 // GfSentinelStop Derived Class
 // -----------------------------------------------------------------------------
 
-GfSentinelStop::GfSentinelStop()
+GfSentinelStop::GfSentinelStop() : GfSentinel("GfSentinelStop")
 {
 }
 
@@ -648,7 +650,7 @@ void GfSentinelStop::cbVel(const geometry_msgs::Twist &msgTwist)
 
 void GfSentinelStop::print(std::ostream &os) const
 {
-  os  << "GfSentinelStop::";
+  os  << nameOf() << "::";
   GfSentinel::print(os);
 
   os  << "GfSentinelStop" << std::endl
@@ -672,7 +674,7 @@ std::ostream &geofrenzy::operator<<(std::ostream &os, const GfSentinelStop &obj)
 // GfSentinelMavRtl Derived Class
 // -----------------------------------------------------------------------------
 
-GfSentinelMavRtl::GfSentinelMavRtl()
+GfSentinelMavRtl::GfSentinelMavRtl() : GfSentinel("SentinelMavRtl")
 {
 }
 
@@ -714,7 +716,6 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   m_serviceLandNow    = "/mavros/cmd/land";
   m_serviceSetMode    = "/mavros/set_mode";
   m_serviceSetHomePos = "/mavros/set_home";
-  m_serviceReqHomePos = "/mavros/home_position/req_update";
  
   //
   // Watch for a bool dwell topic associated with RTL entitlement.
@@ -736,13 +737,15 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   //
   // Extended state
   //
-  m_hasLandingPos = false;
-  m_isLanding     = false;
-  m_isOnTheGround = true;
-  m_deltaCeiling  = 0.0;
-  m_flightCeiling = 0.0;
-  m_isArmed       = false;
+  m_hasLandingPos = false;  // unknown landing (home) geo position
+  m_hasCurrentPos = false;  // unknown currernt geo position
+  m_isLanding     = false;  // not in process of landing
+  m_isOnTheGround = true;   // on the ground
+  m_relCeiling    = 0.0;    // unknown relative flight ceiling
+  m_flightCeiling = 0.0;    // unknown absolute flight ceiling
+  m_isArmed       = false;  // UAS is unarmed
 
+  // user-configured auto set manual op mode boolean
   nh.param(ParamNameSrAutoManual, m_autoManual, false);
 }
 
@@ -791,48 +794,59 @@ void GfSentinelMavRtl::clientServices(ros::NodeHandle &nh)
   // set home geographic position
   m_clientServices[m_serviceSetHomePos] =
     nh.serviceClient<mavros_msgs::CommandHome>(m_serviceSetHomePos);
-
-  // request home geographic position update
-  m_clientServices[m_serviceReqHomePos] =
-    nh.serviceClient<mavros_msgs::CommandHome>(m_serviceReqHomePos);
 }
 
 bool GfSentinelMavRtl::setBreachState(const bool isInFence)
 {
   m_isInFence = isInFence;
 
-  // if on the ground, then clear any landing state
+  //
+  // Cannot be breached if the UAS is on the ground or is disarmed.
+  //
   if( m_isOnTheGround || !m_isArmed )
   {
-    ROS_INFO_STREAM("UAS is on the ground.");
-    m_isLanding = false;
+    m_isLanding  = false;
+    m_isInBreach = false;
   }
 
-  // don't clear any breach until safely landed within valid area
-  if( m_isLanding )
+  //
+  // Don't clear any breach condition until safely landed.
+  //
+  else if( m_isLanding )
   {
-    ROS_INFO_STREAM("In-Breach: UAS is in the process of returning to launch.");
+    ROS_INFO_STREAM(nameOf() << ": "
+        << "In-Breach: UAS is in the process of returning to launch.");
     m_isInBreach = true;
   }
 
-  // inside the fence and a breach is triggered on entry
+  //
+  // Inside the fence and a breach is triggered on entry.
+  //
   else if( m_isInFence && (m_breachTrigger == BreachTriggerEntry) )
   {
-    ROS_INFO_STREAM("In-Breach: UAS entered restricted geofence.");
+    ROS_INFO_STREAM(nameOf() << ": "
+        << "In-Breach: UAS entered restricted geofence.");
     m_isInBreach = true;
   }
 
-  // outside the fence and a breach triggered on exit
+  //
+  // Outside the fence and a breach triggered on exit.
+  //
   else if( !m_isInFence && (m_breachTrigger == BreachTriggerExit) )
   {
-    ROS_INFO_STREAM("In-Breach: UAS exited geofence perimeter.");
+    ROS_INFO_STREAM(nameOf() << ": "
+        << "In-Breach: UAS exited geofence perimeter.");
     m_isInBreach = true;
   }
 
-  // flying too high
-  else if( (m_flightCeiling > 0.0) && (m_posCur.m_altitude > m_flightCeiling) )
+  //
+  // Flying too high.
+  //
+  else if( (m_flightCeiling > 0.0) && m_hasCurrentPos &&
+      (m_posCur.m_altitude > m_flightCeiling) )
   {
-    ROS_INFO_STREAM("In-Breach: UAS exceeded flight ceiling." << std::endl
+    ROS_INFO_STREAM(nameOf() << ": "
+        << "In-Breach: UAS exceeded flight ceiling." << std::endl
         << "  Home altitude:    " << m_posHome.m_altitude << std::endl
         << "  Flight ceiling:   " <<  m_flightCeiling << std::endl
         << "  Current altitude: " << m_posCur.m_altitude << std::endl
@@ -842,7 +856,9 @@ bool GfSentinelMavRtl::setBreachState(const bool isInFence)
     m_isInBreach = true;
   }
 
-  // good to go
+  //
+  // Good to go.
+  //
   else
   {
     m_isInBreach = false;
@@ -855,7 +871,8 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
                                         const bool               isInFence,
                                         const GfEntBaseBoolset   &data)
 {
-  ROS_INFO_STREAM("WatchForBreach(boolset): " << "isInFence = " << isInFence);
+  //ROS_INFO_STREAM(nameOf() << ": "
+  //    << "WatchForBreach(boolset): " << "isInFence = " << isInFence);
 
   setBreachState(isInFence);
 
@@ -869,18 +886,19 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
                                         const bool               isInFence,
                                         const GfEntBaseThreshold &data)
 {
-  ROS_INFO_STREAM("WatchForBreach(threshold): "
-      << "isInFence = " << isInFence
-      << " threshold.upper = " << data.m_upper);
+  //ROS_INFO_STREAM(nameOf() << ": "
+  //    << "WatchForBreach(threshold): "
+  //    << "isInFence = " << isInFence
+  //    << " threshold.upper = " << data.m_upper);
 
-  m_deltaCeiling = data.m_upper >= MinDeltaCeiling? data.m_upper:
-                                                    MinDeltaCeiling;
+  m_relCeiling = data.m_upper >= MinRelCeiling? data.m_upper: MinRelCeiling;
 
   if( m_hasLandingPos )
   {
-    m_flightCeiling = m_posHome.m_altitude + m_deltaCeiling;
+    m_flightCeiling = m_posHome.m_altitude + m_relCeiling;
 
-    ROS_INFO_STREAM("Set flight ceiling: " << std::endl
+    ROS_INFO_STREAM(nameOf() << ": "
+        << "Flight ceiling: " << std::endl
         << "  Home altitude:  " << m_posHome.m_altitude << std::endl
         << "  Flight ceiling: " <<  m_flightCeiling);
   }
@@ -909,17 +927,48 @@ void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
   m_isArmed    = msgState.armed;
   m_flightMode = msgState.mode;
 
-  // transition from disarmed to armed
+  //
+  // Transition from disarmed to armed.
+  //
   if( !oldArm && m_isArmed )
   {
-    ROS_INFO_STREAM("UAS ARMED");
-    reqReqHomePos();
+    ROS_INFO_STREAM(nameOf() << ": UAS ARMED");
+
+    //
+    // The home position update is slow. Provisionaly use the current 
+    // position when the drone is armed. When the next home position update
+    // occurs, the home position and flight ceiling will be adjusted.
+    //
+    if( m_hasCurrentPos )
+    {
+      m_posHome.m_latitude  = m_posCur.m_latitude;
+      m_posHome.m_longitude = m_posCur.m_longitude;
+      m_posHome.m_altitude  = m_posCur.m_altitude;
+      m_hasLandingPos       = true;
+
+      //
+      // Set absolute flight ceiling if relative ceiling is known.
+      //
+      if( m_relCeiling >= MinRelCeiling )
+      {
+        m_flightCeiling = m_posHome.m_altitude + m_relCeiling;
+
+        ROS_INFO_STREAM(nameOf() << ": "
+          << "Provisional flight ceiling: " << std::endl
+          << "  Home altitude:  " << m_posHome.m_altitude << std::endl
+          << "  Flight ceiling: " <<  m_flightCeiling);
+      }
+    }
   }
 
-  // transition from armed to disarmed
+  //
+  // Transition from armed to disarmed.
+  //
   if( oldArm && !m_isArmed )
   {
-    ROS_INFO_STREAM("UAS DISARMED");
+    ROS_INFO_STREAM(nameOf() << ": UAS DISARMED");
+
+    // if user-configured, try to return to manual operation mode 
     if( m_autoManual )
     {
       reqSetOpMode();
@@ -933,8 +982,10 @@ void GfSentinelMavRtl::cbExState(const mavros_msgs::ExtendedState &msgExState)
   {
     case mavros_msgs::ExtendedState::LANDED_STATE_ON_GROUND:
       m_isOnTheGround = true;
+      ROS_INFO_STREAM(nameOf() << ": UAS is on the ground.");
       break;
     case mavros_msgs::ExtendedState::LANDED_STATE_IN_AIR:
+      ROS_INFO_STREAM(nameOf() << ": UAS is in flight.");
       m_isOnTheGround = false;
       break;
     case mavros_msgs::ExtendedState::LANDED_STATE_UNDEFINED:
@@ -945,16 +996,23 @@ void GfSentinelMavRtl::cbExState(const mavros_msgs::ExtendedState &msgExState)
 
 void GfSentinelMavRtl::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
 {
+  //
+  // Set home (RTL) position. Home position can only be trusted when the
+  // UAS has been armed.
+  //
   if( m_isArmed )
   {
     m_posHome.m_latitude  = msgHomePos.latitude;
     m_posHome.m_longitude = msgHomePos.longitude;
     m_posHome.m_altitude  = msgHomePos.altitude;
+    m_hasLandingPos       = true;
 
-    m_hasLandingPos = true;
-
-    ROS_INFO_STREAM("Got Home RTL Position");
+    ROS_INFO_STREAM(nameOf() << ": Got Home RTL Position");
   }
+
+  //
+  // Home is really untrustworthy.
+  //
   else
   {
     m_hasLandingPos = false;
@@ -966,15 +1024,16 @@ void GfSentinelMavRtl::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
   m_posCur.m_latitude  = msgFix.latitude;
   m_posCur.m_longitude = msgFix.longitude;
   m_posCur.m_altitude  = msgFix.altitude;
+  m_hasCurrentPos      = true;
 }
 
 bool GfSentinelMavRtl::reqReturnToHome()
 {
-  std::string               &name = m_serviceOut;
+  std::string               &nameSvc = m_serviceOut;
   mavros_msgs::CommandLong  svc;
 
   //
-  // Droned is not armed.
+  // The drone is not armed.
   //
   if( !m_isArmed )
   {
@@ -991,38 +1050,38 @@ bool GfSentinelMavRtl::reqReturnToHome()
     return false;
   }
 
-  ROS_INFO_STREAM("Return To Launch");
+  ROS_INFO_STREAM(nameOf() << ": Return To Launch");
 
   svc.request.broadcast     = false;
-  svc.request.command       = 20;
+  svc.request.command       = mavros_msgs::CommandCode::NAV_RETURN_TO_LAUNCH;
   svc.request.confirmation  = true;
 
-  if( m_clientServices[name].call(svc) )
+  if( m_clientServices[nameSvc].call(svc) )
   {
-    ROS_DEBUG_STREAM(name);
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
     return svc.response.success;
   }
   else
   {
-    ROS_ERROR_STREAM("Service " << name << " failed.");
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
     return false;
   }
 }
 
 bool GfSentinelMavRtl::reqLandNow()
 {
-  std::string             &name = m_serviceLandNow;
+  std::string             &nameSvc = m_serviceLandNow;
   mavros_msgs::CommandTOL svc;
 
   //
-  // Droned is not armed.
+  // The drone is not armed.
   //
   if( !m_isArmed )
   {
     return false;
   }
   
-  ROS_INFO_STREAM("Land Now");
+  ROS_INFO_STREAM(nameOf() << ": Land Now");
 
   //
   // N.B. Current version mavros land command ignores all fields and
@@ -1034,55 +1093,56 @@ bool GfSentinelMavRtl::reqLandNow()
   svc.request.longitude = m_posHome.m_longitude;
   svc.request.altitude  = m_posHome.m_altitude;
 
-  if( m_clientServices[name].call(svc) )
+  if( m_clientServices[nameSvc].call(svc) )
   {
-    ROS_DEBUG_STREAM(name);
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
     return svc.response.success;
   }
   else
   {
-    ROS_ERROR_STREAM("Service " << name << " failed.");
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
     return false;
   }
 }
 
 bool GfSentinelMavRtl::reqSetOpMode()
 {
-  std::string           &name = m_serviceSetMode;
+  std::string           &nameSvc = m_serviceSetMode;
   mavros_msgs::SetMode  svc;
 
   //
-  // Do not send new operational mode if the state of the UAS is unknowned or
-  // it is armed.
+  // Do not send new operational mode if the UAS current operational mode
+  // is unknowned or if the UAS is armed.
   //
   if( m_flightMode.empty() || m_isArmed )
   {
     return false;
   }
 
-  svc.request.base_mode     = 192;
-  svc.request.custom_mode   = "MANUAL";
+  svc.request.base_mode   = mavros_msgs::SetModeRequest::MAV_MODE_MANUAL_ARMED;
+  svc.request.custom_mode = "MANUAL";
 
-  if( m_clientServices[name].call(svc) )
+  if( m_clientServices[nameSvc].call(svc) )
   {
-    ROS_DEBUG_STREAM(name);
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
     return svc.response.success;
   }
   else
   {
-    ROS_ERROR_STREAM("Service " << name << " failed.");
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
     return false;
   }
 }
 
 bool GfSentinelMavRtl::reqSetHomePos()
 {
-  std::string               &name = m_serviceSetHomePos;
+  std::string               &nameSvc = m_serviceSetHomePos;
   mavros_msgs::CommandHome  svc;
 
   if( !m_hasLandingPos )
   {
-    ROS_ERROR_STREAM(name << ": No home position to set.");
+    ROS_ERROR_STREAM(nameOf() << ": "
+        << nameSvc << ": No home position to set.");
     return false;
   }
 
@@ -1090,48 +1150,31 @@ bool GfSentinelMavRtl::reqSetHomePos()
   svc.request.longitude = m_posHome.m_longitude;
   svc.request.altitude  = m_posHome.m_altitude;
 
-  if( m_clientServices[name].call(svc) )
+  if( m_clientServices[nameSvc].call(svc) )
   {
-    ROS_DEBUG_STREAM(name);
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
     return svc.response.success;
   }
   else
   {
-    ROS_ERROR_STREAM("Service " << name << " failed.");
-    return false;
-  }
-}
-
-
-bool GfSentinelMavRtl::reqReqHomePos()
-{
-  std::string       &name = m_serviceReqHomePos;
-  std_srvs::Trigger svc;
-
-  if( m_clientServices[name].call(svc) )
-  {
-    ROS_DEBUG_STREAM(name);
-    return svc.response.success;
-  }
-  else
-  {
-    ROS_ERROR_STREAM("Service " << name << " failed.");
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
     return false;
   }
 }
 
 void GfSentinelMavRtl::print(std::ostream &os) const
 {
-  os  << "GfSentinelMavRtl::";
+  os  << nameOf() << "::";
   GfSentinel::print(os);
 
   os  << "GfSentinelMavRtl" << std::endl
       << "{" << std::endl
       << "state:" << std::endl
       << "  hasLandingPos  = " << m_hasLandingPos << std::endl
+      << "  hasCurrentPos  = " << m_hasCurrentPos << std::endl
       << "  isLanding      = " << m_isLanding << std::endl
       << "  isOnTheGround  = " << m_isOnTheGround << std::endl
-      << "  deltaCeiling   = " << m_deltaCeiling << std::endl
+      << "  relCeiling     = " << m_relCeiling << std::endl
       << "  flightCeiling  = " << m_flightCeiling << std::endl
       << "  isArmed        = " << m_isArmed << std::endl
       << "  flightMode     = " << m_flightMode << std::endl
