@@ -922,7 +922,7 @@ void GfSentinelMavRtl::cbVel(const geometry_msgs::Twist &msgTwistStamped)
 
 void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
 {
-  bool oldArm = m_isArmed;
+  bool wasArmed = m_isArmed;
 
   m_isArmed    = msgState.armed;
   m_flightMode = msgState.mode;
@@ -930,7 +930,7 @@ void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
   //
   // Transition from disarmed to armed.
   //
-  if( !oldArm && m_isArmed )
+  if( !wasArmed && m_isArmed )
   {
     ROS_INFO_STREAM(nameOf() << ": UAS ARMED");
 
@@ -964,7 +964,7 @@ void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
   //
   // Transition from armed to disarmed.
   //
-  if( oldArm && !m_isArmed )
+  else if( wasArmed && !m_isArmed )
   {
     ROS_INFO_STREAM(nameOf() << ": UAS DISARMED");
 

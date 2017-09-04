@@ -42,12 +42,6 @@
     type="str" value="$(arg geofrenzy_fence_filename)" />
   -->
 
-  <!-- Uncomment to automatically return to MANUAL operation after RTL -->
-  <!--
-  <param name="gf_server_$(arg gf_class_idx)/geofrenzy_sr_auto_manual"
-    type="bool" value="true" />
-  -->
-
 
   <!-- *************************
        Start Geofrenzy Sensor Relay Node
@@ -58,5 +52,11 @@
       _geofrenzy_sr_altitude_gei:=$(arg altitude_gei)"
       output="screen">
   </node>
+
+  <!-- Uncomment to automatically return to MANUAL operation after RTL -->
+  <!--
+  <param name="gf_sensor_relay/geofrenzy_sr_auto_manual"
+    type="bool" value="true" />
+  -->
 
 </launch>
