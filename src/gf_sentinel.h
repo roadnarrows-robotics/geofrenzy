@@ -841,6 +841,18 @@ namespace geofrenzy
     virtual bool reqReturnToHome();
 
     /*!
+     * \brief Request the UAS to start mission.
+     *
+     * The drone will execute its mission algorithm to safely
+     * travel to the first waypoint. The first waypoint should be
+     * set before setting to mission mode.
+     *
+     * \return Returns true on success, false otherwise.
+     */
+
+    virtual bool reqStartMission();
+
+    /*!
      * \brief Request the UAS to immediately land.
      *
      * The drone will execute its Land algorithm to safely land at the current
@@ -848,6 +860,7 @@ namespace geofrenzy
      *
      * \return Returns true on success, false otherwise.
      */
+
     virtual bool reqLandNow();
 
     /*!

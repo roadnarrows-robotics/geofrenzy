@@ -748,7 +748,7 @@ void GfSentinelMav::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   m_serviceSetHomePos = "/mavros/set_home";
   m_serviceWpClear    = "/mavros/mission/clear";
   m_serviceWpPush     = "/mavros/mission/push";
-  m_serviceWpSetCur   = "/mavros/mission/set_curent";
+  m_serviceWpSetCur   = "/mavros/mission/set_current";
  
   //
   // Watch for a bool dwell topic associated with RTL entitlement.
@@ -995,6 +995,7 @@ void GfSentinelMav::execBreachAction()
     case BreachActionGotoWp:
       reqWpPush();
       reqWpSet(0);
+      reqStartMission();
       break;
     case BreachActionUndef:
     default:
@@ -1175,6 +1176,47 @@ bool GfSentinelMav::reqReturnToHome()
   }
 }
 
+bool GfSentinelMav::reqStartMission()
+{
+  std::string               &nameSvc = m_serviceOut;
+  mavros_msgs::CommandLong  svc;
+
+  //
+  // The drone is not armed.
+  //
+  if( !m_isArmed )
+  {
+    return false;
+  }
+
+  //
+  // Already landing.
+  //
+  // Note: May need more tests.
+  //
+  else if( (m_flightMode == "AUTO.RTL") || (m_flightMode == "AUTO.LAND") )
+  {
+    return false;
+  }
+
+  ROS_INFO_STREAM(nameOf() << ": Start Mission");
+
+  svc.request.broadcast     = false;
+  svc.request.command       = mavros_msgs::CommandCode::CMD_MISSION_START;
+  svc.request.confirmation  = true;
+
+  if( m_clientServices[nameSvc].call(svc) )
+  {
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
+    return svc.response.success;
+  }
+  else
+  {
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
+    return false;
+  }
+}
+
 bool GfSentinelMav::reqLandNow()
 {
   std::string             &nameSvc = m_serviceLandNow;
@@ -1309,7 +1351,7 @@ bool GfSentinelMav::reqWpPush()
 
   ROS_INFO_STREAM(nameOf() << ": Push Waypoints");
 
-  dalt = m_flightCeiling / 2.0;
+  dalt = m_relCeiling / 2.0;
   if( dalt < MinRelCeiling )
   {
     dalt = MinRelCeiling;
