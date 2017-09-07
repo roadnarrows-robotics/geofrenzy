@@ -99,8 +99,10 @@ namespace geofrenzy
                                         const SensorRelay &sr);
 
     private:
-        ros::NodeHandle &m_nh;    ///< node handle
-        GfClassIndex m_gciServer; ///< geofrenzy portal server node class index
+        ros::NodeHandle &m_nh;      ///< node handle
+
+        GfClassIndex  m_gciServer;  ///< geofrenzy portal server class index
+        int32_t       m_enables;    ///< built-in enables
 
         //
         // Embedded sentinels
@@ -129,26 +131,49 @@ namespace geofrenzy
   void SensorRelay::initSensorRelayProperties()
   {
     GfSentinel  *p;
+    int32_t     val;
+    int32_t     dft = (int32_t)GciGuestAcct;
+
 
     //
     // Get the gefrenzy portal server class index.
     // 
     // Note: no 64-bit types in parameter server
     //
-    int32_t   val;
-    int32_t   dft = (int32_t)GciGuestAcct;
-
+    dft = (int32_t)GciGuestAcct;
     m_nh.param(ParamNameSrServerGci, val, dft);
 
     m_gciServer = (GfClassIndex)val;
 
     //
+    // Get the gefrenzy built-in sentinel enable/disable states.
+    // 
+    //
+    dft = (int32_t)SrSentinelEnableAll;
+    m_nh.param(ParamNameSrEnables, m_enables, dft);
+
+    //
     // Built-in sentinels
     //
-    m_sentinels.push_back(new GfSentinelCam());
-    m_sentinels.push_back(new GfSentinelStop());
-    //m_sentinels.push_back(new GfSentinelSpeedLimitVel());
-    m_sentinels.push_back(new GfSentinelMavRtl());
+    if( m_enables & SrSentinelEnableCam )
+    {
+      m_sentinels.push_back(new GfSentinelCam());
+    }
+
+    if( m_enables & SrSentinelEnableStop )
+    {
+      m_sentinels.push_back(new GfSentinelStop());
+    }
+
+    if( m_enables & SrSentinelEnableSpeed )
+    {
+      //m_sentinels.push_back(new GfSentinelSpeedLimitVel());
+    }
+
+    if( m_enables & SrSentinelEnableMav )
+    {
+      m_sentinels.push_back(new GfSentinelMav());
+    }
 
     //
     // Initialize properties of all built-in sentinels

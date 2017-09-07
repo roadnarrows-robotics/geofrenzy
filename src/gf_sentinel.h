@@ -124,11 +124,19 @@ namespace geofrenzy
      */
     enum BreachAction
     {
-      BreachActionUndef,      ///< undefined
-      BreachActionCensor,     ///< censor mobile system component(s)
-      BreachActionRtl,        ///< mobile system return to landing
-      BreachActionStop,       ///< mobile system all stop
-      BreachActionLimitSpeed  ///< mobile system all stop
+      BreachActionUndef       = 0,      ///< undefined
+
+      // mobile system sensor sub-components
+      BreachActionCensor      = 1,     ///< censor mobile system component(s)
+
+      // mobile system movement
+      BreachActionStop        = 10,  ///< all stop
+      BreachActionLimitSpeed  = 11,  ///< limit speeds
+      BreachActionRtl         = 12,  ///< return to launch
+      BreachActionLandNow     = 13,  ///< land now at current position
+      BreachActionGotoWp      = 14,  ///< go to last waypoint
+      BreachActionLoiter      = 15,  ///< loiter at current position
+      BreachActionCoAv        = 16   ///< apply collision avoidance
     };
 
     /*!
@@ -612,16 +620,16 @@ namespace geofrenzy
 
 
   // ---------------------------------------------------------------------------
-  // GfSentinelMavRtl Derived Class
+  // GfSentinelMav Derived Class
   // ---------------------------------------------------------------------------
 
   /*!
-   * \brief UAS return-to-landing sentinel class .
+   * \brief UAS sentinel class for MAV support vehicles..
    *
    * This sentinel class monitors a UAS using mavros. When a breach occurs,
-   * UAS control is taken to force return to landing.
+   * the specified breach action is taken.
    */
-  class GfSentinelMavRtl : public GfSentinel
+  class GfSentinelMav : public GfSentinel
   {
   public:
     static const double MinRelCeiling = 2.5; ///< min relative altitide (meters)
@@ -639,12 +647,12 @@ namespace geofrenzy
     /*!
      * \brief Default constructor.
      */
-    GfSentinelMavRtl();
+    GfSentinelMav();
 
     /*!
      * \brief Destructor.
      */
-    virtual ~GfSentinelMavRtl();
+    virtual ~GfSentinelMav();
 
     /*!
      * \brief Initialize all quasi-static properties.
@@ -708,6 +716,26 @@ namespace geofrenzy
     /*! \@} */
 
     /*!
+     * \brief Initialize any specific breach action intiializations.
+     */
+    virtual void initBreachAction();
+
+    /*!
+     * \brief On-armed actions.
+     */
+    virtual void onArmed();
+
+    /*!
+     * \brief On-disarmed actions.
+     */
+    virtual void onDisarmed();
+
+    /*!
+     * \brief Exectue breach action.
+     */
+    virtual void execBreachAction();
+
+    /*!
      * \brief Virtualize print function so that insertion operator overloading
      * works.
      *
@@ -724,10 +752,10 @@ namespace geofrenzy
      * \param Returns reference to stream.
      */
     friend std::ostream &operator<<(std::ostream &os,
-                                    const GfSentinelMavRtl &obj);
+                                    const GfSentinelMav &obj);
 
     friend std::ostream &operator<<(std::ostream &os,
-                                    const GfSentinelMavRtl::GeoPos &obj);
+                                    const GfSentinelMav::GeoPos &obj);
 
   protected:
     //
@@ -759,6 +787,9 @@ namespace geofrenzy
     std::string m_serviceLandNow;     ///< land immediately
     std::string m_serviceSetMode;     ///< set operational mode
     std::string m_serviceSetHomePos;  ///< set home geographic position
+    std::string m_serviceWpClear;     ///< clear waypoints
+    std::string m_serviceWpPush;      ///< push waypoints
+    std::string m_serviceWpSetCur;    ///< set current waypoint
     
     /*!
      * \brief Subscribed twist velocity message callback.
@@ -841,7 +872,13 @@ namespace geofrenzy
      */
     virtual bool reqSetHomePos();
 
-  }; // class GfSentinelMavRtl
+    virtual bool reqWpClear();
+
+    virtual bool reqWpPush();
+
+    virtual bool reqWpSet(unsigned wpIndex = 0);
+
+  }; // class GfSentinelMav
 
 } // namespace geofrenzy
 

@@ -213,6 +213,25 @@ namespace geofrenzy
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Geofrenzy Sensor Relay Cloud Node gf_sensor_relay Defaults
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    
+    /*!
+     * \brief Built-in sentinels enable/disable bits.
+     *
+     * 0 = disable, 1 = enable.
+     */
+    enum SrSentinelEnDis
+    {
+      SrSentinelDisableAll  = 0x00000000, ///< disable all sentinels
+      SrSentinelEnableCam   = 0x00000001, ///< enable camera censor
+      SrSentinelEnableStop  = 0x00000002, ///< enable vehicle stop
+      SrSentinelEnableMav   = 0x00000004, ///< enable MAV sentinel
+      SrSentinelEnableSpeed = 0x00000008, ///< enable vehicle speed limits
+      SrSentinelEnableAll   = 0x7fffffff  ///< enable all sentinels
+    };
+    
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Geofrenzy Node Shared Defaults
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
@@ -396,6 +415,13 @@ namespace geofrenzy
     const char *const ParamNameSrServerGci = "geofrenzy_sr_server_gci";
 
     /*!
+     * \brief Sensor relay built-in sentinels enable/disable bits.
+     *
+     * If the value is not set, then SrSentinelEnableAll is used.
+     */
+    const char *const ParamNameSrEnables = "geofrenzy_sr_enables";
+
+    /*!
      * \brief Sensor relay camera entitlement index.
      *
      * If the value is not set, then GeiNoCameras is used.
@@ -418,18 +444,25 @@ namespace geofrenzy
     const char *const ParamNameSrStopGei = "geofrenzy_sr_stop_gei";
 
     /*!
-     * \brief Sensor relay return-to-landing entitlement index.
+     * \brief Sensor relay MAV UAS boolset entitlement index.
      *
      * If the value is not set, then GeiNoExit is used.
      */
-    const char *const ParamNameSrRtlGei = "geofrenzy_sr_rtl_gei";
+    const char *const ParamNameSrMavGei = "geofrenzy_sr_mav_gei";
 
     /*!
-     * \brief Sensor relay allowed altitudes entitlement index.
+     * \brief Sensor relay MAV UAS altitudes threshold entitlement index.
      *
      * If the value is not set, then GeiFlightAltitudes is used.
      */
     const char *const ParamNameSrAltitudeGei = "geofrenzy_sr_altitude_gei";
+
+    /*!
+     * \brief Sensor relay MAV action type.
+     *
+     * If the value is not set, then GfSentinel::BreachActionRtl is used.
+     */
+    const char *const ParamNameSrMavAction = "geofrenzy_sr_mav_action";
 
     /*!
      * \brief Sensor relay automatically return to MANUAL operation mode
@@ -438,6 +471,7 @@ namespace geofrenzy
      * The default is false;
      */
     const char *const ParamNameSrAutoManual = "geofrenzy_sr_auto_manual";
+
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Geofrenzy Node Shared Parameters

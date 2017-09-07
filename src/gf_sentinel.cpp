@@ -72,6 +72,10 @@
 #include "mavros_msgs/CommandTOL.h"
 #include "mavros_msgs/SetMode.h"
 #include "mavros_msgs/CommandHome.h"
+#include "mavros_msgs/Waypoint.h"
+#include "mavros_msgs/WaypointClear.h"
+#include "mavros_msgs/WaypointPush.h"
+#include "mavros_msgs/WaypointSetCurrent.h"
 
 //
 // ROS generated Geofrenzy messages
@@ -130,11 +134,15 @@ static std::map<std::string, GfSentinel::BreachTrigger> GfTriggerNames =
  */
 static std::map<std::string, GfSentinel::BreachAction> GfActionNames =
   map_list_of
-    ("undef",             GfSentinel::BreachActionUndef)
-    ("censor",            GfSentinel::BreachActionCensor)
-    ("return-to-launch",  GfSentinel::BreachActionRtl)
-    ("all-stop",          GfSentinel::BreachActionStop)
-    ("limit-speed",       GfSentinel::BreachActionLimitSpeed);
+    ("undef",               GfSentinel::BreachActionUndef)
+    ("censor",              GfSentinel::BreachActionCensor)
+    ("all-stop",            GfSentinel::BreachActionStop)
+    ("limit-speed",         GfSentinel::BreachActionLimitSpeed)
+    ("return-to-launch",    GfSentinel::BreachActionRtl)
+    ("land-now",            GfSentinel::BreachActionLandNow)
+    ("goto-waypoint",       GfSentinel::BreachActionGotoWp)
+    ("loiter",              GfSentinel::BreachActionLoiter)
+    ("collision-avoidance", GfSentinel::BreachActionCoAv);
 
 
 // -----------------------------------------------------------------------------
@@ -671,25 +679,47 @@ std::ostream &geofrenzy::operator<<(std::ostream &os, const GfSentinelStop &obj)
 
 
 // -----------------------------------------------------------------------------
-// GfSentinelMavRtl Derived Class
+// GfSentinelMav Derived Class
 // -----------------------------------------------------------------------------
 
-GfSentinelMavRtl::GfSentinelMavRtl() : GfSentinel("SentinelMavRtl")
+GfSentinelMav::GfSentinelMav() : GfSentinel("SentinelMav")
 {
 }
 
-GfSentinelMavRtl::~GfSentinelMavRtl()
+GfSentinelMav::~GfSentinelMav()
 {
 }
 
-void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
+void GfSentinelMav::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
 {
   GfSentinel::EoI eoi;
 
   m_gci           = gci;
   m_mep           = MepSvc;
   m_breachTrigger = BreachTriggerExit;
-  m_breachAction  = BreachActionRtl;
+
+  //
+  // Breach action
+  //
+  int val;
+  int dft = BreachActionRtl;
+  nh.param(ParamNameSrMavAction, val, dft);
+
+  m_breachAction = (BreachAction)val;
+
+  switch( m_breachAction )
+  {
+    case BreachActionRtl:
+    case BreachActionLandNow:
+    case BreachActionGotoWp:
+      break;
+    default:
+      ROS_INFO_STREAM(
+          actionName(m_breachAction) << "(" << m_breachAction << ")"
+        << " not supported or unknown - setting to return-to-launch.");
+      m_breachAction = BreachActionRtl;
+      break;
+  }
 
   //
   // Nannied topics and services
@@ -716,11 +746,14 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
   m_serviceLandNow    = "/mavros/cmd/land";
   m_serviceSetMode    = "/mavros/set_mode";
   m_serviceSetHomePos = "/mavros/set_home";
+  m_serviceWpClear    = "/mavros/mission/clear";
+  m_serviceWpPush     = "/mavros/mission/push";
+  m_serviceWpSetCur   = "/mavros/mission/set_curent";
  
   //
   // Watch for a bool dwell topic associated with RTL entitlement.
   //
-  eoi.m_gei         = paramS64(nh, ParamNameSrRtlGei, GeiNoExit);
+  eoi.m_gei         = paramS64(nh, ParamNameSrMavGei, GeiNoExit);
   eoi.m_entDataType = GfEntDataTypeBoolset;
   eoi.m_topicDwell  = makeDwellTopicName(eoi);
   m_listEoI.push_back(eoi);
@@ -747,37 +780,39 @@ void GfSentinelMavRtl::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
 
   // user-configured auto set manual op mode boolean
   nh.param(ParamNameSrAutoManual, m_autoManual, false);
+
+  initBreachAction();
 }
 
-void GfSentinelMavRtl::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
+void GfSentinelMav::subscribeToTopics(ros::NodeHandle &nh, int nQueueDepth)
 {
   // not needed
   //m_subscriptions[m_topicIn] =
-  //    nh.subscribe(m_topicIn, 1, &GfSentinelMavRtl::cbVel, &(*this));
+  //    nh.subscribe(m_topicIn, 1, &GfSentinelMav::cbVel, &(*this));
 
   m_subscriptions[m_topicState] =
       nh.subscribe(m_topicState, nQueueDepth,
-                  &GfSentinelMavRtl::cbState, &(*this));
+                  &GfSentinelMav::cbState, &(*this));
 
   m_subscriptions[m_topicExState] =
       nh.subscribe(m_topicExState, nQueueDepth,
-                  &GfSentinelMavRtl::cbExState, &(*this));
+                  &GfSentinelMav::cbExState, &(*this));
 
   m_subscriptions[m_topicHomePos] =
-      nh.subscribe(m_topicHomePos, 1, &GfSentinelMavRtl::cbHomePos, &(*this));
+      nh.subscribe(m_topicHomePos, 1, &GfSentinelMav::cbHomePos, &(*this));
 
   m_subscriptions[m_topicGlobalPos] =
-    nh.subscribe(m_topicGlobalPos, 1, &GfSentinelMavRtl::cbGlobalPos, &(*this));
+    nh.subscribe(m_topicGlobalPos, 1, &GfSentinelMav::cbGlobalPos, &(*this));
 }
 
-void GfSentinelMavRtl::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
+void GfSentinelMav::advertisePublishers(ros::NodeHandle &nh, int nQueueDepth)
 {
   // not needed
   //m_publishers[m_topicOut] =
   //  nh.advertise<geometry_msgs::Twist>(m_topicOut, 2, true);
 }
 
-void GfSentinelMavRtl::clientServices(ros::NodeHandle &nh)
+void GfSentinelMav::clientServices(ros::NodeHandle &nh)
 {
   // autonomous return-to-launch
   m_clientServices[m_serviceOut] =
@@ -794,9 +829,21 @@ void GfSentinelMavRtl::clientServices(ros::NodeHandle &nh)
   // set home geographic position
   m_clientServices[m_serviceSetHomePos] =
     nh.serviceClient<mavros_msgs::CommandHome>(m_serviceSetHomePos);
+
+  // clear mission waypoints
+  m_clientServices[m_serviceWpClear] =
+    nh.serviceClient<mavros_msgs::WaypointClear>(m_serviceWpClear);
+
+  // push mission waypoints
+  m_clientServices[m_serviceWpPush] =
+    nh.serviceClient<mavros_msgs::WaypointPush>(m_serviceWpPush);
+
+  // set current mission waypoint
+  m_clientServices[m_serviceWpSetCur] =
+    nh.serviceClient<mavros_msgs::WaypointSetCurrent>(m_serviceWpSetCur);
 }
 
-bool GfSentinelMavRtl::setBreachState(const bool isInFence)
+bool GfSentinelMav::setBreachState(const bool isInFence)
 {
   m_isInFence = isInFence;
 
@@ -843,7 +890,7 @@ bool GfSentinelMavRtl::setBreachState(const bool isInFence)
   // Flying too high.
   //
   else if( (m_flightCeiling > 0.0) && m_hasCurrentPos &&
-      (m_posCur.m_altitude > m_flightCeiling) )
+           (m_posCur.m_altitude > m_flightCeiling) )
   {
     ROS_INFO_STREAM(nameOf() << ": "
         << "In-Breach: UAS exceeded flight ceiling." << std::endl
@@ -867,7 +914,95 @@ bool GfSentinelMavRtl::setBreachState(const bool isInFence)
   return m_isInBreach;
 }
 
-void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
+void GfSentinelMav::initBreachAction()
+{
+  switch( m_breachAction )
+  {
+    case BreachActionGotoWp:
+      reqWpClear();
+      break;
+    default:  // no init actions
+      break;
+  }
+}
+
+void GfSentinelMav::onArmed()
+{
+  //
+  // The home position update is slow. Provisionaly use the current 
+  // position when the drone is armed. When the next home position update
+  // occurs, the home position and flight ceiling will be adjusted.
+  //
+  if( m_hasCurrentPos )
+  {
+    m_posHome.m_latitude  = m_posCur.m_latitude;
+    m_posHome.m_longitude = m_posCur.m_longitude;
+    m_posHome.m_altitude  = m_posCur.m_altitude;
+    m_hasLandingPos       = true;
+
+    //
+    // Set absolute flight ceiling if relative ceiling is known.
+    //
+    if( m_relCeiling >= MinRelCeiling )
+    {
+      m_flightCeiling = m_posHome.m_altitude + m_relCeiling;
+
+      ROS_INFO_STREAM(nameOf() << ": "
+          << "Provisional flight ceiling: " << std::endl
+          << "  Home altitude:  " << m_posHome.m_altitude << std::endl
+          << "  Flight ceiling: " <<  m_flightCeiling);
+    }
+  }
+
+  switch( m_breachAction )
+  {
+    case BreachActionGotoWp:
+      //reqWpPush(); // RDK set in execBreachAction() but may need preset
+      break;
+    default:  // no extra on-armed actions
+      break;
+  }
+}
+
+void GfSentinelMav::onDisarmed()
+{
+  // if user-configured, try to return to manual operation mode 
+  if( m_autoManual )
+  {
+    reqSetOpMode();
+  }
+
+  switch( m_breachAction )
+  {
+    case BreachActionGotoWp:
+      reqWpClear();
+      break;
+    default:  // no extra on-armed actions
+      break;
+  }
+}
+
+void GfSentinelMav::execBreachAction()
+{
+  switch( m_breachAction )
+  {
+    case BreachActionRtl:
+      m_isLanding = reqReturnToHome();
+      break;
+    case BreachActionLandNow:
+      m_isLanding = reqLandNow();
+      break;
+    case BreachActionGotoWp:
+      reqWpPush();
+      reqWpSet(0);
+      break;
+    case BreachActionUndef:
+    default:
+      break;
+  }
+}
+
+void GfSentinelMav::cbWatchForBreach(const GfEntitlementIndex gei,
                                         const bool               isInFence,
                                         const GfEntBaseBoolset   &data)
 {
@@ -878,11 +1013,11 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
 
   if( m_isInBreach && !m_isLanding )
   {
-    m_isLanding = reqReturnToHome();
+    execBreachAction();
   }
 }
 
-void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
+void GfSentinelMav::cbWatchForBreach(const GfEntitlementIndex gei,
                                         const bool               isInFence,
                                         const GfEntBaseThreshold &data)
 {
@@ -907,11 +1042,11 @@ void GfSentinelMavRtl::cbWatchForBreach(const GfEntitlementIndex gei,
 
   if( m_isInBreach && !m_isLanding )
   {
-    m_isLanding = reqReturnToHome();
+    execBreachAction();
   }
 }
 
-void GfSentinelMavRtl::cbVel(const geometry_msgs::Twist &msgTwistStamped)
+void GfSentinelMav::cbVel(const geometry_msgs::Twist &msgTwistStamped)
 {
   // blacklist if UAS is in-breach
   if( !m_isInBreach )
@@ -920,7 +1055,7 @@ void GfSentinelMavRtl::cbVel(const geometry_msgs::Twist &msgTwistStamped)
   }
 }
 
-void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
+void GfSentinelMav::cbState(const mavros_msgs::State &msgState)
 {
   bool wasArmed = m_isArmed;
 
@@ -934,31 +1069,7 @@ void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
   {
     ROS_INFO_STREAM(nameOf() << ": UAS ARMED");
 
-    //
-    // The home position update is slow. Provisionaly use the current 
-    // position when the drone is armed. When the next home position update
-    // occurs, the home position and flight ceiling will be adjusted.
-    //
-    if( m_hasCurrentPos )
-    {
-      m_posHome.m_latitude  = m_posCur.m_latitude;
-      m_posHome.m_longitude = m_posCur.m_longitude;
-      m_posHome.m_altitude  = m_posCur.m_altitude;
-      m_hasLandingPos       = true;
-
-      //
-      // Set absolute flight ceiling if relative ceiling is known.
-      //
-      if( m_relCeiling >= MinRelCeiling )
-      {
-        m_flightCeiling = m_posHome.m_altitude + m_relCeiling;
-
-        ROS_INFO_STREAM(nameOf() << ": "
-          << "Provisional flight ceiling: " << std::endl
-          << "  Home altitude:  " << m_posHome.m_altitude << std::endl
-          << "  Flight ceiling: " <<  m_flightCeiling);
-      }
-    }
+    onArmed();
   }
 
   //
@@ -968,15 +1079,11 @@ void GfSentinelMavRtl::cbState(const mavros_msgs::State &msgState)
   {
     ROS_INFO_STREAM(nameOf() << ": UAS DISARMED");
 
-    // if user-configured, try to return to manual operation mode 
-    if( m_autoManual )
-    {
-      reqSetOpMode();
-    }
+    onDisarmed();
   }
 }
 
-void GfSentinelMavRtl::cbExState(const mavros_msgs::ExtendedState &msgExState)
+void GfSentinelMav::cbExState(const mavros_msgs::ExtendedState &msgExState)
 {
   switch( msgExState.landed_state )
   {
@@ -994,7 +1101,7 @@ void GfSentinelMavRtl::cbExState(const mavros_msgs::ExtendedState &msgExState)
   }
 }
 
-void GfSentinelMavRtl::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
+void GfSentinelMav::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
 {
   //
   // Set home (RTL) position. Home position can only be trusted when the
@@ -1019,7 +1126,7 @@ void GfSentinelMavRtl::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
   }
 }
 
-void GfSentinelMavRtl::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
+void GfSentinelMav::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
 {
   m_posCur.m_latitude  = msgFix.latitude;
   m_posCur.m_longitude = msgFix.longitude;
@@ -1027,7 +1134,7 @@ void GfSentinelMavRtl::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
   m_hasCurrentPos      = true;
 }
 
-bool GfSentinelMavRtl::reqReturnToHome()
+bool GfSentinelMav::reqReturnToHome()
 {
   std::string               &nameSvc = m_serviceOut;
   mavros_msgs::CommandLong  svc;
@@ -1068,7 +1175,7 @@ bool GfSentinelMavRtl::reqReturnToHome()
   }
 }
 
-bool GfSentinelMavRtl::reqLandNow()
+bool GfSentinelMav::reqLandNow()
 {
   std::string             &nameSvc = m_serviceLandNow;
   mavros_msgs::CommandTOL svc;
@@ -1081,6 +1188,16 @@ bool GfSentinelMavRtl::reqLandNow()
     return false;
   }
   
+  //
+  // Already landing.
+  //
+  // Note: May need more tests.
+  //
+  else if( (m_flightMode == "AUTO.RTL") || (m_flightMode == "AUTO.LAND") )
+  {
+    return false;
+  }
+
   ROS_INFO_STREAM(nameOf() << ": Land Now");
 
   //
@@ -1105,7 +1222,7 @@ bool GfSentinelMavRtl::reqLandNow()
   }
 }
 
-bool GfSentinelMavRtl::reqSetOpMode()
+bool GfSentinelMav::reqSetOpMode()
 {
   std::string           &nameSvc = m_serviceSetMode;
   mavros_msgs::SetMode  svc;
@@ -1134,7 +1251,7 @@ bool GfSentinelMavRtl::reqSetOpMode()
   }
 }
 
-bool GfSentinelMavRtl::reqSetHomePos()
+bool GfSentinelMav::reqSetHomePos()
 {
   std::string               &nameSvc = m_serviceSetHomePos;
   mavros_msgs::CommandHome  svc;
@@ -1162,12 +1279,100 @@ bool GfSentinelMavRtl::reqSetHomePos()
   }
 }
 
-void GfSentinelMavRtl::print(std::ostream &os) const
+bool GfSentinelMav::reqWpClear()
+{
+  std::string &nameSvc = m_serviceWpClear;
+  mavros_msgs::WaypointClear svc;
+
+  ROS_INFO_STREAM(nameOf() << ": Clear Waypoints");
+
+  if( m_clientServices[nameSvc].call(svc) )
+  {
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
+    return svc.response.success;
+  }
+  else
+  {
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
+    return false;
+  }
+}
+
+bool GfSentinelMav::reqWpPush()
+{
+  std::string &nameSvc = m_serviceWpPush;
+
+  mavros_msgs::WaypointPush svc;
+
+  double                    dalt;
+  mavros_msgs::Waypoint     wp;
+
+  ROS_INFO_STREAM(nameOf() << ": Push Waypoints");
+
+  dalt = m_flightCeiling / 2.0;
+  if( dalt < MinRelCeiling )
+  {
+    dalt = MinRelCeiling;
+  }
+
+  // build 1 waypoint
+  wp.frame        = mavros_msgs::Waypoint::FRAME_GLOBAL;
+  wp.command      = mavros_msgs::CommandCode::NAV_WAYPOINT;
+  wp.is_current   = true; // RDK ???
+  wp.autocontinue = false; // RDK ???
+  wp.x_lat        = m_posHome.m_latitude;
+  wp.y_long       = m_posHome.m_longitude;
+  wp.z_alt        = m_posHome.m_altitude + dalt;
+
+  svc.request.waypoints.push_back(wp);
+
+  if( m_clientServices[nameSvc].call(svc) )
+  {
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
+    return svc.response.success;
+  }
+  else
+  {
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
+    return false;
+  }
+}
+
+bool GfSentinelMav::reqWpSet(unsigned wpIndex)
+{
+  //
+  // The drone is not armed.
+  //
+  if( !m_isArmed )
+  {
+    return false;
+  }
+  
+  std::string &nameSvc = m_serviceWpSetCur;
+  mavros_msgs::WaypointSetCurrent svc;
+
+  ROS_INFO_STREAM(nameOf() << ": Set Waypoint " << wpIndex);
+
+  svc.request.wp_seq = wpIndex;
+
+  if( m_clientServices[nameSvc].call(svc) )
+  {
+    ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
+    return svc.response.success;
+  }
+  else
+  {
+    ROS_ERROR_STREAM(nameOf() << ": " << "Service " << nameSvc << " failed.");
+    return false;
+  }
+}
+
+void GfSentinelMav::print(std::ostream &os) const
 {
   os  << nameOf() << "::";
   GfSentinel::print(os);
 
-  os  << "GfSentinelMavRtl" << std::endl
+  os  << "GfSentinelMav" << std::endl
       << "{" << std::endl
       << "state:" << std::endl
       << "  hasLandingPos  = " << m_hasLandingPos << std::endl
@@ -1185,7 +1390,7 @@ void GfSentinelMavRtl::print(std::ostream &os) const
 }
 
 std::ostream &geofrenzy::operator<<(std::ostream &os,
-                                    const GfSentinelMavRtl &obj)
+                                    const GfSentinelMav &obj)
 {
   obj.print(os);
 
@@ -1193,7 +1398,7 @@ std::ostream &geofrenzy::operator<<(std::ostream &os,
 }
 
 std::ostream &geofrenzy::operator<<(std::ostream &os,
-                                    const GfSentinelMavRtl::GeoPos &obj)
+                                    const GfSentinelMav::GeoPos &obj)
 {
   os  << "(lat=" << obj.m_latitude  << ", "
       << "lon="  << obj.m_longitude << ", "
