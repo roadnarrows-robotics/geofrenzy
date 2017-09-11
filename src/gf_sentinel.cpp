@@ -712,6 +712,7 @@ void GfSentinelMav::initProperties(ros::NodeHandle &nh, GfClassIndex gci)
     case BreachActionRtl:
     case BreachActionLandNow:
     case BreachActionGotoWp:
+    case BreachActionLimitSpeed:
       break;
     default:
       ROS_INFO_STREAM(
@@ -892,13 +893,13 @@ bool GfSentinelMav::setBreachState(const bool isInFence)
   else if( (m_flightCeiling > 0.0) && m_hasCurrentPos &&
            (m_posCur.m_altitude > m_flightCeiling) )
   {
-    ROS_INFO_STREAM(nameOf() << ": "
-        << "In-Breach: UAS exceeded flight ceiling." << std::endl
-        << "  Home altitude:    " << m_posHome.m_altitude << std::endl
-        << "  Flight ceiling:   " <<  m_flightCeiling << std::endl
-        << "  Current altitude: " << m_posCur.m_altitude << std::endl
-        << "  ----------------  " << std::endl
-        << "  Difference:       " << m_flightCeiling - m_posCur.m_altitude);
+//    ROS_INFO_STREAM(nameOf() << ": "
+//        << "In-Breach: UAS exceeded flight ceiling." << std::endl
+//        << "  Home altitude:    " << m_posHome.m_altitude << std::endl
+//        << "  Flight ceiling:   " <<  m_flightCeiling << std::endl
+//        << "  Current altitude: " << m_posCur.m_altitude << std::endl
+//        << "  ----------------  " << std::endl
+//        << "  Difference:       " << m_flightCeiling - m_posCur.m_altitude);
 
     m_isInBreach = true;
   }
@@ -996,6 +997,8 @@ void GfSentinelMav::execBreachAction()
       reqWpPush();
       reqWpSet(0);
       reqStartMission();
+      sleep(1);
+      reqSetOpMode();
       break;
     case BreachActionUndef:
     default:
@@ -1033,10 +1036,10 @@ void GfSentinelMav::cbWatchForBreach(const GfEntitlementIndex gei,
   {
     m_flightCeiling = m_posHome.m_altitude + m_relCeiling;
 
-    ROS_INFO_STREAM(nameOf() << ": "
-        << "Flight ceiling: " << std::endl
-        << "  Home altitude:  " << m_posHome.m_altitude << std::endl
-        << "  Flight ceiling: " <<  m_flightCeiling);
+//    ROS_INFO_STREAM(nameOf() << ": "
+//        << "Flight ceiling: " << std::endl
+//        << "  Home altitude:  " << m_posHome.m_altitude << std::endl
+//        << "  Flight ceiling: " <<  m_flightCeiling);
   }
 
   setBreachState(isInFence);
@@ -1093,7 +1096,7 @@ void GfSentinelMav::cbExState(const mavros_msgs::ExtendedState &msgExState)
       ROS_INFO_STREAM(nameOf() << ": UAS is on the ground.");
       break;
     case mavros_msgs::ExtendedState::LANDED_STATE_IN_AIR:
-      ROS_INFO_STREAM(nameOf() << ": UAS is in flight.");
+      //ROS_INFO_STREAM(nameOf() << ": UAS is in flight.");
       m_isOnTheGround = false;
       break;
     case mavros_msgs::ExtendedState::LANDED_STATE_UNDEFINED:
@@ -1275,11 +1278,13 @@ bool GfSentinelMav::reqSetOpMode()
   //
   if( m_flightMode.empty() || m_isArmed )
   {
-    return false;
+     //return false;
+     ROS_INFO_STREAM(nameOf() << ": DANGER SWITCH TO POSCTL IN FLIGHT.");
   }
 
-  svc.request.base_mode   = mavros_msgs::SetModeRequest::MAV_MODE_MANUAL_ARMED;
-  svc.request.custom_mode = "MANUAL";
+  //svc.request.base_mode   = mavros_msgs::SetModeRequest::MAV_MODE_MANUAL_ARMED;
+  svc.request.base_mode = 0;
+  svc.request.custom_mode = "POSCTL";  //WGC - Only PX4 Flight Stack!!!
 
   if( m_clientServices[nameSvc].call(svc) )
   {
@@ -1361,7 +1366,7 @@ bool GfSentinelMav::reqWpPush()
   wp.frame        = mavros_msgs::Waypoint::FRAME_GLOBAL;
   wp.command      = mavros_msgs::CommandCode::NAV_WAYPOINT;
   wp.is_current   = true; // RDK ???
-  wp.autocontinue = false; // RDK ???
+  wp.autocontinue = true; // RDK ???
   wp.x_lat        = m_posHome.m_latitude;
   wp.y_long       = m_posHome.m_longitude;
   wp.z_alt        = m_posHome.m_altitude + dalt;

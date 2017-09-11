@@ -472,7 +472,6 @@ namespace geofrenzy
      */
     const char *const ParamNameSrAutoManual = "geofrenzy_sr_auto_manual";
 
-
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Geofrenzy Node Shared Parameters
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -542,6 +541,10 @@ namespace geofrenzy
      */
     const char *const NodeRootSensorRelay  = "gf_sensor_relay";
 
+    /*!
+     * \brief The Geofrenzy ROS breach inhibitor node.
+     */
+    const char *const NodeRootBreachInhibitor  = "gf_breach_inhibitor";
   
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // ROS subscribed and published (sub)topic names

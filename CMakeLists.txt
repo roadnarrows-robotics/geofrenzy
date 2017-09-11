@@ -282,6 +282,13 @@ add_executable(gf_sensor_relay
 target_link_libraries(gf_sensor_relay ${catkin_LIBRARIES})
 add_dependencies(gf_sensor_relay geofrenzy_gencpp)
 
+# geofrenzy breach inhibitor
+add_executable(gf_breach_inhibitor
+  src/gf_ros.cpp
+  src/gf_breach_inhibitor.cpp)
+target_link_libraries(gf_breach_inhibitor ${catkin_LIBRARIES})
+add_dependencies(gf_breach_inhibitor geofrenzy_gencpp)
+
 install(
   PROGRAMS 
     scripts/latlongmeters.py
