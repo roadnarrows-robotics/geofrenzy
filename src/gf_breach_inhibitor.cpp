@@ -40,6 +40,7 @@
 // ROS
 //
 #include "ros/ros.h"
+#include "sensor_msgs/NavSatFix.h"
 
 //
 // ROS generated Geofrenzy messages
@@ -52,6 +53,7 @@
 // mavros
 //
 #include "mavros_msgs/ParamSet.h"
+#include "mavros_msgs/HomePosition.h"
 
 //
 // Geofrenzy
@@ -75,6 +77,8 @@ namespace geofrenzy
         public:
             void featureCollectionCallback(const geofrenzy::GfDistFeatureCollection distFeatures);
             void dwellCallbackThreshold(const GfDwellThreshold &dwellMsg);
+            void cbHomePos(const mavros_msgs::HomePosition &msgHomePos);
+            void cbGlobalPos(const sensor_msgs::NavSatFix &msgFix);
 
             //void advertisePublishers(int nQueueDepth=1);
             void subscribeToTopics(int nQueueDepth=5);
@@ -95,17 +99,29 @@ namespace geofrenzy
 
             GfClassIndex  m_gciServer;           ///< geofrenzy portal server class index
             GfEntBaseThreshold  m_threshEnt;     ///< flight thresholds
-            bool m_defaultSet;
+            GfEntitlementIndex m_geiAltitude;    ///< altitude entitlement index
+
             std::string m_serviceParamSet;       ///< parameter set
             std::string m_paramSetMaxTilt;       ///< Max tilt
             std::string m_paramSetMaxAscentVel;  ///< Maximum ascent velocity
             std::string m_paramSetMaxDescentVel; ///< Maximum ascent velocity
             std::string m_fcTopicName;           ///< Feature Collection Dist
             std::string m_altTopicName;          ///< Altitude Threshold topic
+            std::string m_topicHomePos;          ///< home position topic
+            std::string m_topicGlobalPos;        ///< global position topic
 
+
+            GfSentinelMav::GeoPos  m_posCur;     ///< current geographic position
+            GfSentinelMav::GeoPos  m_posHome;    ///< current home position
+
+            bool m_defaultMaxTiltSet;            ///< default tilt angle set
+            bool m_defaultMaxAVSet;              ///< default ascent velocity set
+            bool m_hasHomePos;
+            bool m_hasCurrentPos;
 
             double getDistanceToLine(geometry_msgs::Point p1, geometry_msgs::Point p2);
-            void updateFirmwareParams(double distance);
+            void updateMaxTilt(double distance);
+            void updateMaxAscentVel();
             bool reqSetParam(std::string paramId, double value);
     };
 
@@ -126,7 +142,7 @@ namespace geofrenzy
         m_gciServer = (GfClassIndex)val;
 
         //TODO: Check if get param matches default
-        m_defaultSet = true;
+        m_defaultMaxTiltSet = true;
 
         //Set FW param service
         m_serviceParamSet  = "/mavros/param/set";
@@ -144,18 +160,16 @@ namespace geofrenzy
         //
         // Watch for an altitude threshold topic entitlement
         //
+        dft = (int32_t)GeiFlightAltitudes;
+        m_nh.param(ParamNameSrAltitudeGei, val, dft);
+        m_geiAltitude = (GfEntitlementIndex)val;
+        std::string slash = "/";
+        m_altTopicName = slash + makeDwellTopicName(m_gciServer, m_geiAltitude, GfEntDataTypeThreshold);
 
-        //TODO
+        m_topicGlobalPos  = "/mavros/global_position/global";
+        m_topicHomePos    = "/mavros/home_position/home";
 
-    }
 
-    void BreachInhibitor::dwellCallbackThreshold(const GfDwellThreshold &dwellMsg)
-    {
-      ROS_INFO_STREAM("dwellCallbackThreshold = " << dwellMsg);
-
-      m_threshEnt.m_lower = dwellMsg.entitlement.threshold_lower;
-      m_threshEnt.m_upper = dwellMsg.entitlement.threshold_upper;
-      m_threshEnt.m_units = dwellMsg.entitlement.threshold_unit;
     }
 
     double BreachInhibitor::getDistanceToLine(geometry_msgs::Point p1, geometry_msgs::Point p2){
@@ -195,7 +209,7 @@ namespace geofrenzy
         return sqrt(dx*dx + dy*dy);
     }
 
-    void BreachInhibitor::updateFirmwareParams(double distance){
+    void BreachInhibitor::updateMaxTilt(double distance){
         //ROS_INFO_STREAM("Min Distance: " << distance << "meters");
         double defaultAngle = 45.0;
         double threshHold = 8.0;
@@ -208,11 +222,46 @@ namespace geofrenzy
          }
          ROS_INFO_STREAM("Max Tilt: " << maxAngle << "degrees");
          reqSetParam(m_paramSetMaxTilt, maxAngle);
-         m_defaultSet = false;
+         m_defaultMaxTiltSet = false;
         }else{
-            if(!m_defaultSet){
-                reqSetParam(m_paramSetMaxTilt, defaultAngle);
-                m_defaultSet = true;
+            if(!m_defaultMaxTiltSet){
+                if(reqSetParam(m_paramSetMaxTilt, defaultAngle)){
+                    m_defaultMaxTiltSet = true;
+                }
+            }
+        }
+    }
+
+    void BreachInhibitor::updateMaxAscentVel(){
+        double defaultVelocity = 3.0;
+        double threshHold = 5.0;
+        double cushion = 0.8;
+        double minVelocity = 0.5;
+
+        if(m_hasHomePos && m_hasCurrentPos){
+            double flightCeiling = m_posHome.m_altitude + m_threshEnt.m_upper;
+            double distance = flightCeiling - m_posCur.m_altitude;
+
+            if(distance < threshHold){
+             double maxVelocity = (defaultVelocity)*(cushion - ((threshHold-distance)/threshHold));
+             if(maxVelocity < minVelocity){
+                 maxVelocity = minVelocity;
+             }
+             ROS_INFO_STREAM("Max Vertical Ascent Velocity: " << maxVelocity << "m/s");
+             reqSetParam(m_paramSetMaxAscentVel, maxVelocity);
+             m_defaultMaxAVSet = false;
+            }else{
+                if(!m_defaultMaxAVSet){
+                    if(reqSetParam(m_paramSetMaxAscentVel, defaultVelocity)){
+                        m_defaultMaxAVSet = true;
+                    }
+                }
+            }
+        }else{
+            if(!m_defaultMaxAVSet){
+                if(reqSetParam(m_paramSetMaxAscentVel, defaultVelocity)){
+                    m_defaultMaxAVSet = true;
+                }
             }
         }
     }
@@ -272,8 +321,38 @@ namespace geofrenzy
                 }
             }
         }
-        updateFirmwareParams(minDistance);
+        updateMaxTilt(minDistance);
+        updateMaxAscentVel();
     }
+
+    void BreachInhibitor::dwellCallbackThreshold(const GfDwellThreshold &dwellMsg)
+    {
+        //ROS_INFO_STREAM("dwellCallbackThreshold = " << dwellMsg);
+
+        m_threshEnt.m_lower = dwellMsg.entitlement.threshold_lower;
+        m_threshEnt.m_upper = dwellMsg.entitlement.threshold_upper;
+        m_threshEnt.m_units = dwellMsg.entitlement.threshold_unit;
+    }
+
+    void BreachInhibitor::cbGlobalPos(const sensor_msgs::NavSatFix &msgFix)
+    {
+        m_posCur.m_latitude  = msgFix.latitude;
+        m_posCur.m_longitude = msgFix.longitude;
+        m_posCur.m_altitude  = msgFix.altitude;
+        m_hasCurrentPos      = true;
+    }
+
+    void BreachInhibitor::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
+    {
+        //
+        // Set home (RTL) position.
+        //
+        m_posHome.m_latitude  = msgHomePos.latitude;
+        m_posHome.m_longitude = msgHomePos.longitude;
+        m_posHome.m_altitude  = msgHomePos.altitude;
+        m_hasHomePos          = true;
+    }
+
 
     /*!
      * \brief Subscribe to all topics.
@@ -288,13 +367,17 @@ namespace geofrenzy
         m_subscriptions[m_altTopicName] =
                 m_nh.subscribe(m_altTopicName,
                                nQueueDepth, &BreachInhibitor::dwellCallbackThreshold, &(*this));
+        m_subscriptions[m_topicGlobalPos] =
+          m_nh.subscribe(m_topicGlobalPos, 1, &BreachInhibitor::cbGlobalPos, &(*this));
+        m_subscriptions[m_topicHomePos] =
+          m_nh.subscribe(m_topicHomePos, 1, &BreachInhibitor::cbHomePos, &(*this));
     }
 
     void BreachInhibitor::clientServices(ros::NodeHandle &nh)
     {
-      // request set parameter
-      m_clientServices[m_serviceParamSet] =
-        nh.serviceClient<mavros_msgs::ParamSet>(m_serviceParamSet);
+        // request set parameter
+        m_clientServices[m_serviceParamSet] =
+          nh.serviceClient<mavros_msgs::ParamSet>(m_serviceParamSet);
     }
 
 }
