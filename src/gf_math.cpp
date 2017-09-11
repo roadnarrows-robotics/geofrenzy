@@ -1081,6 +1081,37 @@ namespace geofrenzy
       return o;
     }
 
+    bool pipCn(const EigenPoint2 &pt, const EigenPoint2List &polygon)
+    {
+      size_t  j;
+      int     cn = 0;
+
+      for(j = 1; j < polygon.size(); ++j)
+      {
+        const EigenPoint2 &pt0 = polygon[j-1];
+        const EigenPoint2 &pt1 = polygon[j];
+
+        //
+        // Upward crossing excludes endpoint. Downward crossing excludes
+        // startpoint.
+        //
+        if( (pt0.y() <= pt.y()) && (pt1.y() > pt.y()) ||  // upward crossing
+            (pt0.y() > pt.y()) && (pt1.y() <= pt.y()) )   // downward crossing
+        {
+          // slope - no divide by zero event given the above test   
+          double vt = (pt.y()  - pt0.y()) / (pt1.y() - pt0.y());
+
+          // compute the actual edge-ray intersect x-coordinate
+          if( pt.x() <  pt0.x() + vt * (pt1.x() - pt0.x()) )
+          {
+            ++cn;   // a valid crossing of y=pt.y() right of pt.x()
+          }
+        }
+      }
+
+      return cn & 0x01? true: false;
+    }
+
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Scene Functions

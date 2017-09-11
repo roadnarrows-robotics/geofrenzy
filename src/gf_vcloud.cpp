@@ -67,6 +67,7 @@
 #include "geofrenzy/GfDistFeatureCollection.h"
 #include "geofrenzy/GfDwellColor.h"
 #include "geofrenzy/GfDwellThreshold.h"
+#include "geofrenzy/SetGeofenceAlt.h"
 
 //
 // ROS tranforms
@@ -186,6 +187,8 @@ namespace geofrenzy
         string  strInvalid("Invalid value: ");  // log string component
         string  strSetTo("set to default=");    // log string component
 
+        m_uOptions = ScanOptionDft;
+
         //
         // Operation mode parameter.
         //
@@ -236,7 +239,7 @@ namespace geofrenzy
         }
 
         //
-        // Verticl field of view parameters.
+        // Vertical field of view parameters.
         //
         name1 = ParamNameCloudVFoVMin;
         name2 = ParamNameCloudVFoVMax;
@@ -271,7 +274,7 @@ namespace geofrenzy
 
         //
         // Width resolution.
-        // (note: no unsigned i/f to parameter server)
+        // (note: no unsigned integer i/f to parameter server)
         //
         name1 = ParamNameCloudWidth;
 
@@ -289,7 +292,7 @@ namespace geofrenzy
 
         //
         // Height resolution.
-        // (note: no unsigned i/f to parameter server)
+        // (note: no unsigned integer i/f to parameter server)
         //
         name1 = ParamNameCloudHeight;
 
@@ -306,14 +309,36 @@ namespace geofrenzy
         m_uHeight = (size_t)val;
 
         //
-        // Nearest Only Option.
-        // (note: no unsigned i/f to parameter server)
+        // Nearest Only Point Option.
         //
         name1 = ParamNameCloudNearestOnly;
 
         m_nh.param(name1, tf, CloudNearestOnlyDft);
 
-        m_uOptions = tf? ScanOptionNearest: ScanOptionDft;
+        if( tf )
+        {
+          m_uOptions |= ScanOptionNearest;
+        }
+        else
+        {
+          m_uOptions &= ~ScanOptionNearest;
+        }
+
+        //
+        // 2D Structured Output Option.
+        //
+        name1 = ParamNameCloud2D;
+
+        m_nh.param(name1, tf, Cloud2DDft);
+
+        if( tf )
+        {
+          m_uOptions |= (ScanOption2D | ScanOptionNearest);
+        }
+        else
+        {
+          m_uOptions &= ~ScanOption2D;
+        }
 
         //
         // Grid size.
@@ -353,6 +378,9 @@ namespace geofrenzy
 
         initCloudMsgFmt(m_msgCloud);
 
+        m_bHasCaps        = false;
+        m_fFenceAltitude  = 0.0;
+        m_fFenceHeight    = GeofenceHeightDft;
 
         return true;
       }
@@ -362,6 +390,12 @@ namespace geofrenzy
        */
       void advertiseServices()
       {
+        std::string strSvc;
+
+        strSvc = ServiceNameSetGeofenceAlt;
+        m_services[strSvc] = m_nh.advertiseService(strSvc,
+                                          &vSensorCloud::setGeofenceAlt,
+                                          &(*this));
       }
 
       /*!
@@ -462,7 +496,10 @@ namespace geofrenzy
                                     << degrees(m_fHFoVMax) << "]" << endl
             << "  vertical FoV:   " << "[" << degrees(m_fVFoVMin) << ", "
                                     << degrees(m_fVFoVMax) << "]" << endl
-            << "  nearest only:   " << (m_uOptions? "true": "false") << endl
+            << "  nearest only:   "
+              << (m_uOptions & ScanOptionNearest? "true": "false") << endl
+            << "  2D structure:   "
+              << (m_uOptions & ScanOption2D? "true": "false") << endl
 
             << "Grid Mode Parameters:" << endl
             << "  grid size:      " << m_fGridSize << endl
@@ -499,7 +536,10 @@ namespace geofrenzy
       uint32_t  m_uOptions;   ///< scanning control options
 
       // scene
-      EigenScene  m_scene;  ///< scene of polygonal shapes with attributes
+      bool        m_bHasCaps;     ///< fences do [not] have floors and ceilings
+      double      m_fFenceAltitude; ///< geofences base altitude (m)
+      double      m_fFenceHeight; ///< geofences height from base (m)
+      EigenScene  m_scene;        ///< scene of polygonal shapes with attributes
 
       // messaging processing 
       int                       m_nPublishCnt;  ///< publish counter
@@ -508,9 +548,9 @@ namespace geofrenzy
 
       //ROS transform listener
       tf::TransformListener m_tfListener;
-      std::string m_globalFrame;
-      std::string m_robotFrame;
-      ros::Time m_fixTime;
+      std::string           m_globalFrame;
+      std::string           m_robotFrame;
+      ros::Time             m_fixTime;
 
       /*!
        * \brief Initialize cloud message output format.
@@ -629,7 +669,7 @@ namespace geofrenzy
           for(j = 0; j < feat.geometry.size(); ++j)
           {
             m_scene.push_back(sceneObj);
-            createSceneObj(feat.geometry[j], FenceColorDft, 2.0,
+            createSceneObj(feat.geometry[j], FenceColorDft, m_fFenceHeight,
                 m_scene.back());
           }
         }
@@ -639,6 +679,36 @@ namespace geofrenzy
           ++m_nPublishCnt;
         }
       }
+
+      /*!
+       * \brief Set the geofence altitude callback.
+       *
+       * \param req   Service request.
+       * \param rsp   Service response.
+       *
+       * \return Returns true on success, false on failure.
+       */
+      bool setGeofenceAlt(geofrenzy::SetGeofenceAlt::Request  &req,
+                          geofrenzy::SetGeofenceAlt::Response &rsp)
+      {
+        ROS_DEBUG_STREAM(ServiceNameSetGeofenceAlt);
+
+        m_fFenceAltitude = req.base;
+
+        if( m_fFenceAltitude < 0.0 )
+        {
+          m_fFenceAltitude = 0.0;
+        }
+
+        m_fFenceHeight = req.height;
+
+        if( m_fFenceHeight < m_fFenceAltitude + 0.1 )
+        {
+          m_fFenceHeight = m_fFenceAltitude + 0.1;
+        }
+
+        return true;
+      };
 
 #ifdef GF_VCLOUD_NODE_UT
       // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .

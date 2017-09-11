@@ -91,6 +91,7 @@ add_message_files(
 	FILES
     GetEntitlement.srv
     GetEntitlementList.srv
+    SetGeofenceAlt.srv
     entitlement_service.srv         # RDK deprecated
     entitlement_list_service.srv    # RDK deprecated
     class_service.srv               # RDK deprecated

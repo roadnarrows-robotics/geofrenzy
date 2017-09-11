@@ -185,14 +185,21 @@ namespace geofrenzy
      *
      * Units: Boolean
      */
-    const bool CloudNearestOnlyDft = false; ///< true of x-ray
+    const bool CloudNearestOnlyDft = false; ///< false for x-ray vision
+
+    /*!
+     * \brief Default point cloud structured 2D output.
+     *
+     * Units: Boolean
+     */
+    const bool Cloud2DDft = false;   ///< false for unordered.
 
     /*!
      * \brief Default point cloud fence grid size.
      *
      * Units: Meters
      */
-    const double CloudGridSizeDft = 1.0; ///< 1 meter
+    const double CloudGridSizeDft = 0.2; ///< 1 meter
 
     /*!
      * \brief Supported point cloud published formats.
@@ -224,8 +231,8 @@ namespace geofrenzy
     enum SrSentinelEnDis
     {
       SrSentinelDisableAll  = 0x00000000, ///< disable all sentinels
-      SrSentinelEnableCam   = 0x00000001, ///< enable camera censor
-      SrSentinelEnableStop  = 0x00000002, ///< enable vehicle stop
+      SrSentinelEnableCam   = 0x00000001, ///< enable camera censor sentinel
+      SrSentinelEnableStop  = 0x00000002, ///< enable vehicle stop sentinel
       SrSentinelEnableMav   = 0x00000004, ///< enable MAV sentinel
       SrSentinelEnableSpeed = 0x00000008, ///< enable vehicle speed limits
       SrSentinelEnableAll   = 0x7fffffff  ///< enable all sentinels
@@ -234,6 +241,13 @@ namespace geofrenzy
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Geofrenzy Node Shared Defaults
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*!
+     * \brief Default geofence height.
+     *
+     * Units: Meters
+     */
+    const double GeofenceHeightDft = 3.0;
 
     /*!
      * \brief Default global frame for transformations
@@ -372,17 +386,34 @@ namespace geofrenzy
     const char *const ParamNameCloudVFoVMax = "geofrenzy_cloud_vfov_max";
 
     /*!
-     * \brief Point cloud sensor capability.
+     * \brief Point cloud vision sensor scanning capability.
      *
-     * Normally, in sensor operation mode, the sensor has superman's x-ray
+     * Normally, in sensor operation mode, the sensor has Superman's x-ray
      * vision to see through all fence surfaces. If set to true, surfaces in the
      * forground obscure background surfaces.
      *
      * Applicable Modes: sensor
      *
-     * If the value is not set, then CloudNearestOnlyDft is used.
+     * If the value is not set, then CloudNearestOnlyDft(false) is used.
      */
     const char *const ParamNameCloudNearestOnly="geofrenzy_cloud_nearest_only";
+
+    /*!
+     * \brief Point cloud 2D structured output.
+     *
+     * Normally, in sensor operation mode, the sensor output is unordered.
+     * If set to true, the the output will be in a structured 2D order of
+     * width x height order. Any undetected fence point will have the value
+     * of Inf.
+     *
+     * Note that in this mode, the NearestOnly parameter is forced to true,
+     * since multiple points at the same x,y are unsupported.
+     *
+     * Applicable Modes: sensor
+     *
+     * If the value is not set, then Cloud2DDft(false) is used.
+     */
+    const char *const ParamNameCloud2D = "geofrenzy_cloud_2d";
 
     /*!
      * \brief Cloud fence grid size.
@@ -564,6 +595,7 @@ namespace geofrenzy
     const char *const ServiceNameGetEntitlementList =
                                               "geofrenzy/get_entitlement_list";
     const char *const ServiceNameGetMap = "geofrenzy/get_map";
+    const char *const ServiceNameSetGeofenceAlt = "geofrenzy/set_geofence_alt";
   
     //
     // Types

@@ -1,0 +1,8 @@
+### Geofrenzy gf_vcloud_<class_idx>/geofrenzy/set_geofence_alt service.
+#
+# Set the relative heights all of the subscribed geofence polygonal areas.
+#
+
+float64   base    # base altitdue of fence with 0 being on the ground [meters]
+float64   height  # height of fence from base [meters]
+---

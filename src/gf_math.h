@@ -85,7 +85,7 @@ namespace geofrenzy
      * \ingroup gfmath_types
      * \brief Basic Geometric Data Types
      *
-     * Eigen data types versions of geometric constructs in 3 dimensional
+     * Eigen data types of geometric constructs in 2 and 3 dimensional
      * ambient space, such as point, line, and plane.
      * \{
      */
@@ -148,6 +148,30 @@ namespace geofrenzy
      * \brief Bounding box rectangular cuboid.
      */
     typedef EigenMinMax3 EigenBBox3;
+
+    /*! 
+     * \brief Basic container types.
+     */
+
+    /*!
+     * \brief List (vector) of 2D points.
+     */
+    typedef std::vector<EigenPoint2> EigenPoint2List;
+
+    /*! 
+     * \brief List (vector) of 3D points.
+     */
+    typedef std::vector<EigenPoint3> EigenPoint3List;
+
+    /*! 
+     * \brief List (vector) of limits container type.
+     */
+    typedef std::vector<EigenMinMax2> EigenMinMax2List;
+
+    /*! 
+     * \brief List (vector) of 3D bounding boxes container type.
+     */
+    typedef std::vector<EigenBBox3> EigenBBox3List;
 
     /*! \} */ // gfmath_types
 
@@ -701,6 +725,27 @@ namespace geofrenzy
               (pt.z() >= bbox.m_min.z()) && (pt.z() <= bbox.m_max.z());
     }
 
+    /*!
+     * \brief Point in Polygon test.
+     *
+     * This method uses the edge crossing Counting Number algorithme.
+     *
+     * \sa http://geomalgorithms.com/a03-_inclusion.html
+     *
+     * If the number of edge crossings is odd, the the point is inside the
+     * polygon. Otherwise it lies outside. Any point on an edge or vertex
+     * is considered inside.
+     *
+     * Note that this simple algortihm does not work well with complex,
+     * crossing polygons.
+     *
+     * \param pt      Point to test.
+     * \param polygon Closed polygon with polygon[n] == polygon[0].
+     *
+     * \return Returns true if inside, false if outside.
+     */
+    bool pipCn(const EigenPoint2 &pt, const EigenPoint2List &polygon);
+
     /*! \} */ // gfmath_basic_ops
 
 
@@ -908,39 +953,6 @@ namespace geofrenzy
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Eigen basic containers.
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*! 
-     * \ingroup gfmath_types
-     * \brief Basic container types.
-     * \{
-     */
-
-    /*!
-     * \brief List (vector) of 2D points.
-     */
-    typedef std::vector<EigenPoint2> EigenPoint2List;
-
-    /*! 
-     * \brief List (vector) of 3D points.
-     */
-    typedef std::vector<EigenPoint3> EigenPoint3List;
-
-    /*! 
-     * \brief List (vector) of limits container type.
-     */
-    typedef std::vector<EigenMinMax2> EigenMinMax2List;
-
-    /*! 
-     * \brief List (vector) of 3D bounding boxes container type.
-     */
-    typedef std::vector<EigenBBox3> EigenBBox3List;
-
-    /*! \} */ // gfmath_types
-
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Eigen scene
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
@@ -988,7 +1000,8 @@ namespace geofrenzy
     struct EigenSceneObj
     {
       EigenRGBA         m_color;    ///< RGBA color attribute
-      EigenSurfaceList  m_surfaces; ///< the object surfaces
+      EigenBBox3        m_bbox;     ///< object bounding 3D box
+      EigenSurfaceList  m_surfaces; ///< the object surface properties
 
       /*!
        * \brief Clear scene object of surfaces and set attribute defaults.
