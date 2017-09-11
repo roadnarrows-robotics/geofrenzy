@@ -63,6 +63,20 @@
         output="screen">
   </node>
 
+  <!-- *************************
+       Start Geofrenzy VCloud Node
+       ************************* -->
+  <!-- Uncomment to publish VCloud data -->
+  <!--
+  <node name="gf_vcloud_$(arg gf_class_idx)" pkg="geofrenzy" type="gf_vcloud"
+      args="_gf_class_idx:=$(arg gf_class_idx)"  output="screen">
+    <remap from="gf_vcloud_$(arg gf_class_idx)/geofrenzy/cloud" to="/cloud_in"/>
+    <param name="geofrenzy_cloud_hfov_min" type="double" value="-3.14159" />
+    <param name="geofrenzy_cloud_hfov_max" type="double" value="3.14159" />
+    <param name="geofrenzy_cloud_op_mode" type="int" value="1" />
+  </node>
+  -->
+
   <!-- Uncomment to automatically return to MANUAL operation after RTL -->
   <!--
   <param name="gf_sensor_relay/geofrenzy_sr_auto_manual"
