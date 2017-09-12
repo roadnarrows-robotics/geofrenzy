@@ -35,6 +35,7 @@
 #include <math.h>
 #include <string>
 #include <iostream>
+#include <ctime>
 
 //
 // ROS
@@ -123,6 +124,7 @@ namespace geofrenzy
             void updateMaxTilt(double distance);
             void updateMaxAscentVel();
             bool reqSetParam(std::string paramId, double value);
+	    clock_t m_lastParamSetTime;
     };
 
     /*!
@@ -168,7 +170,7 @@ namespace geofrenzy
 
         m_topicGlobalPos  = "/mavros/global_position/global";
         m_topicHomePos    = "/mavros/home_position/home";
-
+	m_lastParamSetTime = clock();
 
     }
 
@@ -210,10 +212,10 @@ namespace geofrenzy
     }
 
     void BreachInhibitor::updateMaxTilt(double distance){
-        //ROS_INFO_STREAM("Min Distance: " << distance << "meters");
+        ROS_INFO_STREAM("Min Distance: " << distance << "meters");
         double defaultAngle = 45.0;
-        double threshHold = 8.0;
-        double cushion = 0.8;
+        double threshHold = 10.0;
+        double cushion = 0.5;
         double minAngle = 5.0;
         if(distance < threshHold){
          double maxAngle = (defaultAngle)*(cushion - ((threshHold-distance)/threshHold));
@@ -267,25 +269,30 @@ namespace geofrenzy
     }
 
     bool BreachInhibitor::reqSetParam(std::string paramId, double value){
-        std::string     &nameSvc = m_serviceParamSet;
+        
+	clock_t now = clock();
+	double timeSinceLast = (now - m_lastParamSetTime)/(double)CLOCKS_PER_SEC;
+	//if(timeSinceLast <= 0.01){
+	//  return false;
+	//}else{
+	//  m_lastParamSetTime = now;
+	//}
+	
+	std::string     &nameSvc = m_serviceParamSet;
         mavros_msgs::ParamSet  svc;
 
-        //
-        // Do not send new operational mode if the UAS current operational mode
-        // is unknowned or if the UAS is armed.
-        //
         svc.request.param_id = paramId;
         svc.request.value.integer = 0;
-        svc.request.value.real = value;
+        svc.request.value.real = (int)value;
 
-        if( m_clientServices[nameSvc].call(svc) )
+        if(m_clientServices[nameSvc].call(svc) )
         {
-          ROS_DEBUG_STREAM("nameOf()" << ": " << nameSvc);
+          ROS_DEBUG_STREAM("Breach Inhibitor" << ": " << nameSvc);
           return svc.response.success;
         }
         else
         {
-          ROS_ERROR_STREAM("nameOf()" << ": " << "Service " << nameSvc << " failed.");
+          ROS_ERROR_STREAM("Breach Inhibitor" << ": " << "Service " << nameSvc << " failed.");
           return false;
         }
     }

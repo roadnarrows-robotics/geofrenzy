@@ -56,12 +56,15 @@
   <!-- *************************
        Start Geofrenzy Breach Inhibitor Node
        ************************* -->
+  <!-- Uncomment to inhibit breaching -->
+  <!--
   <node name="gf_breach_inhibitor" pkg="geofrenzy" type="gf_breach_inhibitor"
         args="_geofrenzy_sr_server_gci:=$(arg gf_class_idx)
         _geofrenzy_sr_rtl_gei:=$(arg rtl_gei)
         _geofrenzy_sr_altitude_gei:=$(arg altitude_gei)"
         output="screen">
   </node>
+  -->
 
   <!-- *************************
        Start Geofrenzy VCloud Node
