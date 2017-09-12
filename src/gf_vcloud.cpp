@@ -669,7 +669,8 @@ namespace geofrenzy
           for(j = 0; j < feat.geometry.size(); ++j)
           {
             m_scene.push_back(sceneObj);
-            createSceneObj(feat.geometry[j], FenceColorDft, m_fFenceHeight,
+            createSceneObj(feat.geometry[j], FenceColorDft,
+                m_fFenceAltitude, m_fFenceHeight, m_bHasCaps,
                 m_scene.back());
           }
         }

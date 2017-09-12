@@ -334,6 +334,56 @@ namespace geofrenzy
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
     /*!
+     * \brief Point in Polygon test for scene object.
+     *
+     * This method uses the edge crossing Counting Number algorithme.
+     *
+     * \sa http://geomalgorithms.com/a03-_inclusion.html
+     *
+     * If the number of edge crossings is odd, the the point is inside the
+     * polygon. Otherwise it lies outside. Any point on an edge or vertex
+     * is considered inside.
+     *
+     * Note that this simple algortihm does not work well with complex,
+     * crossing polygons.
+     *
+     * \param pt      Point to test.
+     * \param polygon Closed polygon with polygon[n] == polygon[0].
+     *
+     * \return Returns true if inside, false if outside.
+     */
+    static bool pipCn(const EigenPoint2 &pt, const EigenSceneObj &sceneObj)
+    {
+      size_t  j;
+      int     cn = 0;
+
+      for(j = 1; j < sceneObj.m_surfaces.size(); ++j)
+      {
+        const EigenPoint3 &pt0 = sceneObj.m_surfaces[j-1].m_vertices[0];
+        const EigenPoint3 &pt1 = sceneObj.m_surfaces[j].m_vertices[0];
+
+        //
+        // Upward crossing excludes endpoint. Downward crossing excludes
+        // startpoint.
+        //
+        if( (pt0.y() <= pt.y()) && (pt1.y() > pt.y()) ||  // upward crossing
+            (pt0.y() > pt.y()) && (pt1.y() <= pt.y()) )   // downward crossing
+        {
+          // slope - no divide by zero event given the above test   
+          double vt = (pt.y()  - pt0.y()) / (pt1.y() - pt0.y());
+
+          // compute the actual edge-ray intersect x-coordinate
+          if( pt.x() <  pt0.x() + vt * (pt1.x() - pt0.x()) )
+          {
+            ++cn;   // a valid crossing of y=pt.y() right of pt.x()
+          }
+        }
+      }
+
+      return cn & 0x01? true: false;
+    }
+
+    /*!
      * \brief Project vsensor ray onto the surface.
      *
      * The ray emanates from the origin at the spherical direction theta,phi.
@@ -1119,11 +1169,14 @@ namespace geofrenzy
 
     void createSceneObj(const Polygon64 &polygon,
                         const EigenRGBA &color,
+                        const double    &fenceAlt,
                         const double    &fenceHeight,
+                        const bool      hasCaps,
                         EigenSceneObj   &sceneObj)
     {
       size_t            numPoints = polygon.points.size();
       EigenSurface      surface;
+      double            altitude;
       double            height;
       size_t            i, j;
 
@@ -1136,13 +1189,26 @@ namespace geofrenzy
         return;
       }
 
-      // constrain height
-      height = fenceHeight < FenceMinHeight? FenceMinHeight: fenceHeight;
+      // fence base altitude - constrain as appropriate
+      altitude = fenceAlt >= 0.0? fenceAlt: 0.0;
+
+      // fence height from base - constrain as appropriate
+      height = fenceHeight >= FenceMinHeight? fenceHeight: FenceMinHeight;
 
       //
       // Attrubutes
       //
       sceneObj.m_color = color;
+
+      //
+      // Initialize object's bounding 3D box
+      //
+      sceneObj.m_bbox.m_min.x() = polygon.points[0].x;
+      sceneObj.m_bbox.m_min.y() = polygon.points[0].x;
+      sceneObj.m_bbox.m_min.z() = altitude;
+      sceneObj.m_bbox.m_max.x() = polygon.points[0].x;
+      sceneObj.m_bbox.m_max.y() = polygon.points[0].x;
+      sceneObj.m_bbox.m_max.z() = altitude + height;
 
       //
       // Loop through polygon points to create scene object surfaces.
@@ -1152,6 +1218,23 @@ namespace geofrenzy
         sceneObj.m_surfaces.push_back(surface);
 
         sceneObj.m_surfaces.back().m_num = i;
+
+        if( polygon.points[j].x < sceneObj.m_bbox.m_min.x() )
+        {
+          sceneObj.m_bbox.m_min.x() = polygon.points[j].x;
+        }
+        if( polygon.points[j].y < sceneObj.m_bbox.m_min.y() )
+        {
+          sceneObj.m_bbox.m_min.y() = polygon.points[j].y;
+        }
+        if( polygon.points[j].x > sceneObj.m_bbox.m_max.x() )
+        {
+          sceneObj.m_bbox.m_max.x() = polygon.points[j].x;
+        }
+        if( polygon.points[j].y > sceneObj.m_bbox.m_max.y() )
+        {
+          sceneObj.m_bbox.m_max.y() = polygon.points[j].y;
+        }
 
         calcSurfaceProps(polygon.points[i].x, polygon.points[j].x,
                          polygon.points[i].y, polygon.points[j].y,
@@ -1330,7 +1413,7 @@ namespace geofrenzy
 
       cout << "Create scene" << endl;
 
-      createSceneObj(polygon, FenceColorDft, 100.0, scene.back());
+      createSceneObj(polygon, FenceColorDft, 0.0, 100.0, false, scene.back());
 
       cout << "Scan scene" << endl;
 

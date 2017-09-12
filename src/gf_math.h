@@ -1000,6 +1000,7 @@ namespace geofrenzy
     struct EigenSceneObj
     {
       EigenRGBA         m_color;    ///< RGBA color attribute
+      bool              m_hasCaps;  ///< object has top and bottom caps
       EigenBBox3        m_bbox;     ///< object bounding 3D box
       EigenSurfaceList  m_surfaces; ///< the object surface properties
 
@@ -1117,12 +1118,17 @@ namespace geofrenzy
      *                      observer (meters).
      * \param color         Color attribute applied to the fence.
      *                      (red-green-blue intensities + alpha).
-     * \param fenceHeight   Height of fence (meters).  
+     * \param fenceAlt      Base altitude from ground (meters).
+     * \param fenceHeight   Height of fence from base (meters).  
+     * \param hasCaps       The object is a polyhedron. That is, it has both
+     *                      top(ceiling) and bottom(floor) horizontal caps.
      * \param[out] sceneObj Created scene object.
      */
     void createSceneObj(const Polygon64 &polygon,
                         const EigenRGBA &color,
+                        const double    &fenceAlt,
                         const double    &fenceHeight,
+                        const bool      hasCaps,
                         EigenSceneObj   &sceneObj);
 
     /*!

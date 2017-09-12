@@ -6,17 +6,34 @@
        Command Line Arguments
        ************************* -->
 
-  <!-- gf_server -->
+  <!-- ..............
+       gf_server
+       .............. -->
+
+  <!-- all nodes key off geofrenzy class index -->
   <arg name="gf_class_idx" default="168" />
+
+  <!-- Uncomment corresponding param element below for this to take effect -->
   <arg name="geofrenzy_fence_filename"
     default="$(find geofrenzy)/samples/fences/2x3_fence.json" />
 
-  <!-- mavros -->
+  <!-- ..............
+       mavros
+       .............. -->
   <arg name="fcu_url" default="tcp://intel-aero:5760" />
 
-  <!-- gf_sensor_relay -->
-  <arg name="rtl_gei" default="208" />
-  <arg name="altitude_gei" default="211" />
+  <!-- ..............
+       gf_sensor_relay
+       .............. -->
+  <arg name="rtl_gei" default="208" />        <!-- boolset base type -->
+  <arg name="altitude_gei" default="211" />   <!-- threshold base type -->
+
+  <!-- Define breach action for MAV
+        12 = return-to-launch
+        13 = land-now
+        14 = goto-waypoint
+  -->
+  <arg name="mav_action" default="12" />
 
 
   <!-- *************************
@@ -52,6 +69,14 @@
       _geofrenzy_sr_altitude_gei:=$(arg altitude_gei)"
       output="screen">
   </node>
+
+  <!-- Only enable MAV related sentinel -->
+  <param name="/gf_sensor_relay/geofrenzy_sr_enables" type="int" value="4" />
+
+  <!-- Define breach action for MAV -->
+  <param name="/gf_sensor_relay/geofrenzy_sr_mav_action" type="int"
+    value="$(arg mav_action)" />
+
 
   <!-- *************************
        Start Geofrenzy Breach Inhibitor Node
