@@ -3,6 +3,7 @@
 # Set the relative heights all of the subscribed geofence polygonal areas.
 #
 
-float64   base    # base altitdue of fence with 0 being on the ground [meters]
-float64   height  # height of fence from base [meters]
+float64 base      # base altitdue of fences with 0 being on the ground [meters]
+float64 height    # height of fences from base [meters]
+bool    cap       # do [not] cap the fences with have ceilings and floors
 ---

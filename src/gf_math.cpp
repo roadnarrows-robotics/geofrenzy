@@ -309,6 +309,9 @@ namespace geofrenzy
                                              surface.m_vertices[1],
                                              surface.m_vertices[2]);
 
+      // surface base altitude
+      surface.m_altitude = z0;
+
       // length of surface base line
       surface.m_length = distance(surface.m_vertices[0], surface.m_vertices[1]);
 
@@ -332,56 +335,6 @@ namespace geofrenzy
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Generate Scene Points of Interest Functions
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \brief Point in Polygon test for scene object.
-     *
-     * This method uses the edge crossing Counting Number algorithme.
-     *
-     * \sa http://geomalgorithms.com/a03-_inclusion.html
-     *
-     * If the number of edge crossings is odd, the the point is inside the
-     * polygon. Otherwise it lies outside. Any point on an edge or vertex
-     * is considered inside.
-     *
-     * Note that this simple algortihm does not work well with complex,
-     * crossing polygons.
-     *
-     * \param pt      Point to test.
-     * \param polygon Closed polygon with polygon[n] == polygon[0].
-     *
-     * \return Returns true if inside, false if outside.
-     */
-    static bool pipCn(const EigenPoint2 &pt, const EigenSceneObj &sceneObj)
-    {
-      size_t  j;
-      int     cn = 0;
-
-      for(j = 1; j < sceneObj.m_surfaces.size(); ++j)
-      {
-        const EigenPoint3 &pt0 = sceneObj.m_surfaces[j-1].m_vertices[0];
-        const EigenPoint3 &pt1 = sceneObj.m_surfaces[j].m_vertices[0];
-
-        //
-        // Upward crossing excludes endpoint. Downward crossing excludes
-        // startpoint.
-        //
-        if( (pt0.y() <= pt.y()) && (pt1.y() > pt.y()) ||  // upward crossing
-            (pt0.y() > pt.y()) && (pt1.y() <= pt.y()) )   // downward crossing
-        {
-          // slope - no divide by zero event given the above test   
-          double vt = (pt.y()  - pt0.y()) / (pt1.y() - pt0.y());
-
-          // compute the actual edge-ray intersect x-coordinate
-          if( pt.x() <  pt0.x() + vt * (pt1.x() - pt0.x()) )
-          {
-            ++cn;   // a valid crossing of y=pt.y() right of pt.x()
-          }
-        }
-      }
-
-      return cn & 0x01? true: false;
-    }
 
     /*!
      * \brief Project vsensor ray onto the surface.
@@ -884,6 +837,53 @@ namespace geofrenzy
       return n;
     }
 
+    /*!
+     * \brief Grid fence caps to generate a list of depth + color
+     * points.
+     *
+     * \param       gridSize    Grid size.
+     * \param       sceneObj    Scene object.
+     * \param[out]  intersects  List of intersecting points.
+     * \param       options     Options to control the grid generations.
+     *
+     * \return Number of points generated.
+     */
+    static size_t gridSceneCaps(const double        gridSize,
+                                const EigenSceneObj &sceneObj,
+                                EigenXYZRGBAList    &intersects,
+                                uint32_t            options)
+    {
+      const EigenBBox3  &bbox = sceneObj.m_bbox;  // object's bounding box
+
+      double        ceiling = bbox.m_max.z();   // ceiling z coordinate
+      EigenPoint3   pt;                         // working point
+      EigenXYZRGBA  xyzrgba;                    // xyz rgba point
+      size_t        n = 0;                      // points added
+
+      pt.z() = ceiling;
+
+      //
+      // Loop over object's bounding box.
+      //
+      for(pt.x() = bbox.m_min.x(); pt.x() <= bbox.m_max.x(); pt.x() += gridSize)
+      {
+        for(pt.y()=bbox.m_min.y(); pt.y() <= bbox.m_max.y(); pt.y() += gridSize)
+        {
+          if( pipCn(pt, sceneObj.m_footprint) )
+          {
+            xyzrgba << pt, sceneObj.m_color;
+            intersects.push_back(xyzrgba);
+            ++n;
+          }
+        }
+      }
+
+      // TODO: floor
+
+      return n;
+    }
+
+
     // -------------------------------------------------------------------------
     // Public
     // -------------------------------------------------------------------------
@@ -940,7 +940,7 @@ namespace geofrenzy
     ostream &operator<<(ostream &os, const EigenSurface &surface)
     {
       os << "{" << endl
-        << "  surface:      " << surface.m_num << endl
+        << "  surface_num:  " << surface.m_num << endl
         << "  vertices:" << endl
         << "  [" << endl;
         for(size_t i = 0; i< surface.m_vertices.size(); ++i)
@@ -949,12 +949,13 @@ namespace geofrenzy
         }
       os << "  ]" << endl
         << "  plane:        " << surface.m_plane.coeffs() << endl
+        << "  altitude:     " << surface.m_altitude << endl
         << "  length:       " << surface.m_length << endl
         << "  height:       " << surface.m_height << endl
         << "  inclination:  " << degrees(surface.m_inclination) << endl
         << "  projection:   " << surface.m_projection << endl
         << "  bbox:         " << surface.m_bbox << endl
-        << "  theta limits: " 
+        << "  theta_limits: " 
           << "["
             << degrees(surface.m_thetas.m_min[0]) << ", "
             << degrees(surface.m_thetas.m_max[0])
@@ -970,6 +971,33 @@ namespace geofrenzy
       return os;
     }
 
+    ostream &operator<<(ostream &os, const EigenSceneObj &sceneObj)
+    {
+      size_t  i;
+
+      os << "{" << endl;
+      os << "  color:    " << sceneObj.m_color << endl;
+      os << "  has_caps: " << sceneObj.m_hasCaps << endl;
+      os << "  bbox:     " << sceneObj.m_bbox << endl;
+
+      os << "  footprint:" << endl
+         << "  [" << endl;
+      for(i = 0; i< sceneObj.m_footprint.size(); ++i)
+      {
+        os << "    " << sceneObj.m_footprint[i] << "," << endl;
+      }
+      os << "  ]" << endl;
+
+      for(i = 0; i < sceneObj.m_surfaces.size(); ++i)
+      {
+        os << "  surface[" << i << "] =" << endl;
+        os << sceneObj.m_surfaces[i] << endl;
+      }
+
+      os << "}";
+
+      return os;
+    }
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Geometric and Color Functions.
@@ -1175,6 +1203,7 @@ namespace geofrenzy
                         EigenSceneObj   &sceneObj)
     {
       size_t            numPoints = polygon.points.size();
+      EigenPoint2       pt;
       EigenSurface      surface;
       double            altitude;
       double            height;
@@ -1198,7 +1227,8 @@ namespace geofrenzy
       //
       // Attrubutes
       //
-      sceneObj.m_color = color;
+      sceneObj.m_color    = color;
+      sceneObj.m_hasCaps  = hasCaps;
 
       //
       // Initialize object's bounding 3D box
@@ -1209,6 +1239,24 @@ namespace geofrenzy
       sceneObj.m_bbox.m_max.x() = polygon.points[0].x;
       sceneObj.m_bbox.m_max.y() = polygon.points[0].x;
       sceneObj.m_bbox.m_max.z() = altitude + height;
+
+      //
+      // Base footprint
+      //
+      for(i = 0; i < numPoints; ++i)
+      {
+        pt.x() = polygon.points[i].x;
+        pt.y() = polygon.points[i].y;
+        sceneObj.m_footprint.push_back(pt);
+      }
+
+      // close the polygonal footprint
+      if( (sceneObj.m_footprint[0].x() != pt.x()) ||
+          (sceneObj.m_footprint[0].y() != pt.y()) )
+      {
+        sceneObj.m_footprint.push_back(sceneObj.m_footprint[0]);
+      }
+
 
       //
       // Loop through polygon points to create scene object surfaces.
@@ -1238,15 +1286,14 @@ namespace geofrenzy
 
         calcSurfaceProps(polygon.points[i].x, polygon.points[j].x,
                          polygon.points[i].y, polygon.points[j].y,
-                         0.0, height,
+                         altitude, altitude+height,
                          sceneObj.m_surfaces.back());
 
         // cerr << sceneObj.m_surfaces.back() << endl;
       }
 
-      // cerr << "Created scene object: " << endl;
-      // cerr << "  color:    " << sceneObj.m_color << endl;
-      // cerr << "  surfaces: " << sceneObj.m_surfaces.size() << endl;
+      cerr << "Created scene object: " << endl;
+      cerr << sceneObj << endl;
     }
 
     void scanScene(const double thetaMin, const double thetaMax,
@@ -1310,6 +1357,11 @@ namespace geofrenzy
           // grid surface
           gridSurface(gridSize, color, sceneObj.m_surfaces[j],
                       intersects, options);
+        }
+
+        if( sceneObj.m_hasCaps )
+        {
+          gridSceneCaps(gridSize, sceneObj, intersects, options);
         }
       }
     }

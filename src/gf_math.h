@@ -728,7 +728,7 @@ namespace geofrenzy
     /*!
      * \brief Point in Polygon test.
      *
-     * This method uses the edge crossing Counting Number algorithme.
+     * This method uses the edge crossing Counting Number algorithm.
      *
      * \sa http://geomalgorithms.com/a03-_inclusion.html
      *
@@ -745,6 +745,22 @@ namespace geofrenzy
      * \return Returns true if inside, false if outside.
      */
     bool pipCn(const EigenPoint2 &pt, const EigenPoint2List &polygon);
+
+    /*!
+     * \brief Point in Polygon test.
+     *
+     * The 3D point is projected onto the x-y plane (i.e. z = 0)
+     *
+     * \param pt      Point to test.
+     * \param polygon Closed polygon with polygon[n] == polygon[0].
+     *
+     * \return Returns true if inside, false if outside.
+     */
+    inline bool pipCn(const EigenPoint3 &pt, const EigenPoint2List &polygon)
+    {
+      EigenPoint2 pt2(pt.x(), pt.y());
+      return pipCn(pt2, polygon);
+    }
 
     /*! \} */ // gfmath_basic_ops
 
@@ -974,6 +990,7 @@ namespace geofrenzy
       unsigned int    m_num;        ///< surface number in scene object
       EigenPoint3List m_vertices;   ///< surface vertices
       EigenPlane3     m_plane;      ///< infinite plane
+      double          m_altitude;   ///< surface base altitude
       double          m_length;     ///< surface length
       double          m_height;     ///< surface height
       double          m_inclination;///< surface inclination angle from x-axis
@@ -999,17 +1016,19 @@ namespace geofrenzy
      */
     struct EigenSceneObj
     {
-      EigenRGBA         m_color;    ///< RGBA color attribute
-      bool              m_hasCaps;  ///< object has top and bottom caps
-      EigenBBox3        m_bbox;     ///< object bounding 3D box
-      EigenSurfaceList  m_surfaces; ///< the object surface properties
-
+      EigenRGBA         m_color;      ///< RGBA color attribute
+      bool              m_hasCaps;    ///< object has top and bottom caps
+      EigenBBox3        m_bbox;       ///< object bounding 3D box
+      EigenPoint2List   m_footprint;  ///< object base footprint
+      EigenSurfaceList  m_surfaces;   ///< the object surface properties
       /*!
        * \brief Clear scene object of surfaces and set attribute defaults.
        */
       void clear()
       {
-        m_color = FenceColorDft;
+        m_color   = FenceColorDft;
+        m_hasCaps = false;
+        m_footprint.clear();
         m_surfaces.clear();
       }
     };
@@ -1203,13 +1222,15 @@ namespace geofrenzy
     std::ostream &operator<<(std::ostream &os, const EigenMinMax3 &minmax);
 
     std::ostream &operator<<(std::ostream &os, const EigenSurface &surface);
+
+    std::ostream &operator<<(std::ostream &os, const EigenSceneObj &sceneObj);
     ///@}
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Unit Tests
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-#undef GF_MATH_UT  ///< define/undef to enable/disable unit test functions.
+#define GF_MATH_UT  ///< define/undef to enable/disable unit test functions.
 
 #ifdef GF_MATH_UT
     /*!

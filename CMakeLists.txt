@@ -293,5 +293,7 @@ add_dependencies(gf_breach_inhibitor geofrenzy_gencpp)
 install(
   PROGRAMS 
     scripts/latlongmeters.py
+    scripts/fix.sh
+    scripts/tfstatic.sh
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

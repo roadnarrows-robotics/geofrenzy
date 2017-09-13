@@ -33,6 +33,8 @@
 //
 // System
 //
+#include <unistd.h>
+
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -583,6 +585,13 @@ namespace geofrenzy
         //
         if( (bFromFile = m_nh.getParam(ParamNameFenceFilename, filename)) )
         {
+          if( access(filename.c_str(), R_OK) == -1 )
+          {
+            ROS_ERROR_STREAM(filename
+                << ": File does not exist or read permissions are denied.");
+            return false;
+          }
+
           ROS_INFO_STREAM(ros::this_node::getName()
             << ": Retrieving Geofrenzy properties for fence class "
             << m_fenceClass
@@ -803,6 +812,13 @@ namespace geofrenzy
         //
         if( m_nh.getParam(ParamNameFenceFilename, filename) )
         {
+          if( access(filename.c_str(), R_OK) == -1 )
+          {
+            ROS_ERROR_STREAM(filename
+                << ": File does not exist or read permissions are denied.");
+            return false;
+          }
+
           ROS_INFO_STREAM("Reading file " << filename);
 
           std::ifstream in(filename.c_str());

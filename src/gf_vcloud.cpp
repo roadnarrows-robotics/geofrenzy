@@ -90,7 +90,7 @@ using namespace geofrenzy::gf_math;
 // Unit Test Switch (only available if math ut is also enabled)  
 //
 #ifdef GF_MATH_UT
-#undef GF_VCLOUD_NODE_UT  ///< define to enable unit test
+#define GF_VCLOUD_NODE_UT  ///< define to enable unit test
 #else
 #undef GF_VCLOUD_NODE_UT  ///< ut always disabled
 #endif // GF_MATH_UT
@@ -378,7 +378,7 @@ namespace geofrenzy
 
         initCloudMsgFmt(m_msgCloud);
 
-        m_bHasCaps        = false;
+        m_bCapFences      = false;
         m_fFenceAltitude  = 0.0;
         m_fFenceHeight    = GeofenceHeightDft;
 
@@ -535,11 +535,13 @@ namespace geofrenzy
       double    m_fGridSize;  ///< grid size (meters)
       uint32_t  m_uOptions;   ///< scanning control options
 
-      // scene
-      bool        m_bHasCaps;     ///< fences do [not] have floors and ceilings
-      double      m_fFenceAltitude; ///< geofences base altitude (m)
-      double      m_fFenceHeight; ///< geofences height from base (m)
-      EigenScene  m_scene;        ///< scene of polygonal shapes with attributes
+      // scene global properties
+      bool    m_bCapFences;     ///< [don't] cap geofences with floors/ceilings
+      double  m_fFenceAltitude; ///< geofences base altitude (m)
+      double  m_fFenceHeight;   ///< geofences height from base (m)
+
+      // the dynamic scene
+      EigenScene  m_scene;      ///< scene of polygonal shapes with attributes
 
       // messaging processing 
       int                       m_nPublishCnt;  ///< publish counter
@@ -670,7 +672,7 @@ namespace geofrenzy
           {
             m_scene.push_back(sceneObj);
             createSceneObj(feat.geometry[j], FenceColorDft,
-                m_fFenceAltitude, m_fFenceHeight, m_bHasCaps,
+                m_fFenceAltitude, m_fFenceHeight, m_bCapFences,
                 m_scene.back());
           }
         }
@@ -708,6 +710,8 @@ namespace geofrenzy
           m_fFenceHeight = m_fFenceAltitude + 0.1;
         }
 
+        m_bCapFences = req.cap;
+
         return true;
       };
 
@@ -733,6 +737,11 @@ namespace geofrenzy
         EigenRGBA             color4(0.1, 0.5, 0.1, 0.5);
         double                scale  = 0.1;
 
+        // tweaks
+        double alt      = 0.0;  // fences base altitude (meters)
+        double height   = 2.0;  // fences height (meters)
+        bool   cap      = true; // do [not] cap fences with ceilings/floors
+
         m_scene.clear();
 
         //
@@ -740,7 +749,7 @@ namespace geofrenzy
         //
         utMakeCannedPolygon(UtPolynumTee, offset1, scale, polygon);
         m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color1, 2.0, m_scene.back());
+        createSceneObj(polygon, color1, alt, height, cap, m_scene.back());
 
         //
         // Object two
@@ -748,7 +757,7 @@ namespace geofrenzy
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumRectangle, offset2, scale, polygon);
         m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color2, 2.0, m_scene.back());
+        createSceneObj(polygon, color2, alt, height, cap, m_scene.back());
 
         //
         // Object three
@@ -756,7 +765,7 @@ namespace geofrenzy
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumHexagon, offset3, scale, polygon);
         m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color3, 2.0, m_scene.back());
+        createSceneObj(polygon, color3, alt, height, cap, m_scene.back());
 
         //
         // Object four
@@ -764,7 +773,7 @@ namespace geofrenzy
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumTriangle, offset4, 0.05, polygon);
         m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color4, 2.0, m_scene.back());
+        createSceneObj(polygon, color4, alt, height, cap, m_scene.back());
 
         ++m_nPublishCnt;
       }
