@@ -1292,8 +1292,8 @@ namespace geofrenzy
         // cerr << sceneObj.m_surfaces.back() << endl;
       }
 
-      cerr << "Created scene object: " << endl;
-      cerr << sceneObj << endl;
+      // cerr << "Created scene object: " << endl;
+      // cerr << sceneObj << endl;
     }
 
     void scanScene(const double thetaMin, const double thetaMax,
