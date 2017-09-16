@@ -1230,7 +1230,7 @@ namespace geofrenzy
     // Unit Tests
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-#undef GF_MATH_UT  ///< define/undef to enable/disable unit test functions.
+#define GF_MATH_UT  ///< define/undef to enable/disable unit test functions.
 
 #ifdef GF_MATH_UT
     /*!

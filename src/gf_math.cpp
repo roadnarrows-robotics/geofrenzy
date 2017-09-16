@@ -321,7 +321,7 @@ namespace geofrenzy
       // base line inclination
       surface.m_inclination = inclination(pt0, pt1);
 
-      // origin project (distance) from extended base line 
+      // origin projection (distance) from extended base line 
       surface.m_projection = projection(pt0, pt1);
 
       // surface bounding box
@@ -552,7 +552,7 @@ namespace geofrenzy
      * \brief Trace vsensor ray through virtual scene to generate a list of
      * intersecting depth + color points.
      *
-     * The Sperical coordinates are as used in mathematics.
+     * The spherical coordinates are as used in mathematics.
      *
      * \param       theta       Ray's azimuthal angle from x+ axis (-pi, pi].
      * \param       phi         Ray's polar angle from z+ [0, pi].
@@ -653,7 +653,7 @@ namespace geofrenzy
 
             if( isNearest )
             {
-              projectRay(theta, phi, ParallelStepInit, ParallelStepRatio,
+              projectRay(thetaNearest, phi, ParallelStepInit, ParallelStepRatio,
                         color, surface, rayPoI);
             }
           }
@@ -698,6 +698,11 @@ namespace geofrenzy
 
             // add to ascending distance ordered list
             rayPoI[t] = poi;
+          }
+
+          if( sceneObj.m_hasCaps )
+          {
+            //traceRayCeiling(ray, sceneObj, rayPoI);
           }
         }
       }
@@ -1233,30 +1238,46 @@ namespace geofrenzy
       //
       // Initialize object's bounding 3D box
       //
-      sceneObj.m_bbox.m_min.x() = polygon.points[0].x;
-      sceneObj.m_bbox.m_min.y() = polygon.points[0].x;
-      sceneObj.m_bbox.m_min.z() = altitude;
-      sceneObj.m_bbox.m_max.x() = polygon.points[0].x;
-      sceneObj.m_bbox.m_max.y() = polygon.points[0].x;
-      sceneObj.m_bbox.m_max.z() = altitude + height;
+      mkBBox(polygon.points[0].x, polygon.points[0].x,
+             polygon.points[0].y, polygon.points[0].y,
+             altitude, altitude + height,
+             0.0, sceneObj.m_bbox);
 
       //
-      // Base footprint
+      // Base polygonal footprint.
       //
       for(i = 0; i < numPoints; ++i)
       {
         pt.x() = polygon.points[i].x;
         pt.y() = polygon.points[i].y;
+
+        // expand object's bounding box
+        if( pt.x() < sceneObj.m_bbox.m_min.x() )
+        {
+          sceneObj.m_bbox.m_min.x() = pt.x();
+        }
+        if( pt.y() < sceneObj.m_bbox.m_min.y() )
+        {
+          sceneObj.m_bbox.m_min.y() = pt.y();
+        }
+        if( pt.x() > sceneObj.m_bbox.m_max.x() )
+        {
+          sceneObj.m_bbox.m_max.x() = pt.x();
+        }
+        if( pt.y() > sceneObj.m_bbox.m_max.y() )
+        {
+          sceneObj.m_bbox.m_max.y() = pt.y();
+        }
+
         sceneObj.m_footprint.push_back(pt);
       }
 
-      // close the polygonal footprint
+      // make sure footprint is closed
       if( (sceneObj.m_footprint[0].x() != pt.x()) ||
           (sceneObj.m_footprint[0].y() != pt.y()) )
       {
         sceneObj.m_footprint.push_back(sceneObj.m_footprint[0]);
       }
-
 
       //
       // Loop through polygon points to create scene object surfaces.
@@ -1266,23 +1287,6 @@ namespace geofrenzy
         sceneObj.m_surfaces.push_back(surface);
 
         sceneObj.m_surfaces.back().m_num = i;
-
-        if( polygon.points[j].x < sceneObj.m_bbox.m_min.x() )
-        {
-          sceneObj.m_bbox.m_min.x() = polygon.points[j].x;
-        }
-        if( polygon.points[j].y < sceneObj.m_bbox.m_min.y() )
-        {
-          sceneObj.m_bbox.m_min.y() = polygon.points[j].y;
-        }
-        if( polygon.points[j].x > sceneObj.m_bbox.m_max.x() )
-        {
-          sceneObj.m_bbox.m_max.x() = polygon.points[j].x;
-        }
-        if( polygon.points[j].y > sceneObj.m_bbox.m_max.y() )
-        {
-          sceneObj.m_bbox.m_max.y() = polygon.points[j].y;
-        }
 
         calcSurfaceProps(polygon.points[i].x, polygon.points[j].x,
                          polygon.points[i].y, polygon.points[j].y,
