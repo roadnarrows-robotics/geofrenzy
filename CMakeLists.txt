@@ -24,6 +24,8 @@ if(NOT EIGEN3_FOUND)
   find_package(Eigen3 REQUIRED)
 endif()
 
+#set (CMAKE_CXX_STANDARD 11)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -267,7 +269,9 @@ add_dependencies(gf_server geofrenzy_gencpp)
 # geofrenzy RGBD virtual sensor
 add_executable(gf_vcloud
   src/gf_math.cpp
+  src/gf_poly.cpp
   src/gf_ros.cpp
+  src/gf_scene.cpp
   src/gf_vcloud.cpp)
 target_link_libraries(gf_vcloud
   ${GPROF_OPTS}

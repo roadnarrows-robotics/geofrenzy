@@ -10,6 +10,11 @@
  *
  * \brief The Geofrenzy math declarations.
  *
+ * The geometric math and data structures supports basic geometry.
+ *
+ * For a more complete libray, see:\n
+ *  Computational Geometry Algorithms Library (CGAL) https://www.cgal.org
+ *
  * \author Bill Coon (bill@roadnarrows.com)
  * \author Robin Knight (robin.knight@roadnarrows.com)
  *
@@ -37,11 +42,10 @@
 #include <string>
 #include <limits>
 #include <ostream>
+#include <cassert>
 
 #include <Eigen/Eigen>
 #include <Eigen/Geometry>
-
-#include "geofrenzy/Polygon64.h"
 
 namespace geofrenzy
 {
@@ -50,45 +54,20 @@ namespace geofrenzy
     /*!
      * \defgroup gfmath Geofrenzy Math
      * 
-     * The Eigen3 library data types and algorithms are used by this Geofrenzy
+     * The Eigen3 library data types and algorithms are used by the Geofrenzy
      * source. With ROS, Eigen3 is required, so no additional third-party
-     * packages are required for the math.
+     * packages are required.
      * \{
      */
 
-    /*!
-     * \defgroup gfmath_types Data Types
-     * \brief Geofrenzy math data types.
-     * \{
-     * \}
-     */
+    //--------------------------------------------------------------------------
+    // Math Data Types, Constants, and Defines
+    //
+    // Eigen geometric constructs in 2 and 3 dimensional ambient space, such as
+    // point, line, and plane. Also color space
+    //--------------------------------------------------------------------------
 
-    /*!
-     * \defgroup gfmath_const Constants
-     * \brief Geofrenzy math data constants.
-     * \{
-     * \}
-     */
-
-    /*!
-     * \defgroup gfmath_basic_ops Basic Operations 
-     * \brief Geofrenzy math basic operations.
-     * \{
-     * \}
-     */
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Eigen geometric constructs and simple operations.
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \ingroup gfmath_types
-     * \brief Basic Geometric Data Types
-     *
-     * Eigen data types of geometric constructs in 2 and 3 dimensional
-     * ambient space, such as point, line, and plane.
-     * \{
-     */
+    #define M_TAU (2.0 * M_PI)  ///< tau is defined as 2 pi 
 
     /*!
      * \brief Point in 2D space: 2x1 vector of doubles.
@@ -99,6 +78,93 @@ namespace geofrenzy
      * \brief Point in 3D space: 3x1 vector of doubles.
      */
     typedef Eigen::Vector3d EigenPoint3;
+
+    /*!
+     * \brief Color specified as red-green-blue: 3x1 vector of doubles.
+     *
+     * Each color component is a color intensity in the range [0.0, 1.0]
+     * where 0.0 is no color and 1.0 is full intensity.
+     */
+    typedef EigenPoint3 EigenRGB;
+
+    /*!
+     * \brief Color specified as red-green-blue-alpha: 4x1 vector of doubles.
+     *
+     * Each color component is a color intensity in the range [0.0, 1.0]
+     * where 0.0 is no color and 1.0 is full intensity.
+     *
+     * The alpha channel is in the range [0.0, 1.0] where 0.0 completely
+     * transparent and 1.0 is completely opaque.
+     */
+    typedef Eigen::Vector4d EigenRGBA;
+
+    /*!
+     * \brief Depth plus color: 6x1 vector of doubles.
+     */
+    typedef Eigen::Matrix<double, 6, 1> EigenXYZRGB;
+
+    /*!
+     * \brief Depth plus color plus alpha: 7x1 vector of doubles.
+     */
+    typedef Eigen::Matrix<double, 7, 1> EigenXYZRGBA;
+
+    /*!
+     * Cartesian x,y,z coordinates indices.
+     *
+     * \sa EigenPoint2(_X, _Y only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
+     */
+    const size_t  _X = 0; ///< x coordinate pt[_X] or pt.x()
+    const size_t  _Y = 1; ///< y coordinate pt[_Y] or pt.y()
+    const size_t  _Z = 2; ///< z coordinate pt[_Z] or pt.z()
+  
+    /*!
+     * \brief Polar and spherical coordinates indices r,theta,phi.
+     *
+     * Polar:     pt[_R], pt[_THETA]
+     * Spherical: pt[_RHO], pt[_THETA], pt[_PHI]
+     *
+     * \sa EigenPoint2(_R, _THETA only), EigenPoint3
+     */
+    const size_t  _R      = 0;  ///< radial distance [0, inf)
+    const size_t  _RHO    = 0;  ///< radial distance [0, inf)
+    const size_t  _THETA  = 1;  ///< azimuthal angle from x+ axis (-pi, pi].
+    const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
+
+    /*!
+     * Size dimensions length x width x height.
+     *
+     * \sa EigenPoint2(_L, _W only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
+     */
+    const size_t  _L = 0; ///< x coordinate pt[_L] or pt.x()
+    const size_t  _W = 1; ///< y coordinate pt[_W] or pt.y()
+    const size_t  _H = 2; ///< z coordinate pt[_H] or pt.z()
+
+    /*!
+     * \brief Color red-green-blue-alpha indices.
+     *
+     * \sa EigenRGB, EigenRGBA
+     */
+    const size_t  _RED    = 0; ///< red   pt[_RED]   or pt.x()
+    const size_t  _GREEN  = 1; ///< green pt[_GREEN] or pt.y()
+    const size_t  _BLUE   = 2; ///< blue  pt[_BLUE]  or pt.z()
+    const size_t  _ALPHA  = 3; ///< alpha pt[_ALPHA] or pt.w()
+  
+    /*!
+     * \brief Color red-green-blue-alpha indices for XYZ+ points.
+     *
+     * \sa EigenXYZRGB, EigenXYZRGBA
+     */
+    const size_t  _XYZRED   = 3; ///< xyzred
+    const size_t  _XYZGREEN = 4; ///< xyzgreen
+    const size_t  _XYZBLUE  = 5; ///< xyzblue
+    const size_t  _XYZALPHA = 6; ///< xyzalpha
+
+    /*!
+     * \brief 24-bit color, 8-bits per channel (rgb), values and mask.
+     */
+    const double        Color24ChanMin  =   0.0;    ///< minimum value
+    const double        Color24ChanMax  = 255.0;    ///< maximum value
+    const unsigned int  Color24ChanMask = 0x00ff;   ///< mask
 
     /*!
      * \brief Parameterized 1D line in 2D space: l(t) = o + t * d.
@@ -116,14 +182,22 @@ namespace geofrenzy
     typedef Eigen::Hyperplane<double, 3> EigenPlane3;
 
     /*!
-     * \brief 1 2-tuple minimum,maximum limit.
+     * \brief One 2-tuple minimum,maximum limit.
      *
      * Limits: [minmax[_MIN], minmax[_MAX]]
      */
     typedef EigenPoint2 EigenMinMax1; 
 
     /*!
-     * \brief 2 2-tuple minimum,maximum limits.
+     * \brief Minimum and maximum indices.
+     *
+     * \sa EigenPoint2, EigenMinMax1
+     */
+    const size_t  _MIN = 0; ///< x coordinate pt[_MIN] or pt.x()
+    const size_t  _MAX = 1; ///< y coordinate pt[_MAX] or pt.y()
+  
+    /*!
+     * \brief Two 2-tuple minimum,maximum limits.
      *
      * Limits: [m_min[k], m_max[k]], k=0,1
      */
@@ -134,7 +208,12 @@ namespace geofrenzy
     };
 
     /*!
-     * \brief 2 3-tuple minimum,maximum limits.
+     * \brief Rectangular boundary.
+     */
+    typedef EigenMinMax2 EigenBoundary2;
+
+    /*!
+     * \brief Two 3-tuple minimum,maximum limits.
      *
      * Limits: [m_min[k], m_max[k]], k=0,2
      */
@@ -145,13 +224,9 @@ namespace geofrenzy
     };
 
     /*!
-     * \brief Bounding box rectangular cuboid.
+     * \brief Rectangular cuboid boundary.
      */
-    typedef EigenMinMax3 EigenBBox3;
-
-    /*! 
-     * \brief Basic container types.
-     */
+    typedef EigenMinMax3 EigenBoundary3;
 
     /*!
      * \brief List (vector) of 2D points.
@@ -164,52 +239,20 @@ namespace geofrenzy
     typedef std::vector<EigenPoint3> EigenPoint3List;
 
     /*! 
-     * \brief List (vector) of limits container type.
+     * \brief List of depth plus RGB insensity points.
+     *
+     * The list may or may not be an 2D ordered list and may contain multiple
+     * collinear points for the same (x,y).
      */
-    typedef std::vector<EigenMinMax2> EigenMinMax2List;
+    typedef std::vector<EigenXYZRGB> EigenXYZRGBList;
 
     /*! 
-     * \brief List (vector) of 3D bounding boxes container type.
-     */
-    typedef std::vector<EigenBBox3> EigenBBox3List;
-
-    /*! \} */ // gfmath_types
-
-    /*!
-     * \ingroup gfmath_const
-     * \brief Geometric constants.
-     * \{
-     */
-
-    /*! tau is defined as 2 pi */
-    #define M_TAU (2.0 * M_PI)
-
-    /*!
-     * \brief Minimum and maximum indices.
+     * \brief List of depth plus RGBA insensity points.
      *
-     * \sa EigenPoint2
+     * The list may or may not be an 2D ordered list and may contain multiple
+     * collinear points for the same (x,y).
      */
-    const size_t  _MIN = 0; ///< x coordinate (= pt.x())
-    const size_t  _MAX = 1; ///< y coordinate (= pt.y())
-  
-    /*!
-     * Cartesian x,y,z coordinates indices.
-     *
-     * \sa EigenPoint2(_X,_Y only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
-     *
-     */
-    const size_t  _X = 0; ///< x coordinate (= pt.x())
-    const size_t  _Y = 1; ///< y coordinate (= pt.y())
-    const size_t  _Z = 2; ///< z coordinate (= pt.z())
-  
-    /*!
-     * \brief Spherical coordinates indices r,theta,phi.
-     *
-     * \sa EigenPoint3
-     */
-    const size_t  _R      = 0;  ///< radial distance [0, inf).
-    const size_t  _THETA  = 1;  ///< azimuthal angle from x+ axis (-pi, pi].
-    const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
+    typedef std::vector<EigenXYZRGBA> EigenXYZRGBAList;
 
     /*!
      * \brief X-Y plane quadrants.
@@ -249,46 +292,129 @@ namespace geofrenzy
     const EigenPoint3 Origin3(0.0, 0.0, 0.0);
 
     /*!
-     * \brief Minimum fence height (meters).
-     */
-    const double FenceMinHeight = 0.10;
-
-    /*!
      * \brief Default precision.
-     */
-    const double PrecisionDft = 1.0e-10;
-
-    /*! \} */ // gfmath_const
-  
-    /*!
-     * \ingroup gfmath_basic_ops
-     * \brief Geometric basic operations.
-     * \{
-     */
-
-    /*!
-     * \brief Convert degrees to radians.
      *
-     * \param degrees Degrees.
-     *
-     * \return Radians
+     * This default precision is somewhat optimized for location technologies,
+     * which have at best, sub-millimeter linear resolutions.
      */
-    inline double radians(const double degrees)
+    const double PrecisionDft = 1.0e-5;
+
+
+
+    //--------------------------------------------------------------------------
+    // Print and Insertion Operators
+    //--------------------------------------------------------------------------
+
+    ///@{
+    /*!
+     * \brief Print object.
+     *
+     * Note:  Since many of the math object types are simple typedefs of
+     *        Eigen types, the Eigen insertion operators << can take precedence.
+     *        Use the print versions, if needed, to force desired output.
+     *
+     * \param os  Output stream.
+     * \param obj Object to print.
+     */
+    void print(std::ostream &os, const EigenPoint2 &obj);
+
+    void print(std::ostream &os, const EigenPoint3 &obj);
+
+    void print(std::ostream &os, const EigenLine2 &obj);
+
+    void print(std::ostream &os, const EigenLine3 &obj);
+
+    void print(std::ostream &os, const EigenPlane3 &obj);
+
+    void print(std::ostream &os, const EigenRGBA &obj);
+
+    void print(std::ostream &os, const EigenXYZRGB &obj);
+
+    void print(std::ostream &os, const EigenXYZRGBA &obj);
+
+    void print(std::ostream &os, const EigenMinMax2 &obj);
+
+    void print(std::ostream &os, const EigenMinMax3 &obj);
+    ///@}
+
+    ///@{
+    /*!
+     * \brief Stream insertion operators.
+     *
+     * \param os  Output stream.
+     * \param obj Object to insert.
+     *
+     * \return Reference to output stream.
+     */
+    inline std::ostream &operator<<(std::ostream &os, const EigenPoint2 &obj)
     {
-      return degrees / 180.0 * M_PI;
+      print(os, obj);
+      return os;
     }
 
-    /*!
-     * \brief Convert radians to degrees.
-     *
-     * \param radians  Radians
-     *
-     * \return Degrees
-     */
-    inline double degrees(const double radians)
+    inline std::ostream &operator<<(std::ostream &os, const EigenPoint3 &obj)
     {
-      return 180.0 * radians / M_PI;
+      print(os, obj);
+      return os;
     }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenLine2 &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenLine3 &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenPlane3 &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenRGBA &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenXYZRGB &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenXYZRGBA &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenMinMax2 &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+
+    inline std::ostream &operator<<(std::ostream &os, const EigenMinMax3 &obj)
+    {
+      print(os, obj);
+      return os;
+    }
+    ///@}
+
+
+    //--------------------------------------------------------------------------
+    // Basic Math and Geometric Operations
+    //--------------------------------------------------------------------------
+    
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Boot Camp
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
     /*!
      * \brief Cap value between [min, max].
@@ -305,18 +431,58 @@ namespace geofrenzy
     }
 
     /*!
+     * \brief Minimum of two values.
+     *
+     * \param val0  Value 0.
+     * \param val1  Value 1.
+     *
+     * \return Minimum value.
+     */
+    inline double min(const double val0, const double val1)
+    {
+      return val0 <= val1? val0: val1;
+    }
+
+    /*!
+     * \brief Maximum of two values.
+     *
+     * \param val0  Value 0.
+     * \param val1  Value 1.
+     *
+     * \return Maximum value.
+     */
+    inline double max(const double val0, const double val1)
+    {
+      return val0 >= val1? val0: val1;
+    }
+
+    /*!
      * \brief Determine sign of value.
      *
-     * Zero is considered position.
+     * Zero is considered positive.
      *
      * \param val   Value to test.
      *
-     * \return Returns 1 or -1 if value is non-negative or negative,
+     * \return Returns 1 or -1 depending if value is non-negative or negative,
      * respectively.
      */
     inline int sign(const double val)
     {
       return val >= 0.0? 1: -1;
+    }
+
+    /*!
+     * \brief Calculate the hypotenuse c from right triangle with length of
+     * sides a and b.
+     *
+     * \param a  Length of side a.
+     * \param b  Length of side b.
+     *
+     * \return Length of c.
+     */
+    inline double pythagorean(const double a, const double b)
+    {
+      return sqrt(pow(fabs(a), 2.0) + pow(fabs(b), 2.0));
     }
 
     /*
@@ -348,74 +514,37 @@ namespace geofrenzy
     {
       return EigenPoint2(pt.y(), pt.z());
     }
+    
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Angles
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
     /*!
-     * \brief Test if values are approximately equal.
+     * \brief Convert degrees to radians.
      *
-     * \param val0      Value 0.
-     * \param val1      Value 1.
-     * \param precision Precision of equality.
+     * \param degrees Degrees.
      *
-     * \return Returns true or false.
+     * \return Radians
      */
-    inline bool isApprox(const double val0,
-                         const double val1,
-                         const double precision = PrecisionDft)
+    inline double radians(const double degrees)
     {
-      return fabs(val1 - val0) <= precision;
+      return degrees / 180.0 * M_PI;
     }
 
     /*!
-     * \brief Test if value are approximately equal to 0 (zero).
+     * \brief Convert radians to degrees.
      *
-     * \param val       Value to test.
-     * \param precision Precision of equality.
+     * \param radians  Radians
      *
-     * \return Returns true or false.
+     * \return Degrees
      */
-    inline bool isApproxZero(const double val,
-                             const double precision = PrecisionDft)
+    inline double degrees(const double radians)
     {
-      return fabs(val) <= precision;
+      return 180.0 * radians / M_PI;
     }
 
     /*!
-     * \brief Test if two points, within precision, are approximately equal.
-     *
-     * \param pt0         Point 0.
-     * \param pt1         Point 1.
-     * \param precesion   Precision of equality check.
-     *
-     * \return Returns true or false.
-     */
-    inline bool isApprox(const EigenPoint2 &pt0,
-                         const EigenPoint2 &pt1,
-                         const double      precision = PrecisionDft)
-    {
-      return  (fabs(pt1.x() - pt0.x()) <= precision) &&
-              (fabs(pt1.y() - pt0.y()) <= precision);
-    }
-
-    /*!
-     * \brief Test if two points, within precision, are approximately equal.
-     *
-     * \param pt0         Point 0.
-     * \param pt1         Point 1.
-     * \param precesion   Precision of equality check.
-     *
-     * \return Returns true or false.
-     */
-    inline bool isApprox(const EigenPoint3 &pt0,
-                         const EigenPoint3 &pt1,
-                         const double      precision = PrecisionDft)
-    {
-      return  (fabs(pt1.x() - pt0.x()) <= precision) &&
-              (fabs(pt1.y() - pt0.y()) <= precision) &&
-              (fabs(pt1.z() - pt0.z()) <= precision);
-    }
-
-    /*!
-     * \brief Remap angle into equivalent (-pi, pi] range.
+     * \brief Remap angle into equivalent value in (-pi, pi] range.
      *
      * \param a   Angle (radians).
      *
@@ -435,6 +564,19 @@ namespace geofrenzy
       {
         return a;
       }
+    }
+
+    /*!
+     * \brief Add two angles keeping result in (-pi, pi].
+     *
+     * \param a0  Angle 0 in radians.
+     * \param a1  Angle 1 in radians.
+     *
+     * \return Added angles in radians (-pi, pi].
+     */
+    static inline double addAngles(const double a0, const double a1)
+    {
+      return pi2pi(a0 + a1);
     }
 
     /*!
@@ -462,6 +604,353 @@ namespace geofrenzy
       return pi2pi(a + M_PI);
     }
 
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Norms and Metric Distances
+    //
+    // The Lp norms and distances supported are:
+    //  * L1        - Sum of absolutes. A.K.A rectilinear or taxicab.norm.
+    //  * squaredL2 - Sum of squares. L2 without the square root operation.
+    //  * L2        - Square root of sum of squares. A.K.A Euclidean norm.
+    //  * Linf      - Maximum absolute component. Infinity A.K.A maximum norm.
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*!
+     * \brief Calculate the L1 absolute distance of scalars.
+     *
+     * For scalars, L1 == L2 == Linf
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param s0  Scalar value 0.
+     * \param s1  Scalar value 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double L1Dist(const double s0, const double s1)
+    {
+      return fabs(s1 - s0);
+    }
+
+    /*!
+     * \brief Calculate the L1 norm of a point in R2.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double L1Norm(const EigenPoint2 &pt)
+    {
+      return fabs(pt.x()) + fabs(pt.y());
+    }
+
+    /*!
+     * \brief Calculate the L1 absolute distance between two points in R2.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0 Point 0.
+     * \param pt1 Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double L1Dist(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    {
+      return fabs(pt1.x() - pt0.x()) + fabs(pt1.y() - pt0.y());
+    }
+
+    /*!
+     * \brief Calculate the L1 norm of a point in R3.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double L1Norm(const EigenPoint3 &pt)
+    {
+      return fabs(pt.x()) + fabs(pt.y() + fabs(pt.z()));
+    }
+
+    /*!
+     * \brief Calculate the L1 absolute distance between two points in R3.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0 Point 0.
+     * \param pt1 Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double L1Dist(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
+    {
+      return  fabs(pt1.x() - pt0.x()) +
+              fabs(pt1.y() - pt0.y()) +
+              fabs(pt1.z() - pt0.z());
+    }
+
+    /*!
+     * \brief Calculate the squared L2 distance of scalars.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param s0  Scalar value 0.
+     * \param s1  Scalar value 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double squaredL2Dist(const double s0, const double s1)
+    {
+      return pow(fabs(s1-s0), 2.0);
+    }
+
+    /*!
+     * \brief Calculate the squared L2 norm of a point in R2.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double squaredL2Norm(const EigenPoint2 &pt)
+    {
+      return pt.squaredNorm();
+    }
+
+    /*!
+     * \brief Calculate the squared L2 distance between two points in R2.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0 Point 0.
+     * \param pt1 Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double squaredL2Dist(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    {
+      return squaredL2Norm(EigenPoint2(pt1 - pt0));
+    }
+
+    /*!
+     * \brief Calculate the squared L2 norm of a point in R3.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double squaredL2Norm(const EigenPoint3 &pt)
+    {
+      return pt.squaredNorm();
+    }
+
+    /*!
+     * \brief Calculate the squared L2 distance between two points in R3.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0 Point 0.
+     * \param pt1 Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double squaredL2Dist(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
+    {
+      return squaredL2Norm(EigenPoint3(pt1 - pt0));
+    }
+
+    /*!
+     * \brief Calculate the L2 norm of a point in R2.
+     *
+     * \note The Blue's L2 norm algorithm avoids underflow and overflow.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double L2Norm(const EigenPoint2 &pt)
+    {
+      return pt.blueNorm();
+    }
+
+    /*!
+     * \brief Calculate the L2 absolute distance between two points in R2.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0   Point 0.
+     * \param pt1   Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double L2Dist(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    {
+      return sqrt(squaredL2Dist(pt0, pt1));
+    }
+
+    /*!
+     * \brief Calculate the L2 norm of a point in R3.
+     *
+     * \note The Blue's L2 norm algorithm avoids underflow and overflow.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double L2Norm(const EigenPoint3 &pt)
+    {
+      return pt.blueNorm();
+    }
+
+    /*!
+     * \brief Calculate the L2 absolute distance between two points in R3.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0   Point 0.
+     * \param pt1   Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double L2Dist(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
+    {
+      return sqrt(squaredL2Dist(pt0, pt1));
+    }
+
+    /*!
+     * \brief Calculate the Linf norm of a point in R2.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double LInfNorm(const EigenPoint2 &pt)
+    {
+      return fabs(pt.maxCoeff());
+    }
+
+    /*!
+     * \brief Calculate the Linf absolute distance between two points in R2.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0   Point 0.
+     * \param pt1   Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double LInfDist(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    {
+      return LInfNorm(EigenPoint2(pt1 - pt0));
+    }
+
+    /*!
+     * \brief Calculate the Linf norm of a point in R3.
+     *
+     * \param pt  Point.
+     *
+     * \return Norm.
+     */
+    inline double LInfNorm(const EigenPoint3 &pt)
+    {
+      return fabs(pt.maxCoeff());
+    }
+
+    /*!
+     * \brief Calculate the Linf absolute distance between two points in R3.
+     *
+     * \note Catastrophic cancellation may occur for nearly identical values.
+     *
+     * \param pt0   Point 0.
+     * \param pt1   Point 1.
+     *
+     * \return Distance >= 0.
+     */
+    inline double LInfDist(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
+    {
+      return LInfNorm(EigenPoint3(pt1 - pt0));
+    }
+
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Approximates
+    //
+    // Stand back! DC may have the Justice League and Marvel the Avengers,
+    // but lo, here be the Approximators!
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    /*!
+     * \brief Test if values are approximately equal.
+     *
+     * \param s0        Scalar value 0.
+     * \param s1        Scalar value 1.
+     * \param precision Precision of equality.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApprox(const double s0,
+                         const double s1,
+                         const double precision = PrecisionDft)
+    {
+      return L1Dist(s0, s1) <= precision;
+    }
+
+    /*!
+     * \brief Test if value are approximately equal to 0 (zero).
+     *
+     * \param s         Scalar value to test.
+     * \param precision Precision of equality.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApproxZero(const double s,
+                             const double precision = PrecisionDft)
+    {
+      return fabs(s) <= precision;
+    }
+
+    /*!
+     * \brief Test if two points, within precision, are approximately equal.
+     *
+     * The L1 distance is used.
+     *
+     * \param pt0         Point 0.
+     * \param pt1         Point 1.
+     * \param precesion   Precision of equality check.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApprox(const EigenPoint2 &pt0,
+                         const EigenPoint2 &pt1,
+                         const double      precision = PrecisionDft)
+    {
+      return L1Dist(pt0, pt1) <= precision;
+    }
+
+    /*!
+     * \brief Test if two points, within precision, are approximately equal.
+     *
+     * The L1 distance is used.
+     *
+     * \param pt0         Point 0.
+     * \param pt1         Point 1.
+     * \param precesion   Precision of equality check.
+     *
+     * \return Returns true or false.
+     */
+    inline bool isApprox(const EigenPoint3 &pt0,
+                         const EigenPoint3 &pt1,
+                         const double      precision = PrecisionDft)
+    {
+      return L1Dist(pt0, pt1) <= precision;
+    }
+
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Coordinate System Converters
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+    ///@{
     /*!
      * \brief Convert polar coordinate (r,theta) to Cartesion (x,y).
      *
@@ -469,6 +958,7 @@ namespace geofrenzy
      *
      * \param r     Radial distance [0, inf).
      * \param theta Azimuthal angle from x+ axis (-pi, pi].
+     * \param pt    Point in polar coordinates.
      *
      * \return Cartesion (x,y) point.
      */
@@ -477,6 +967,38 @@ namespace geofrenzy
       return EigenPoint2(r * cos(theta), r * sin(theta));
     }
 
+    inline EigenPoint2 polarToCartesian(const EigenPoint2 &pt)
+    {
+      return polarToCartesian(pt[_R], pt[_THETA]);
+    }
+    ///@}
+
+    ///@{
+    /*!
+     * \brief Convert Cartesian coordinate (x,y) to polar (r,theta).
+     *
+     * The polar coordinates are as used in mathematics with:
+     *  - r is the radial distance [0, inf) from the origin
+     *  - theta is the azimuthal angle from the x+ axis (-pi, pi].
+     *
+     * \param pt    Cartesian point (x,y).
+     * \param x     X coordinate.
+     * \param y     Y coordinate.
+     *
+     * \return Polar point (r,theta).
+     */
+    inline EigenPoint2 cartesianToPolar(const EigenPoint2 &pt)
+    {
+      return EigenPoint2(L2Norm(pt), atan2(pt.y(), pt.x()));
+    }
+
+    inline EigenPoint2 cartesianToPolar(const double x, const double y)
+    {
+      return cartesianToPolar(EigenPoint2(x, y));
+    }
+    ///@}
+
+    ///@{
     /*!
      * \brief Convert spherical coordinate (r,theta,phi) to Cartesion (x,y,z).
      *
@@ -485,6 +1007,7 @@ namespace geofrenzy
      * \param r     Radial distance [0, inf).
      * \param theta Azimuthal angle from x+ axis (-pi, pi].
      * \param phi   Polar angle from z+ [0, pi].
+     * \param pt    Point in spherical coordinates.
      *
      * \return Cartesion (x,y,z) point.
      */
@@ -496,54 +1019,40 @@ namespace geofrenzy
                          r * sin(phi) * sin(theta),
                          r * cos(phi));
     }
+
+    inline EigenPoint3 sphericalToCartesian(const EigenPoint3 &pt)
+    {
+      return sphericalToCartesian(pt[_RHO], pt[_THETA], pt[_PHI]);
+    }
+    ///@}
     
+    ///@{
     /*!
-     * \brief Convert spherical coordinate (r,theta,phi) to Cartesion (x,y,z).
+     * \brief Convert Cartesian coordinate (x,y,z) to spherical (r,theta,phi).
      *
      * The Sperical coordinates are as used in mathematics.
      *
-     * \param       r       Radial distance [0, inf)
-     * \param       theta   Azimuthal angle from x+ axis (-pi, pi].
-     * \param       phi     Polar angle from z+ [0, pi].
-     * \param[out]  pt      Cartesion (x,y,z) point.
+     * \param pt    Cartesion (x,y,z) point.
+     * \param x     X coordinate.
+     * \param y     Y coordinate.
+     * \param z     Z coordinate.
+     *
+     * \return Spherical coordinate (r,theta,phi) point.
      */
-    inline void sphericalToCartesian(const double r,
-                                     const double theta,
-                                     const double phi,
-                                     EigenPoint3  &pt)
-    {
-      pt << r * sin(phi) * cos(theta), r * sin(phi) * sin(theta), r * cos(phi);
-    }
+    EigenPoint3 cartesianToSpherical(const EigenPoint3 &pt);
 
-    /*!
-     * \brief Calculate the Euclidean absolute distance between two points in
-     * Re2.
-     *
-     * \param pt0   Point 0.
-     * \param pt1   Point 1.
-     *
-     * \return Distance >= 0.0
-     */
-    inline double distance(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    inline EigenPoint3 cartesianToSpherical(const double x,
+                                            const double y,
+                                            const double z)
     {
-      return sqrt(pow(pt1.x()-pt0.x(), 2.0) + pow(pt1.y()-pt0.y(), 2.0));
+      return cartesianToSpherical(EigenPoint3(x, y, z));
     }
+    ///@}
 
-    /*!
-     * \brief Calculate the Euclidean absolute distance between two points in
-     * Re3.
-     *
-     * \param pt0   Point 0.
-     * \param pt1   Point 1.
-     *
-     * \return Distance >= 0.0
-     */
-    inline double distance(const EigenPoint3 &pt0, const EigenPoint3 &pt1)
-    {
-      return sqrt(pow(pt1.x()-pt0.x(), 2.0) +
-                  pow(pt1.y()-pt0.y(), 2.0) +
-                  pow(pt1.z()-pt0.z(), 2.0));
-    }
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Point - Line Geometry
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
     /*!
      * \brief Calculate the distance from the origin (0,0) to a line in 2D.
@@ -565,23 +1074,24 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Calculate the distance from a point pt0 to a line in 2D
+     * \brief Calculate the distance from a point pt0 to a line in ambient 2D
+     * space.
      *
      * The 2D line is defined by the two points pt1 and pt2.
      *
      * The projection on the line pt1,pt2 of the point pt0 forms a point on the
      * line that defines an orthogonal line between the projection and point
-     * pt0
+     * pt0.
      *
+     * \param pt0   Point to project.
      * \param pt1   Line point 1.
      * \param pt2   Line point 2.
-     * \param pt0   Point to project.
      *
-     * \return Projection distance >= 0.0
+     * \return Projection distance >= 0.
      */
-    inline double projection(const EigenPoint2 &pt1,
-                             const EigenPoint2 &pt2,
-                             const EigenPoint2 &pt0)
+    inline double projection(const EigenPoint2 &pt0,
+                             const EigenPoint2 &pt1,
+                             const EigenPoint2 &pt2)
     {
       double dx = pt2.x() - pt1.x();
       double dy = pt2.y() - pt1.y();
@@ -591,7 +1101,7 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Calculate the inclination angle of a line.
+     * \brief Calculate the inclination angle of a line in ambient 2D space.
      *
      * The 2D line is defined by the two points pt0 and pt1.
      *
@@ -609,10 +1119,10 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Find the intersection of two 2D parametric lines.
+     * \brief Find the intersection of two parametric lines in ambient 2D space.
      *
      * \param line1   Parametric line 1 line1(t) = o1 + t * d1
-     * \param line2   Parametric line 2 line2(u) = o1 + u * d1
+     * \param line2   Parametric line 2 line2(u) = o2 + u * d2
      *
      * \return
      * If the lines intersect, then the intersection point is returned.
@@ -624,14 +1134,19 @@ namespace geofrenzy
     /*!
      * \brief Find the t value for the parametric line at the given point.
      *
-     * First x, then the y component is tried. No consistency check is made.
+     * First x, then the y component is tried. No consistency checks are made.
      *
-     * \param line  Parametric line in 3D space.
+     * \param line  Parametric line in ambient 3D space.
      * \param pt    Point in the x-y plane.
      *
      * \return Returns t or Inf.
      */
     double t_param(const EigenLine3 &line, const EigenPoint2 &pt);
+
+
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+    // Checks on Limits, Locations, and Containment
+    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
     /*!
      * \brief Check if the value is within the min,max limits.
@@ -652,9 +1167,9 @@ namespace geofrenzy
      * \param val   Value to check.
      * \param lim   Limits.
      *
-     * \return Returns true or false if value in [min[k], max[k]], k=0,1.
+     * \return Returns true or false if value in any [min[k], max[k]], k=0,1.
      */
-    inline bool within(const double &val, const EigenMinMax2 &lim)
+    inline bool withinOneOf(const double &val, const EigenMinMax2 &lim)
     {
       return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
               ((val >= lim.m_min[1]) && (val <= lim.m_max[1]));
@@ -666,9 +1181,9 @@ namespace geofrenzy
      * \param val   Value to check.
      * \param lim   Limits.
      *
-     * \return Returns true or false if value in [min[k], max[k]], k=0,2.
+     * \return Returns true or false if value in any [min[k], max[k]], k=0,2.
      */
-    inline bool within(const double &val, const EigenMinMax3 &lim)
+    inline bool withinOneOf(const double &val, const EigenMinMax3 &lim)
     {
       return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
               ((val >= lim.m_min[1]) && (val <= lim.m_max[1])) ||
@@ -676,54 +1191,125 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Determine the x-y plane quadrant the point lies within.
+     * \brief Determine which x-y quadrant the point is located.
      *
      * \param pt        2D point.
      * \param precision Precision of position.
      *
-     * \return Returns 1-4 for quadrants QI - QIV, respectively. Returns 0
-     * if point lies on or is sufficiently close to an axis.
+     * \return  Returns 1-4 for quadrants QI - QIV, respectively.
+     *          Returns 0 if the point lies sufficiently close to an axis.
      */
     int quadrant(const EigenPoint2 &pt, const double precision = PrecisionDft);
 
     /*!
-     * \brief Determine the x-y plane quadrant the angle from origin projects
-     * into.
+     * \brief Determine which x-y quadrant the ray from the origin is located.
      *
-     * \param theta     Angle in the x-y plane (radians).
+     * \param theta     Azimuthal angle of ray from x+ axis (-pi, pi].
      * \param precision Precision of angle.
      *
-     * \return Returns 1-4 for quadrants QI - QIV, respectively. Returns 0
-     * if angle lies on or is sufficiently close to an axis.
+     * \return  Returns 1-4 for quadrants QI - QIV, respectively.
+     *          Returns 0 if angle lies sufficiently close to an axis.
      */
     int quadrant(const double theta, const double precision = PrecisionDft);
 
     /*!
-     * \brief Determine the x-y-z actant the point lies within.
+     * \brief Determine which x-y-z octant the point is located.
      *
      * \param pt        3D point.
      * \param precision Precision of position.
      *
-     * \return Returns 1-8 for octants OI - OVII, respectively. Returns 0
-     * if point lies on or is sufficiently close to an axis plane.
+     * \return  Returns 1-8 for octants OI - OVII, respectively.
+     *          Returns 0 if point lies sufficiently close to an axes plane.
      */
     int octant(const EigenPoint3 &pt, const double precision = PrecisionDft);
 
     /*!
-     * \brief Test if point is contained within a rectangular cuboid bounding
-     * box.
+     * \brief Determine which x-y-z octant the ray from the origin is located.
      *
-     * \param pt    Point to test.
-     * \param bbox  Bounding box.
+     * \param pt        3D point.
+     * \param theta     Azimuthal angle of ray from x+ axis (-pi, pi].
+     * \param phi       Polar angle of ray from z+ [0, pi].
+     * \param precision Precision of position.
+     *
+     * \return  Returns 1-8 for octants OI - OVII, respectively.
+     *          Returns 0 if point lies sufficiently close to an axes plane.
+     */
+    int octant(const double theta,
+               const double phi,
+               const double precision = PrecisionDft);
+
+    ///@(
+    /*!
+     * \brief Seed boundary with initial values.
+     *
+     * \param pt      Point value.
+     * \param bounds  Bounding area.
+     */
+    inline void seedBounds(const EigenPoint2 &seed, EigenBoundary2 &bounds)
+    {
+      bounds.m_min[0] = bounds.m_max[0] = seed[0];
+      bounds.m_min[1] = bounds.m_max[1] = seed[1];
+    }
+
+    inline void seedBounds(const EigenPoint3 &seed, EigenBoundary3 &bounds)
+    {
+      bounds.m_min[0] = bounds.m_max[0] = seed[0];
+      bounds.m_min[1] = bounds.m_max[1] = seed[1];
+      bounds.m_min[2] = bounds.m_max[2] = seed[2];
+    }
+    ///@}
+
+    ///@(
+    /*!
+     * \brief Conditionally expand bounds to include the point.
+     *
+     * \param pt      Point to include.
+     * \param bounds  Bounding area.
+     */
+    void growBounds(const EigenPoint2 &pt, EigenBoundary2 &bounds);
+
+    // conditionally expand bounds to include point
+    void growBounds(const EigenPoint3 &pt, EigenBoundary3 &bounds);
+    ///@}
+
+    ///@(
+    /*!
+     * \brief Uniformally expand the bounds by epsilong
+     *
+     * \param epsilon Epsilon expansion.
+     * \param bounds  Bounding area.
      *
      * \return Returns true or false.
      */
-    inline bool contained(const EigenPoint3 &pt, const EigenBBox3 &bbox)
+    // expane bounds by epsilon
+    void growBounds(const double epsilon, EigenBoundary2 &bounds);
+
+    // expane bounds by epsilon
+    void growBounds(const double epsilon, EigenBoundary3 &bounds);
+    ///@}
+
+    ///@(
+    /*!
+     * \brief Test if point is in bounds.
+     *
+     * \param pt      Point to test.
+     * \param bounds  Bounding area.
+     *
+     * \return Returns true or false.
+     */
+    inline bool inbounds(const EigenPoint2 &pt, const EigenBoundary2 &bounds)
     {
-      return  (pt.x() >= bbox.m_min.x()) && (pt.x() <= bbox.m_max.x()) &&
-              (pt.y() >= bbox.m_min.y()) && (pt.y() <= bbox.m_max.y()) &&
-              (pt.z() >= bbox.m_min.z()) && (pt.z() <= bbox.m_max.z());
+      return  (pt.x() >= bounds.m_min.x()) && (pt.x() <= bounds.m_max.x()) &&
+              (pt.y() >= bounds.m_min.y()) && (pt.y() <= bounds.m_max.y());
     }
+
+    inline bool inbounds(const EigenPoint3 &pt, const EigenBoundary3 &bounds)
+    {
+      return  (pt.x() >= bounds.m_min.x()) && (pt.x() <= bounds.m_max.x()) &&
+              (pt.y() >= bounds.m_min.y()) && (pt.y() <= bounds.m_max.y()) &&
+              (pt.z() >= bounds.m_min.z()) && (pt.z() <= bounds.m_max.z());
+    }
+    ///@}
 
     /*!
      * \brief Point in Polygon test.
@@ -736,8 +1322,8 @@ namespace geofrenzy
      * polygon. Otherwise it lies outside. Any point on an edge or vertex
      * is considered inside.
      *
-     * Note that this simple algortihm does not work well with complex,
-     * crossing polygons.
+     * The polygon is can be either convex or concave. This simple algortihm
+     * does not work well with complex, crossing polygons.
      *
      * \param pt      Point to test.
      * \param polygon Closed polygon with polygon[n] == polygon[0].
@@ -746,111 +1332,10 @@ namespace geofrenzy
      */
     bool pipCn(const EigenPoint2 &pt, const EigenPoint2List &polygon);
 
-    /*!
-     * \brief Point in Polygon test.
-     *
-     * The 3D point is projected onto the x-y plane (i.e. z = 0)
-     *
-     * \param pt      Point to test.
-     * \param polygon Closed polygon with polygon[n] == polygon[0].
-     *
-     * \return Returns true if inside, false if outside.
-     */
-    inline bool pipCn(const EigenPoint3 &pt, const EigenPoint2List &polygon)
-    {
-      EigenPoint2 pt2(pt.x(), pt.y());
-      return pipCn(pt2, polygon);
-    }
-
-    /*! \} */ // gfmath_basic_ops
-
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Eigen color spaces and simple operations.
+    // Color
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \ingroup gfmath_types
-     * \brief Basic Color Data Types
-     * \{
-     */
-
-    /*!
-     * \brief Color specified as red-green-blue: 3x1 vector of doubles.
-     *
-     * Each color component is a color intensity in the range [0.0, 1.0]
-     * where 0.0 is no color and 1.0 is full intensity.
-     */
-    typedef EigenPoint3 EigenRGB;
-
-    /*!
-     * \brief Color specified as red-green-blue-alpha: 4x1 vector of doubles.
-     *
-     * Each color component is a color intensity in the range [0.0, 1.0]
-     * where 0.0 is no color and 1.0 is full intensity.
-     *
-     * The alpha channel is in the range [0.0, 1.0] where 0.0 completely
-     * transparent and 1.0 is completely opaque.
-     */
-    typedef Eigen::Vector4d EigenRGBA;
-
-    /*!
-     * \brief Depth plus color: 6x1 vector of doubles.
-     */
-    typedef Eigen::Matrix<double, 6, 1> EigenXYZRGB;
-
-    /*!
-     * \brief Depth plus color plus alpha: 7x1 vector of doubles.
-     */
-    typedef Eigen::Matrix<double, 7, 1> EigenXYZRGBA;
-
-    /*! \} */ // gfmath_types
-
-    /*!
-     * \ingroup gfmath_const
-     * \brief Color constants.
-     * \{
-     */
-
-    /*!
-     * \brief Color red-green-blue-alpha indices.
-     *
-     * \sa EigenRBG, EigenRGBA
-     */
-    const size_t  _RED    = 0; ///< red   (= pt.x())
-    const size_t  _GREEN  = 1; ///< green (= pt.y())
-    const size_t  _BLUE   = 2; ///< blue  (= pt.z())
-    const size_t  _ALPHA  = 3; ///< alpha (= pt.w()?)
-  
-    /*!
-     * \brief Color red-green-blue-alpha indices for XYZ+ points.
-     *
-     * \sa EigenXYZRBG, EigenXYZRGBA
-     */
-    const size_t  _XYZRED   = 3; ///< xyzred
-    const size_t  _XYZGREEN = 4; ///< xyzgreen
-    const size_t  _XYZBLUE  = 5; ///< xyzblue
-    const size_t  _XYZALPHA = 6; ///< xyzalpha
-
-    /*!
-     * \brief Maximum 24-bit color 8-bit channel (rgb) values and mask.
-     */
-    const double        Color24ChanMin  =   0.0;    ///< minimum value
-    const double        Color24ChanMax  = 255.0;    ///< maximum value
-    const unsigned int  Color24ChanMask = 0x00ff;   ///< mask
-
-    /*!
-     * \brief Default fence color. 50% transparent blueish gray.
-     */
-    const EigenRGBA FenceColorDft(0.30, 0.30, 0.45, 0.50);
-
-    /*! \} */ // gfmath_const
- 
-    /*!
-     * \ingroup gfmath_basic_ops
-     * \brief Color basic operations.
-     * \{
-     */
 
     /*!
      * \brief Make black color.
@@ -965,310 +1450,11 @@ namespace geofrenzy
                     const EigenRGBA &colorBg,
                     EigenRGBA       &colorOut);
 
-    /*! \} */ // gfmath_basic_ops
-
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Eigen scene
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \defgroup gfmath_scene Scene Data Types and Functions
-     * \brief An Eigen scene is built up of objects, with each object
-     * a set of attributes and surfaces.
-     *
-     * \{
-     */
-
-    /*!
-     * \brief Eigen planar surface rendering properties.
-     *
-     * The properties are used to speed computer rendering of a surface.
-     */
-    struct EigenSurface
-    {
-      unsigned int    m_num;        ///< surface number in scene object
-      EigenPoint3List m_vertices;   ///< surface vertices
-      EigenPlane3     m_plane;      ///< infinite plane
-      double          m_altitude;   ///< surface base altitude
-      double          m_length;     ///< surface length
-      double          m_height;     ///< surface height
-      double          m_inclination;///< surface inclination angle from x-axis
-      double          m_projection; ///< project origin on base 2D line
-      EigenBBox3      m_bbox;       ///< clipping bounding box
-      EigenMinMax2    m_thetas;     ///< horizontal apparent theta limits
-      double          m_subtended;  ///< subtended angle of surface from viewer
-    };
-
-    /*!
-     * \brief List (vector) of surfaces container type.
-     */
-    typedef std::vector<EigenSurface> EigenSurfaceList;
-
-    /*! 
-     * \brief Eigen scene object data type.
-     *
-     * Each object has a a set of rendering attributes (e.g. color, texture)
-     * plus a set of surfaces. The set of surfaces typically specifiy a fully
-     * connected, close shape (e.g. polyhedron), but this is not a requirement.
-     *
-     * A scene object must contain at least one surface.
-     */
-    struct EigenSceneObj
-    {
-      EigenRGBA         m_color;      ///< RGBA color attribute
-      bool              m_hasCaps;    ///< object has top and bottom caps
-      EigenBBox3        m_bbox;       ///< object bounding 3D box
-      EigenPoint2List   m_footprint;  ///< object base footprint
-      EigenSurfaceList  m_surfaces;   ///< the object surface properties
-      /*!
-       * \brief Clear scene object of surfaces and set attribute defaults.
-       */
-      void clear()
-      {
-        m_color   = FenceColorDft;
-        m_hasCaps = false;
-        m_footprint.clear();
-        m_surfaces.clear();
-      }
-    };
-
-    /*! 
-     * \brief Eigen scene data type is a vector of scene objects.
-     */
-    typedef std::vector<EigenSceneObj> EigenScene;
-
-    /*!
-     * \brief Scanning bit-or'ed options.
-     */
-    enum ScanOptions
-    {
-      /*!
-       * The default scanning option.
-       *  - Include all instersecting points along any traced ray. This option
-       *    excludes use of the 2D option.
-       *  - Do not produce any 2D structure. That is, if no intersection along
-       *    a traced ray is detected, no point is added.
-       *  - Do not alpha blend colors along ray.
-       */
-      ScanOptionDft = 0x00,
-
-      /*!
-       * Generate a full height x width 2D structure of points. Any "no object"
-       * point has a value of inf.
-       */
-      ScanOption2D  = 0x01,
-
-      /*!
-       * Include only the nearest point of a set of intersections along a
-       * traced ray.
-       */
-      ScanOptionNearest = 0x02,
-
-      /*!
-       * Alpha blend colors.
-       */
-      ScanOptionAlphaBlend = 0x04
-    };
-
-    ///@{
-    /*!
-     * \brief Useful scan option macros.
-     *
-     * \param _opt  Option bits
-     *
-     * \return Boolean
-     */
-    #define SCANOPT_2D(_opt)            ((_opt) & ScanOption2D)
-    #define SCANOPT_ALPHA_BLEND(_opt)   ((_opt) & ScanOptionAlphaBlend)
-    #define SCANOPT_NEAREST_ONLY(_opt)  ((_opt) & ScanOptionNearest)
-    #define SCANOPT_XRAY_VIS(_opt)      !SCANOPT_NEAREST_ONLY(_opt)
-    ///@}
-
-    /*! \} */ // gfmath_scene
-
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Ouput types  
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \ingroup gfmath_scene
-     * \defgroup gfmath_cloud Output Cloud Data Types
-     * \brief Geofrenzy math calculated ouput data types.
-     *
-     * From Geofrenzy features, a synthetic set of depth plus color points 
-     * are generated. These data points can be converted to standard set of
-     * ROS messages to create virtual sensors such as point cloud structured
-     * light sensors and laser scanners. 
-     *
-     * \{
-     */
-
-    /*! 
-     * \brief List of depth plus RGB insensity points.
-     *
-     * The list may or may not be an 2D ordered list and may contain multiple
-     * collinear points for the same (x,y).
-     */
-    typedef std::vector<EigenXYZRGB> EigenXYZRGBList;
-
-    /*! 
-     * \ingroup gfmath_types_out
-     * \brief List of depth plus RGBA insensity points.
-     *
-     * The list may or may not be an 2D ordered list and may contain multiple
-     * collinear points for the same (x,y).
-     */
-    typedef std::vector<EigenXYZRGBA> EigenXYZRGBAList;
-
-    /*! \} */ // gfmath_cloud
-
-    /*!
-     * \ingroup gfmath_scene
-     * \{
-     */
-
-    /*!
-     * \brief Create a scene object.
-     *
-     * \param polygon       ROS polygon defining a fence. Each (x,y,z) point
-     *                      specifies a distance from a reference point or an
-     *                      observer (meters).
-     * \param color         Color attribute applied to the fence.
-     *                      (red-green-blue intensities + alpha).
-     * \param fenceAlt      Base altitude from ground (meters).
-     * \param fenceHeight   Height of fence from base (meters).  
-     * \param hasCaps       The object is a polyhedron. That is, it has both
-     *                      top(ceiling) and bottom(floor) horizontal caps.
-     * \param[out] sceneObj Created scene object.
-     */
-    void createSceneObj(const Polygon64 &polygon,
-                        const EigenRGBA &color,
-                        const double    &fenceAlt,
-                        const double    &fenceHeight,
-                        const bool      hasCaps,
-                        EigenSceneObj   &sceneObj);
-
-    /*!
-     * \brief Scan virtual scene to generate a list of intersecting depth +
-     * color points.
-     *
-     * In this operation mode, the scene is a posteriori detected by a virtual
-     * scanning sensor.
-     *
-     * Scanning proceeds from the minimum to maximum phi in height steps, with
-     * each step sweeping from the minimum to maximum theta in width steps.
-     *
-     * The spherical angles are as used in mathematics.
-     *
-     * \param       thetaMin    Azimuthal minimum angle from x+ axis (-pi, pi].
-     * \param       thetaMax    Azimuthal max angle from x+ axis (-pi, pi].
-     * \param       phiMin      Polar minimum angle from z+ [0, pi].
-     * \param       phiMax      Polar maximum angle from z+ [0, pi].
-     * \param       width       Width resolution. Number of horizontal points.
-     * \param       height      Height resoluion. Number of vertical points.
-     * \param       scene       The scene to scan.
-     * \param[out]  intersects  List of intersecting points.
-     * \param       options     Options to control the scan.
-     */
-    void scanScene(const double thetaMin, const double thetaMax,
-                   const double phiMin,   const double phiMax,
-                   const size_t width,    const size_t height,
-                   const EigenScene       &scene,
-                   EigenXYZRGBAList       &intersects,
-                   uint32_t               options = ScanOptionDft);
-
-    /*!
-     * \brief Grid virtual scene fences to generate a list of depth + color
-     * points.
-     *
-     * In this operation mode, the scene is a priori known and a fast grid
-     * of the fences is performed.
-     *
-     * \param       gridSize    Grid size.
-     * \param       scene       The scene to scan.
-     * \param[out]  intersects  List of intersecting points.
-     * \param       options     Options to control the grid generations.
-     */
-    void gridScene(const double       gridSize,
-                   const EigenScene   &scene,
-                   EigenXYZRGBAList   &intersects,
-                   uint32_t           options = ScanOptionDft);
-
-    /*! \} */ // gfmath_scene
-
-    ///@{
-    /*!
-     * \brief Stream insertion operators.
-     *
-     * \param os  Output stream.
-     * \param arg Object to insert.
-     *
-     * \return Reference to output stream.
-     */
-    std::ostream &operator<<(std::ostream &os, const EigenPoint2 &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenPoint3 &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenRGBA &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenXYZRGB &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenXYZRGBA &pt);
-
-    std::ostream &operator<<(std::ostream &os, const EigenMinMax2 &minmax);
-
-    std::ostream &operator<<(std::ostream &os, const EigenMinMax3 &minmax);
-
-    std::ostream &operator<<(std::ostream &os, const EigenSurface &surface);
-
-    std::ostream &operator<<(std::ostream &os, const EigenSceneObj &sceneObj);
-    ///@}
-
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-    // Unit Tests
-    // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-#undef GF_MATH_UT  ///< define/undef to enable/disable unit test functions.
-
-#ifdef GF_MATH_UT
-    /*!
-     * \defgroup gfmath_ut Unit Test
-     * \{
-     */
-
-    const int UtPolynumTriangle   = 0;  ///< equalateral triangle with 50m sides
-    const int UtPolynumRectangle  = 1;  ///< 20m x 30m rectangle
-    const int UtPolynumHexagon    = 2;  ///< hexagon with 10m sides
-    const int UtPolynumTee        = 3;  ///< 40m x 50m tee 
-
-    /*!
-     * \brief Make a ROS polygon message from a canned shape.
-     *
-     * \param polynum       Canned shape number. See above.
-     * \param offset        Offset add to polygon position.
-     * \param scale         Polygon size scale multiplier. 
-     * \param [out] polygon Output polygon message.
-     */
-    void utMakeCannedPolygon(const int         polynum,
-                             const EigenPoint3 &offset,
-                             const double      scale,
-                             Polygon64         &polygon);
-
-    /*!
-     * \brief Scan a single polygon.
-     *
-     * \param polygon Polygon to scan.
-     */
-    void utScanPolygon(const Polygon64 &polygon);
-#endif // GF_MATH_UT
-
-    /*! \} */ // end of gfmath_ut group
-    
-    /*! \} */ // end of gfmath group
+    /*! \} */ // end of gfmath doxy group
 
   } // namespace gf_math
+
 } // namespace geofrenzy
+
 
 #endif // _GF_MATH_H
