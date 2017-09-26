@@ -92,7 +92,7 @@ using namespace geofrenzy::gf_scene;
 // Unit Test Switch (only available if math ut is also enabled)  
 //
 #ifdef GF_SCENE_UT
-#define GF_VCLOUD_NODE_UT  ///< define to enable unit test
+#undef GF_VCLOUD_NODE_UT  ///< define to enable unit test
 #else
 #undef GF_VCLOUD_NODE_UT  ///< ut always disabled
 #endif // GF_SCENE_UT
