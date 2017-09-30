@@ -399,6 +399,7 @@ namespace geofrenzy
         switch( m_eOpMode )
         {
           case CloudOpModeSensor:
+            //RDK m_pScanner = new SensorSceneScanner(..., m_uOptions);
             break;
 
           case CloudOpModeGrid:
