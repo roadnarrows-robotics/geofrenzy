@@ -223,8 +223,10 @@ namespace geofrenzy
       // This will then have the normals consistently point outwards.
       //
   
+      // --- Fence polyhedron vertices ---
+ 
       //
-      // Base of fence
+      // Base of fence vertices
       //
       for(i = 0; i < numBaseVerts; ++i)
       {
@@ -243,6 +245,8 @@ namespace geofrenzy
                                    altitude+height));
       }
 
+      // --- Fence polyhedron facets ---
+ 
       //
       // Add side rectangular facets
       //
@@ -250,18 +254,6 @@ namespace geofrenzy
 
       for(i = 0, j = 1; i < n; ++i)
       {
-
-#if 0 // RDK
-        id = poly.addFacet();
-
-        poly.addVertexToFacet(id, i);               // base start
-        poly.addVertexToFacet(id, j);               // base next
-        poly.addVertexToFacet(id, j+numBaseVerts);  // up to the top
-        poly.addVertexToFacet(id, i+numBaseVerts);  // top back
-
-        poly.closeFacet(id);
-#endif // RDK
-
         //
         // Add vertically oriented rectangular face.
         // Vertex order: base start, base next, up to the top, top back.
@@ -286,28 +278,28 @@ namespace geofrenzy
 
         for(i = 0; i < numBaseVerts; ++i)
         {
-          poly.addVertexToFacet(id, i);               // base start
+          poly.addVertexToFacet(id, i+numBaseVerts);
         }
-
-        poly.closeFacet(id);
 
         poly.facetAt(id).setAttr(EigenFacet::POLYGON, EigenFacet::HORIZONTAL);
         poly.facetAt(id).setAttr(color);
+
+        poly.closeFacet(id);
 
         //
         // Add floor
         //
-          id = poly.addFacet();
+        id = poly.addFacet();
 
         for(ssize_t k = numBaseVerts-1; k >= 0; --k)
         {
-          poly.addVertexToFacet(id, i);               // base start
+          poly.addVertexToFacet(id, k);               // base start
         }
-
-        poly.closeFacet(id);
 
         poly.facetAt(id).setAttr(EigenFacet::POLYGON, EigenFacet::HORIZONTAL);
         poly.facetAt(id).setAttr(color);
+
+        poly.closeFacet(id);
 
         fenceObj.m_hasCaps = true;
       }
@@ -407,7 +399,7 @@ namespace geofrenzy
       const EigenPoint3 &pt0 = facet.vertexAt(0);
       const EigenPoint3 &pt1 = facet.vertexAt(1);
 
-      // diminsion
+      // dimension
       const EigenPoint2 &dim = facet.dim();
 
       //
@@ -440,7 +432,7 @@ namespace geofrenzy
         pt = baseline.pointAt(len);
 
         // grid surface vertical strip
-        //n += gridWallStripe(facet, pt, intersects);
+        n += gridWallStripe(facet, pt, intersects);
       }
 
       //
@@ -449,7 +441,7 @@ namespace geofrenzy
       //
       if( !isApprox(len-m_gridSize, dim[_L], EpsilonLinear) )
       {
-        //n += gridWallStripe(facet, pt1, intersects);
+        n += gridWallStripe(facet, pt1, intersects);
       }
 
       return n;
@@ -477,13 +469,13 @@ namespace geofrenzy
       size_t        n = 0;
       double        h;
 
-      // diminsion
+      // dimension
       const EigenPoint2 &dim = facet.dim();
 
       //
       // Loop from starting base point to surface top at the fixed x-y position.
       //
-      for(h = pt.z(); h < dim[_W]; h += m_gridSize)
+      for(h = pt.z(); h < basept.z() + dim[_W]; h += m_gridSize)
       {
         pt.z() = h;
 
@@ -524,7 +516,7 @@ namespace geofrenzy
       pt.z() = bounds.m_max.z();
 
       //
-      // Loop over object's bounding box.
+      // Loop over object's bounding box for calculate ceiling points.
       //
       for(pt.x() = bounds.m_min.x();
           pt.x() <= bounds.m_max.x();
@@ -534,18 +526,14 @@ namespace geofrenzy
             pt.y() <= bounds.m_max.y();
             pt.y() += m_gridSize)
         {
-#if 0 // RDK
-          if( pipCn(xy(pt), sceneObj.m_footprint) )
+          if( pipCnZ(pt, facet.vertices()) )
           {
-            xyzrgba << pt, sceneObj.m_color;
+            xyzrgba << pt, facet.color();
             intersects.push_back(xyzrgba);
             ++n;
           }
-#endif // RDK
         }
       }
-
-      // TODO: floor
 
       return n;
     }

@@ -1113,9 +1113,9 @@ void GfSentinelMav::cbHomePos(const mavros_msgs::HomePosition &msgHomePos)
   //
   if( m_isArmed )
   {
-    m_posHome.m_latitude  = msgHomePos.latitude;
-    m_posHome.m_longitude = msgHomePos.longitude;
-    m_posHome.m_altitude  = msgHomePos.altitude;
+    m_posHome.m_latitude  = msgHomePos.geo.latitude;
+    m_posHome.m_longitude = msgHomePos.geo.longitude;
+    m_posHome.m_altitude  = msgHomePos.geo.altitude;
     m_hasLandingPos       = true;
 
     ROS_INFO_STREAM(nameOf() << ": Got Home RTL Position");
@@ -1289,7 +1289,7 @@ bool GfSentinelMav::reqSetOpMode()
   if( m_clientServices[nameSvc].call(svc) )
   {
     ROS_DEBUG_STREAM(nameOf() << ": " << nameSvc);
-    return svc.response.success;
+    return svc.response.mode_sent;
   }
   else
   {

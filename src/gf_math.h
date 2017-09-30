@@ -1312,7 +1312,7 @@ namespace geofrenzy
     ///@}
 
     /*!
-     * \brief Point in Polygon test.
+     * \brief Test if the point is within the polygon in ambient 2D space.
      *
      * This method uses the edge crossing Counting Number algorithm.
      *
@@ -1326,11 +1326,40 @@ namespace geofrenzy
      * does not work well with complex, crossing polygons.
      *
      * \param pt      Point to test.
-     * \param polygon Closed polygon with polygon[n] == polygon[0].
+     * \param polygon Closed polygon. The polygon vertices may or may not
+     *                include vertex polygon[last] == polygon[first].
+     *                Regardless, the polygon is treated as closed.
      *
      * \return Returns true if inside, false if outside.
      */
     bool pipCn(const EigenPoint2 &pt, const EigenPoint2List &polygon);
+
+    /*!
+     * \brief Test if the point is within the polygon in ambient 3D space, where
+     * z is constant (i.e. the polygon is horizontal to the x-y plane).
+     *
+     * This algorithm is an optimized version of the more general test of a
+     * point within a polygon at any orientation in ambient 3D space.
+     *
+     * This method uses the edge crossing Counting Number algorithm.
+     *
+     * \sa http://geomalgorithms.com/a03-_inclusion.html
+     *
+     * If the number of edge crossings is odd, the the point is inside the
+     * polygon. Otherwise it lies outside. Any point on an edge or vertex
+     * is considered inside.
+     *
+     * The polygon is can be either convex or concave. This simple algortihm
+     * does not work well with complex, crossing polygons.
+     *
+     * \param pt      Point to test.
+     * \param polygon Closed polygon. The polygon vertices may or may not
+     *                include vertex polygon[last] == polygon[first].
+     *                Regardless, the polygon is treated as closed.
+     *
+     * \return Returns true if inside, false if outside.
+     */
+    bool pipCnZ(const EigenPoint3 &pt, const EigenPoint3List &polygon);
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .

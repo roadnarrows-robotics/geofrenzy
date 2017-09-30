@@ -57,19 +57,32 @@ namespace geofrenzy
      * \{
      */
 
-    //
-    // Vertex in ambient 3D space types.
-    //
+
+    //--------------------------------------------------------------------------
+    // Vertex
+    //--------------------------------------------------------------------------
+
     typedef EigenPoint3                     EigenVertex;      ///< vertex
-    typedef EigenPoint3List                 EigenVertexList;  ///< vertex list
+    typedef std::vector<EigenVertex>        EigenVertexList;  ///< vertex list
     typedef EigenVertexList::iterator       EigenVertexIter;  ///< vertex iter
     typedef EigenVertexList::const_iterator EigenVertexCIter; ///< vertex citer
+
+    struct EigenEVertex
+    {
+      EigenVertex m_xyz;
+      EigenVertex m_rtp;
+    };
 
 
     //--------------------------------------------------------------------------
     // Class EigenFacet
     //--------------------------------------------------------------------------
  
+    /*!
+     * \brief Helper macros
+     */
+    #define DEF_DIM(_d) (((_d)[_L] != 0.0) && ((_d)[_W] != 0.0))
+
     /*!
      * \brief The EigenFacet container class.
      *
@@ -123,6 +136,26 @@ namespace geofrenzy
        * The first two vertices form the base to calculate facet length.
        * The width is the standard triangle height calculation.
        *
+       * The vertices are specified in x,y,z Cartesion coordinates.
+       * The equivalent spherical coordinates will be automatically calculated.
+       *
+       * \param v0      Base vertex 0.
+       * \param v1      Base vertex 1.
+       * \param v2      Third vertex of triangle.
+       * \param orient  Orientation w.r.t. the x-y plane.
+       */
+      void makeTriangle(const EigenPoint3 &v0,
+                        const EigenPoint3 &v1,
+                        const EigenPoint3 &v2,
+                        const Orientation orient = ANGLED);
+      /*!
+       * \brief Make triangular facet.
+       *
+       * The first two vertices form the base to calculate facet length.
+       * The width is the standard triangle height calculation.
+       *
+       * The vertices are specified in x,y,z Cartesian coordinates.
+       *
        * \param v0      Base vertex 0.
        * \param v1      Base vertex 1.
        * \param v2      Third vertex of triangle.
@@ -139,6 +172,27 @@ namespace geofrenzy
        * The first two verices form the base to calculate facet length.
        * The width is L2Dist(v0, v3) (or L2Dist(v1, v2)).
        *
+       * The vertices are specified in x,y, coordinates. The equivalent
+       * spherical coordinates will be automatically calculated.
+       *
+       * \param v0      Base vertex 0.
+       * \param v1      Base vertex 1.
+       * \param v2      Opposing vertex to vertex 1.
+       * \param v3      Opposing vertex to vertex 0.
+       * \param orient  Orientation w.r.t. the x-y plane.
+       */
+      void makeRectangle(const EigenPoint3 &v0, const EigenPoint3 &v1,
+                         const EigenPoint3 &v2, const EigenPoint3 &v3,
+                         const Orientation orient = ANGLED);
+
+      /*!
+       * \brief Make rectangular facet.
+       *
+       * The first two verices form the base to calculate facet length.
+       * The width is L2Dist(v0, v3) (or L2Dist(v1, v2)).
+       *
+       * The vertices are specified in both x,y,z and r,theta,phi coordinates.
+       *
        * \param v0      Base vertex 0.
        * \param v1      Base vertex 1.
        * \param v2      Opposing vertex to vertex 1.
@@ -151,6 +205,22 @@ namespace geofrenzy
 
       /*!
        * \brief Make general polygonal facet.
+       *
+       * The vertices are specified in x,y, coordinates. The equivalent
+       * spherical coordinates will be automatically calculated.
+       *
+       * \param vertices  List of vertices.
+       * \param shape     Shape of polygon.
+       * \param orient    Orientation w.r.t. the x-y plane.
+       */
+      void makePolygon(const EigenPoint3List &vertices,
+                       const Shape shape = POLYGON,
+                       const Orientation orient = ANGLED);
+
+      /*!
+       * \brief Make general polygonal facet.
+       *
+       * The vertices are specified in both x,y,z and r,theta,phi coordinates.
        *
        * \param vertices  List of vertices.
        * \param shape     Shape of polygon.
@@ -166,6 +236,8 @@ namespace geofrenzy
        * The order of the vertices are important. It is the caller's
        * responsibility to define the ordering by sequentially calling this
        * function. The ordering defines the normal.
+       *
+       * The vertices are specified in x,y,z Cartesian coordinates.
        *
        * \param v   Facet vertex.
        *
@@ -183,24 +255,24 @@ namespace geofrenzy
       void processVertices();
 
       /*!
-       * \brief Test if face is within view from a hypothetical ray emitting
-       * from the origin at direction theta, phi.
+       * \brief Test if the facet is within view from a hypothetical ray
+       * emitting from the origin at direction theta, phi.
        *
        * \param theta Azimuthal angle from x+ axis (-pi, pi].
-       * \param pt    Point in polar coordinates.
+       * \param phi   Polar angle from z+ [0, pi].
        *
        * \return Returns true or false.
        */
       bool inview(const double theta, const double phi)
       {
-        return false; // todo
+        return gf_path::inbounds(EigenPoint2(theta, phi), m_subtended);
       }
 
       /*!
        * \brief Test if a point is within the facet boundary.
        *
        * The boundary is a cuboid with sides parallel to the x-y-z axes planes
-       * that minimally contain the facet surface.
+       * that minimally contains the facet surface.
        *
        * Being within the boundary is a necessary, but not sufficient
        * requirement for a point to be on the surface of the facet.
@@ -227,6 +299,17 @@ namespace geofrenzy
       bool intersection(const EigenLine3 &line, EigenPoint3 &pt);
 
       /*!
+       * \brief Return the reference the coplanar infinite plane.
+       *
+       * \return Reference to plane.
+       */
+      const EigenPlane3 &plane() const
+      {
+        assert(m_isValid);
+        return m_plane;
+      }
+
+      /*!
        * \brief Return the reference to the unit normal vector of the facet.
        *
        * \return Unit normal.
@@ -240,21 +323,23 @@ namespace geofrenzy
       /*!
        * \brief Return the circumscribed rectangle dimensions of the facet.
        *
-       * The rotated sides of the rectangle are either parallel to the x or y
-       * axis.
-       *
-       * \return Dimension point length x width.
+       * \return Dimension length x width.
        */
       const EigenPoint2 &dim() const
       {
         assert(m_isValid);
+
+        if( !DEF_DIM(m_dim) )
+        {
+          // calcDim();
+        }
         return m_dim;
       }
 
       /*!
        * \brief Return the cuboid bounding box of the facet.
        *
-       * \return Boundary.
+       * \return Min,max boundary.
        */
       const EigenBoundary3 &boundary() const
       {
@@ -263,11 +348,11 @@ namespace geofrenzy
       }
 
       /*!
-       * \brief Return the subtended theta and phi angles of the facet.
+       * \brief Return the subtended theta and phi angle bounds of the facet.
        *
-       * The subtended angels are calculate for view point of the origin.
+       * The subtended angels are calculated for the view point from the origin.
        *
-       * \return Subtended angles.
+       * \return Min,max subtended angle bounds.
        */
       const EigenMinMax2 &subtended() const
       {
@@ -321,6 +406,16 @@ namespace geofrenzy
        * \param orient  (Special) orientation of polygon.
        */
       void setAttr(const Shape shape, const Orientation orient);
+
+      /*!
+       * \brief Return list of facet vertices.
+       *
+       * \return Reference to vertices.
+       */
+      const EigenVertexList &vertices() const
+      {
+        return m_vertices;
+      }
 
       /*!
        * \brief Returns the number of facet vertices.
@@ -421,9 +516,13 @@ namespace geofrenzy
       // Properties
       //
       EigenPlane3       m_plane;      ///< infinite coplanar surface to facet
-      EigenPoint2       m_dim;        ///< length x width dimension
+      EigenPoint2       m_dim;        ///< length x width dimensions
       EigenBoundary3    m_bounds;     ///< cuboid bounds of facet
       EigenMinMax2      m_subtended;  ///< subtended angles
+
+      EigenVertex &mkvert(const EigenPoint3 &xyz, EigenVertex &v)
+      {
+      }
 
     }; // class EigenFacet
 
@@ -495,8 +594,8 @@ namespace geofrenzy
        * // add other vertices here
        *
        * closeFacet(id);          // mark the facet closed with props calc'd
-       \endcode
-
+       * \endcode
+       *
        * \return Returns the id of the added facet.
        */
       size_t addFacet();
@@ -574,8 +673,8 @@ namespace geofrenzy
       /*!
        * \brief Test if point is within the polyhedron boundary.
        *
-       * The boundary is a cuboid with sides parallel to the x-y-z axes planes.
-       * that minimally contain the polyhedron.
+       * The boundary is a cuboid with sides parallel to the x-y-z axes planes
+       * that minimally contains the polyhedron.
        *
        * Being within the boundary is a necessary, but not sufficient
        * requirement for a point to be on or within the polyhedron.
@@ -594,11 +693,48 @@ namespace geofrenzy
       /*!
        * \brief Return the cuboid bounding box of the polyhedron.
        *
-       * \return Boundary.
+       * \return Min,max boundary.
        */
       const EigenBoundary3 &boundary() const
       {
         return m_bounds;
+      }
+
+      /*!
+       * \brief Test if the polyhedron is within view from a hypothetical
+       * ray emitting from the origin at direction theta, phi.
+       *
+       * \param theta Azimuthal angle from x+ axis (-pi, pi].
+       * \param phi   Polar angle from z+ [0, pi].
+       *
+       * \return Returns true or false.
+       */
+      bool inview(const double theta, const double phi)
+      {
+        return gf_math::inbounds(EigenPoint2(theta, phi), m_subtended);
+      }
+
+      /*!
+       * \brief Return the subtended theta and phi angle bounds of the
+       * polyhedron.
+       *
+       * The subtended angels are calculated for the view point from the origin.
+       *
+       * \return Min,max subtended angle bounds.
+       */
+      const EigenBoundary2 &subtended() const
+      {
+        return m_subtended;
+      }
+
+      /*!
+       * \brief Return list of polyhedron vertices.
+       *
+       * \return Reference to vertices.
+       */
+      const EigenVertexList &vertices() const
+      {
+        return m_vertices;
       }
 
       /*!
@@ -636,7 +772,6 @@ namespace geofrenzy
         assert(i < m_vertices.size());
         return m_vertices[i];
       }
-
       
       /*!
        * \brief Return an iterator pointing to the first element of the list
@@ -680,6 +815,16 @@ namespace geofrenzy
       EigenVertexCIter iterVertexEnd() const
       {
         return m_vertices.end();
+      }
+
+      /*!
+       * \brief Return list of facets.
+       *
+       * \return Reference to vertices.
+       */
+      const EigenFacetList &facets() const
+      {
+        return m_facets;
       }
 
       /*!
@@ -763,9 +908,11 @@ namespace geofrenzy
       }
 
     protected:
-      EigenVertexList   m_vertices;   ///< polyhedral vertices
-      EigenFacetList    m_facets;
-      EigenBoundary3    m_bounds;
+      EigenVertexList m_vertices;   ///< polyhedral vertices in cartesian
+      EigenVertexList m_rtp;        ///< polyhedral vertices in spherical
+      EigenFacetList  m_facets;     ///< polyhedral facets
+      EigenBoundary3  m_bounds;     ///< bounding box
+      EigenBoundary2  m_subtended;  ///< subtended view from origin
 
     }; // class EigenPolyhedron
 

@@ -79,6 +79,7 @@
 //
 #include "gf_ros.h"
 #include "gf_math.h"
+#include "gf_poly.h"
 #include "gf_scene.h"
 
 
@@ -92,7 +93,7 @@ using namespace geofrenzy::gf_scene;
 // Unit Test Switch (only available if math ut is also enabled)  
 //
 #ifdef GF_SCENE_UT
-#undef GF_VCLOUD_NODE_UT  ///< define to enable unit test
+#define GF_VCLOUD_NODE_UT  ///< define to enable unit test
 #else
 #undef GF_VCLOUD_NODE_UT  ///< ut always disabled
 #endif // GF_SCENE_UT
@@ -166,6 +167,7 @@ namespace geofrenzy
         ROS_DEBUG_STREAM("vSensorCloud gf_class_idx = " << m_gfClassIdx);
 
         m_nPublishCnt = 0;
+        m_pScanner    = NULL;
       };
   
       /*!
@@ -173,6 +175,10 @@ namespace geofrenzy
        */
       ~vSensorCloud()
       {
+        if( m_pScanner != NULL )
+        {
+          delete m_pScanner;
+        }
       }
 
       /*!
@@ -384,6 +390,22 @@ namespace geofrenzy
         m_fFenceAltitude  = 0.0;
         m_fFenceHeight    = GeofenceHeightDft;
 
+        if( m_pScanner != NULL )
+        {
+          delete m_pScanner;
+          m_pScanner = NULL;
+        }
+
+        switch( m_eOpMode )
+        {
+          case CloudOpModeSensor:
+            break;
+
+          case CloudOpModeGrid:
+            m_pScanner = new GridSceneScanner(m_fGridSize, m_uOptions);
+            break;
+        }
+
         return true;
       }
 
@@ -447,6 +469,12 @@ namespace geofrenzy
        */
       void publish()
       {
+        // no scaner
+        if( m_pScanner == NULL )
+        {
+          return;
+        }
+
 #ifdef GF_VCLOUD_NODE_UT
         // force publishing on every cycle
         if( m_nPublishCnt <= 0 )
@@ -459,17 +487,19 @@ namespace geofrenzy
         {
           EigenXYZRGBAList      points;
 
-          ROS_INFO_STREAM("Scan " << m_scene.size() << " fences.");
+          ROS_INFO_STREAM("Scan " << m_scene.numOfFences() << " fences.");
 
-          if( m_eOpMode == CloudOpModeSensor )
-          {
-            scanScene(m_fHFoVMin, m_fHFoVMax, m_fVFoVMin, m_fVFoVMax,
-                      m_uWidth, m_uHeight, m_scene, points, m_uOptions);
-          }
-          else if( m_eOpMode == CloudOpModeGrid )
-          {
-            gridScene(m_fGridSize, m_scene, points, m_uOptions);
-          }
+          //RDK if( m_eOpMode == CloudOpModeSensor )
+          //RDK {
+          //RDK   scanScene(m_fHFoVMin, m_fHFoVMax, m_fVFoVMin, m_fVFoVMax,
+          //RDK             m_uWidth, m_uHeight, m_scene, points, m_uOptions);
+          //RDK }
+          //RDK else if( m_eOpMode == CloudOpModeGrid )
+          //RDK {
+          //RDK   gridScene(m_fGridSize, m_scene, points, m_uOptions);
+          //RDK }
+
+          m_pScanner->scan(m_scene, points);
 
           ROS_INFO_STREAM("Update and publish cloud message.");
 
@@ -543,7 +573,9 @@ namespace geofrenzy
       double  m_fFenceHeight;   ///< geofences height from base (m)
 
       // the dynamic scene
-      EigenScene  m_scene;      ///< scene of polygonal shapes with attributes
+      //RDK EigenScene  m_scene;      ///< scene of polygonal shapes with attributes
+      GeofenceScene   m_scene;
+      SceneScanner    *m_pScanner;
 
       // messaging processing 
       int                       m_nPublishCnt;  ///< publish counter
@@ -661,25 +693,29 @@ namespace geofrenzy
         ROS_DEBUG(TopicNameFcDist);
 
         EigenSceneObj sceneObj;
-        size_t        i, j;
+        size_t        i, j, id;
 
         m_fixTime = msg->fix_time;
         m_scene.clear();
 
-        for(i = 0; i < msg->features.size(); ++i)
+        for(i = 0, id = 0; i < msg->features.size(); ++i)
         {
           const GfDistFeature &feat = msg->features[i]; 
 
-          for(j = 0; j < feat.geometry.size(); ++j)
+          for(j = 0; j < feat.geometry.size(); ++j, ++id)
           {
-            m_scene.push_back(sceneObj);
-            createSceneObj(feat.geometry[j], FenceColorDft,
-                m_fFenceAltitude, m_fFenceHeight, m_bCapFences,
-                m_scene.back());
+            // RDK m_scene.push_back(sceneObj);
+            // RDK createSceneObj(feat.geometry[j], FenceColorDft,
+            // RDK     m_fFenceAltitude, m_fFenceHeight, m_bCapFences,
+            // RDK     m_scene.back());
+
+            m_scene.addFence(id, feat.geometry[j], FenceColorDft,
+                             m_fFenceAltitude, m_fFenceHeight, m_bCapFences);
           }
         }
 
-        if( m_scene.size() > 0 )
+        // RDK if( m_scene.size() > 0 )
+        if( m_scene.numOfFences() > 0 )
         {
           ++m_nPublishCnt;
         }
@@ -750,32 +786,36 @@ namespace geofrenzy
         // Object one
         //
         utMakeCannedPolygon(UtPolynumTee, offset1, scale, polygon);
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color1, alt, height, cap, m_scene.back());
+        //RDK m_scene.push_back(sceneObj);
+        //RDK createSceneObj(polygon, color1, alt, height, cap, m_scene.back());
+        m_scene.addFence(1, polygon, color1, alt, height, cap);
 
         //
         // Object two
         //
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumRectangle, offset2, scale, polygon);
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color2, alt, height, cap, m_scene.back());
+        //RDK m_scene.push_back(sceneObj);
+        //RDK createSceneObj(polygon, color2, alt, height, cap, m_scene.back());
+        m_scene.addFence(2, polygon, color2, alt, height, cap);
 
         //
         // Object three
         //
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumHexagon, offset3, scale, polygon);
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color3, alt, height, cap, m_scene.back());
+        //RDK m_scene.push_back(sceneObj);
+        //RDK createSceneObj(polygon, color3, alt, height, cap, m_scene.back());
+        m_scene.addFence(3, polygon, color3, alt+2.0, height, cap);
 
         //
         // Object four
         //
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumTriangle, offset4, 0.05, polygon);
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color4, alt, height, cap, m_scene.back());
+        //RDK m_scene.push_back(sceneObj);
+        //RDK createSceneObj(polygon, color4, alt, height, cap, m_scene.back());
+        m_scene.addFence(4, polygon, color4, alt, height, cap);
 
         ++m_nPublishCnt;
       }

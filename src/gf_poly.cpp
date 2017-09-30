@@ -80,6 +80,13 @@ namespace geofrenzy
       m_isValid = false;
     }
   
+    void EigenFacet::makeTriangle(const EigenVertex &v0, const EigenVertex &w0,
+                                  const EigenVertex &v1, const EigenVertex &w0,
+                                  const EigenVertex &v2, const EigenVertex &w0,
+                                  const Orientation orient)
+    {
+    }
+
     void EigenFacet::makeTriangle(const EigenVertex &v0,
                                   const EigenVertex &v1,
                                   const EigenVertex &v2,
@@ -88,8 +95,10 @@ namespace geofrenzy
       m_isValid = false;
 
       m_vertices.clear();
+      m_rtp.clear();
 
-      m_vertices.push_back(v0); m_vertices.push_back(v1);
+      m_vertices.push_back(v0);
+      m_vertices.push_back(v1);
       m_vertices.push_back(v2);
 
       m_shape   = TRIANGLE;
@@ -106,8 +115,10 @@ namespace geofrenzy
 
       m_vertices.clear();
 
-      m_vertices.push_back(v0); m_vertices.push_back(v1);
-      m_vertices.push_back(v2); m_vertices.push_back(v3);
+      m_vertices.push_back(v0);
+      m_vertices.push_back(v1);
+      m_vertices.push_back(v2);
+      m_vertices.push_back(v3);
 
       m_shape   = RECTANGLE;
       m_orient  = orient;
@@ -175,7 +186,7 @@ namespace geofrenzy
         growBounds(m_vertices[i], m_bounds);
       }
 
-      growBounds(PrecisionDft, m_bounds);
+      //growBounds(PrecisionDft, m_bounds);
 
       switch( m_shape )
       {
@@ -201,10 +212,22 @@ namespace geofrenzy
           m_dim[_W] = L2Dist(m_vertices[0], m_vertices[3]);
           break;
 
-        case POLYGON: // lazy init
+        case POLYGON:
         default:
-          m_dim[_L] = 0.0;
-          m_dim[_W] = 0.0;
+          switch( m_orient )
+          {
+            case HORIZONTAL:
+              m_dim[_L] = m_bounds.m_max.x() - m_bounds.m_min.x();
+              m_dim[_W] = m_bounds.m_max.y() - m_bounds.m_min.y();
+              break;
+            case VERTICAL:
+            case ANGLED:
+            default:
+              // lazy init
+              m_dim[_L] = 0.0;
+              m_dim[_W] = 0.0;
+              break;
+          }
           break;
       }
 
@@ -257,21 +280,25 @@ namespace geofrenzy
     void EigenPolyhedron::clear()
     {
       m_vertices.clear();
+      m_rtp.clear();
       m_facets.clear();
     }
 
     size_t EigenPolyhedron::addVertex(const EigenVertex &v)
     {
       m_vertices.push_back(v);
+      m_rtp.push_back(cartesianToSpherical(v));
 
       if( m_vertices.size() == 1 )
       {
         seedBounds(v, m_bounds);
+        seedBounds(yz(m_rtp.back()), m_subtended);
       }
 
       else
       {
         growBounds(v, m_bounds);
+        growBounds(yz(m_rtp.back()), m_subtended);
       }
 
       return m_vertices.size() - 1;
@@ -303,7 +330,8 @@ namespace geofrenzy
       m_facets.push_back(f);
 
       m_facets.back().makeTriangle(m_vertices[i], m_vertices[j], m_vertices[k],
-                                    orient);
+                                   m_rtp[i],      m_rtp[j],      m_rtp[k],
+                                   orient);
 
       return id;
     }
@@ -325,6 +353,8 @@ namespace geofrenzy
 
       m_facets.back().makeRectangle(m_vertices[i], m_vertices[j],
                                     m_vertices[k], m_vertices[l],
+                                    m_rtp[i],      m_rtp[j],
+                                    m_rtp[k],      m_rtp[l],
                                     orient);
 
       return id;
@@ -335,11 +365,13 @@ namespace geofrenzy
                                           const EigenFacet::Orientation orient)
     {
       EigenVertexList vertices;
+      EigenVertexList rtp;
 
       for(size_t i = 0; i < indices.size(); ++i)
       {
         assert(indices[i] < m_vertices.size());
         vertices.push_back(m_vertices[indices[i]]);
+        rtp.push_back(m_rtp[indices[i]]);
       }
 
       size_t  id = m_facets.size();
@@ -348,7 +380,7 @@ namespace geofrenzy
 
       m_facets.push_back(f);
 
-      m_facets.back().makePolygon(vertices, shape, orient);
+      m_facets.back().makePolygon(vertices, rtp, shape, orient);
 
       return id;
     }

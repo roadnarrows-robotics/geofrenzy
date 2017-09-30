@@ -371,26 +371,123 @@ namespace geofrenzy
 
     bool pipCn(const EigenPoint2 &pt, const EigenPoint2List &polygon)
     {
+      size_t  n = polygon.size();
+      size_t  k;
       size_t  j;
       int     cn = 0;
 
-      for(j = 1; j < polygon.size(); ++j)
+      // minimum polygon is a triangle.
+      if( n < 3 )
       {
-        const EigenPoint2 &pt0 = polygon[j-1];
-        const EigenPoint2 &pt1 = polygon[j];
+        return false;
+      }
+
+      // test vertices to see if last == first
+      if( isApprox(polygon[n-1], polygon[0]) )
+      {
+        // recheck min
+        if( n < 4 )
+        {
+          return false;
+        }
+
+        k = n;
+      }
+
+      // "add" last vertex
+      else
+      {
+        k = n + 1;
+      }
+
+      //
+      // Count the edge crossings.
+      //
+      for(j = 1; j < k; ++j)
+      {
+        // v0-v1 edge
+        const EigenPoint2 &v0 = polygon[j-1];
+        const EigenPoint2 &v1 = polygon[j % n];
 
         //
         // Upward crossing excludes endpoint. Downward crossing excludes
         // startpoint.
         //
-        if( (pt0.y() <= pt.y()) && (pt1.y() > pt.y()) ||  // upward crossing
-            (pt0.y() > pt.y()) && (pt1.y() <= pt.y()) )   // downward crossing
+        if( (v0.y() <= pt.y()) && (v1.y() > pt.y()) ||  // upward crossing
+            (v0.y() > pt.y()) && (v1.y() <= pt.y()) )   // downward crossing
         {
-          // slope - no divide by zero event given the above test   
-          double vt = (pt.y()  - pt0.y()) / (pt1.y() - pt0.y());
+          // slope - no divide by zero exception given the above test   
+          double vt = (pt.y()  - v0.y()) / (v1.y() - v0.y());
 
           // compute the actual edge-ray intersect x-coordinate
-          if( pt.x() <  pt0.x() + vt * (pt1.x() - pt0.x()) )
+          if( pt.x() <  v0.x() + vt * (v1.x() - v0.x()) )
+          {
+            ++cn;   // a valid crossing of y=pt.y() right of pt.x()
+          }
+        }
+      }
+
+      return cn & 0x01? true: false;
+    }
+
+    bool pipCnZ(const EigenPoint3 &pt, const EigenPoint3List &polygon)
+    {
+      size_t  n = polygon.size();
+      size_t  k;
+      size_t  j;
+      int     cn = 0;
+
+      // minimum polygon is a triangle.
+      if( n < 3 )
+      {
+        return false;
+      }
+
+      // test vertices to see if last == first
+      if( isApprox(polygon[n-1], polygon[0]) )
+      {
+        // recheck min
+        if( n < 4 )
+        {
+          return false;
+        }
+
+        k = n;
+      }
+
+      // "add" last vertex
+      else
+      {
+        k = n + 1;
+      }
+
+      // point is not in the x-y plane at z
+      //RDK if( !isApprox(pt.z(), polygon[0].z()) )
+      //RDK {
+      //RDK   return false;
+      //RDK }
+
+      //
+      // Count the edge crossings.
+      //
+      for(j = 1; j < k; ++j)
+      {
+        // v0-v1 edge
+        const EigenPoint3 &v0 = polygon[j-1];
+        const EigenPoint3 &v1 = polygon[j % n];
+
+        //
+        // Upward crossing excludes endpoint. Downward crossing excludes
+        // startpoint.
+        //
+        if( (v0.y() <= pt.y()) && (v1.y() > pt.y()) ||  // upward crossing
+            (v0.y() > pt.y()) && (v1.y() <= pt.y()) )   // downward crossing
+        {
+          // slope - no divide by zero exception given the above test   
+          double vt = (pt.y()  - v0.y()) / (v1.y() - v0.y());
+
+          // compute the actual edge-ray intersect x-coordinate
+          if( pt.x() <  v0.x() + vt * (v1.x() - v0.x()) )
           {
             ++cn;   // a valid crossing of y=pt.y() right of pt.x()
           }

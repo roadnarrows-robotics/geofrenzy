@@ -354,9 +354,9 @@ namespace geofrenzy
         //
         // Set home (RTL) position.
         //
-        m_posHome.m_latitude  = msgHomePos.latitude;
-        m_posHome.m_longitude = msgHomePos.longitude;
-        m_posHome.m_altitude  = msgHomePos.altitude;
+        m_posHome.m_latitude  = msgHomePos.geo.latitude;
+        m_posHome.m_longitude = msgHomePos.geo.longitude;
+        m_posHome.m_altitude  = msgHomePos.geo.altitude;
         m_hasHomePos          = true;
     }
 
