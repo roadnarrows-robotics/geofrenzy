@@ -67,7 +67,7 @@ namespace geofrenzy
     typedef EigenVertexList::iterator       EigenVertexIter;  ///< vertex iter
     typedef EigenVertexList::const_iterator EigenVertexCIter; ///< vertex citer
 
-    struct EigenEVertex
+    struct VertexPool
     {
       EigenVertex m_xyz;
       EigenVertex m_rtp;
@@ -130,6 +130,7 @@ namespace geofrenzy
        */
       void clear();
 
+#ifdef NEWYEW
       /*!
        * \brief Make triangular facet.
        *
@@ -148,6 +149,8 @@ namespace geofrenzy
                         const EigenPoint3 &v1,
                         const EigenPoint3 &v2,
                         const Orientation orient = ANGLED);
+#endif // NEWYOU
+
       /*!
        * \brief Make triangular facet.
        *
@@ -166,6 +169,7 @@ namespace geofrenzy
                         const EigenVertex &v2,
                         const Orientation orient = ANGLED);
 
+#ifdef NEWYEW
       /*!
        * \brief Make rectangular facet.
        *
@@ -184,6 +188,7 @@ namespace geofrenzy
       void makeRectangle(const EigenPoint3 &v0, const EigenPoint3 &v1,
                          const EigenPoint3 &v2, const EigenPoint3 &v3,
                          const Orientation orient = ANGLED);
+#endif // NEWYEW
 
       /*!
        * \brief Make rectangular facet.
@@ -203,6 +208,7 @@ namespace geofrenzy
                          const EigenVertex &v2, const EigenVertex &v3,
                          const Orientation orient = ANGLED);
 
+#ifdef NEWYEW
       /*!
        * \brief Make general polygonal facet.
        *
@@ -216,6 +222,7 @@ namespace geofrenzy
       void makePolygon(const EigenPoint3List &vertices,
                        const Shape shape = POLYGON,
                        const Orientation orient = ANGLED);
+#endif // NEWYEW
 
       /*!
        * \brief Make general polygonal facet.
@@ -265,7 +272,7 @@ namespace geofrenzy
        */
       bool inview(const double theta, const double phi)
       {
-        return gf_path::inbounds(EigenPoint2(theta, phi), m_subtended);
+        return gf_math::inbounds(EigenPoint2(theta, phi), m_subtended);
       }
 
       /*!
@@ -503,6 +510,7 @@ namespace geofrenzy
       //
       size_t            m_id;         ///< facet id
       EigenVertexList   m_vertices;   ///< ordered facet vertices
+      EigenVertexList m_rtp;        ///< polyhedral vertices in spherical
       bool              m_isValid;    ///< facet is [not] valid and processed
 
       //
@@ -519,10 +527,6 @@ namespace geofrenzy
       EigenPoint2       m_dim;        ///< length x width dimensions
       EigenBoundary3    m_bounds;     ///< cuboid bounds of facet
       EigenMinMax2      m_subtended;  ///< subtended angles
-
-      EigenVertex &mkvert(const EigenPoint3 &xyz, EigenVertex &v)
-      {
-      }
 
     }; // class EigenFacet
 

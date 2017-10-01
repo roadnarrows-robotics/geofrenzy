@@ -49,7 +49,6 @@
 using namespace std;
 using namespace Eigen;
 
-
 //------------------------------------------------------------------------------
 // Basic Eigen Operators and Geometry Functions
 //------------------------------------------------------------------------------
@@ -80,13 +79,6 @@ namespace geofrenzy
       m_isValid = false;
     }
   
-    void EigenFacet::makeTriangle(const EigenVertex &v0, const EigenVertex &w0,
-                                  const EigenVertex &v1, const EigenVertex &w0,
-                                  const EigenVertex &v2, const EigenVertex &w0,
-                                  const Orientation orient)
-    {
-    }
-
     void EigenFacet::makeTriangle(const EigenVertex &v0,
                                   const EigenVertex &v1,
                                   const EigenVertex &v2,
@@ -330,7 +322,6 @@ namespace geofrenzy
       m_facets.push_back(f);
 
       m_facets.back().makeTriangle(m_vertices[i], m_vertices[j], m_vertices[k],
-                                   m_rtp[i],      m_rtp[j],      m_rtp[k],
                                    orient);
 
       return id;
@@ -353,8 +344,6 @@ namespace geofrenzy
 
       m_facets.back().makeRectangle(m_vertices[i], m_vertices[j],
                                     m_vertices[k], m_vertices[l],
-                                    m_rtp[i],      m_rtp[j],
-                                    m_rtp[k],      m_rtp[l],
                                     orient);
 
       return id;
@@ -380,7 +369,7 @@ namespace geofrenzy
 
       m_facets.push_back(f);
 
-      m_facets.back().makePolygon(vertices, rtp, shape, orient);
+      m_facets.back().makePolygon(vertices, shape, orient);
 
       return id;
     }
