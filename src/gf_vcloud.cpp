@@ -87,16 +87,29 @@ using namespace std;
 using namespace boost::assign;
 using namespace geofrenzy::gf_ros;
 using namespace geofrenzy::gf_math;
+using namespace geofrenzy::gf_math::gf_index;
 using namespace geofrenzy::gf_scene;
 
 //
-// Unit Test Switch (only available if math ut is also enabled)  
+// Unit Test Switch (only available if scene ut is also enabled)  
 //
 #ifdef GF_SCENE_UT
 #undef GF_VCLOUD_NODE_UT  ///< define to enable unit test
 #else
 #undef GF_VCLOUD_NODE_UT  ///< ut always disabled
 #endif // GF_SCENE_UT
+
+//
+// Debug macro
+//
+#undef DBG_VCLOUD_ENABLE   ///< define or undef
+#ifdef DBG_VCLOUD_ENABLE
+#define DBG_VCLOUD(_obj)  \
+  std::cerr << "DBG: " << __func__ << "() " << _obj << std::endl
+#else
+#define DBG_VCLOUD(_obj)
+#endif // DBG_VCLOUD_ENABLE
+
 
 namespace geofrenzy
 {
@@ -167,9 +180,7 @@ namespace geofrenzy
         ROS_DEBUG_STREAM("vSensorCloud gf_class_idx = " << m_gfClassIdx);
 
         m_nPublishCnt = 0;
-#if NEWYEW
         m_pScanner    = NULL;
-#endif // NEWYEW
       };
   
       /*!
@@ -177,12 +188,10 @@ namespace geofrenzy
        */
       ~vSensorCloud()
       {
-#if NEWYEW
         if( m_pScanner != NULL )
         {
           delete m_pScanner;
         }
-#endif // NEWYEW
       }
 
       /*!
@@ -394,7 +403,6 @@ namespace geofrenzy
         m_fFenceAltitude  = 0.0;
         m_fFenceHeight    = GeofenceHeightDft;
 
-#ifdef NEWYEW
         if( m_pScanner != NULL )
         {
           delete m_pScanner;
@@ -404,14 +412,20 @@ namespace geofrenzy
         switch( m_eOpMode )
         {
           case CloudOpModeSensor:
-            //YEW m_pScanner = new SensorSceneScanner(..., m_uOptions);
+            m_pScanner = new SensorSceneScanner(m_fHFoVMin, m_fHFoVMax,
+                                                m_fVFoVMin, m_fVFoVMax,
+                                                m_uWidth, m_uHeight,
+                                                m_uOptions);
+            DBG_VCLOUD(endl << "scenescanner " << endl
+                << *(SensorSceneScanner *)m_pScanner << endl);
             break;
 
           case CloudOpModeGrid:
             m_pScanner = new GridSceneScanner(m_fGridSize, m_uOptions);
+            DBG_VCLOUD(endl << "scenescanner " << endl
+                << *(GridSceneScanner *)m_pScanner << endl);
             break;
         }
-#endif // NEWYEW
 
         return true;
       }
@@ -476,13 +490,11 @@ namespace geofrenzy
        */
       void publish()
       {
-#if NEWYEW
         // no scaner
         if( m_pScanner == NULL )
         {
           return;
         }
-#endif // NEWYEW
 
 #ifdef GF_VCLOUD_NODE_UT
         // force publishing on every cycle
@@ -496,24 +508,11 @@ namespace geofrenzy
         {
           EigenXYZRGBAList      points;
 
-#if NEWYEW
           ROS_INFO_STREAM("Scan " << m_scene.numOfFences() << " fences.");
 
+          DBG_VCLOUD(endl << "geoscene " << endl << m_scene << endl);
+
           m_pScanner->scan(m_scene, points);
-#else // the old you
-          ROS_INFO_STREAM("Scan " << m_scene.size() << " fences.");
-
-          if( m_eOpMode == CloudOpModeSensor )
-          {
-            scanScene(m_fHFoVMin, m_fHFoVMax, m_fVFoVMin, m_fVFoVMax,
-            m_uWidth, m_uHeight, m_scene, points, m_uOptions);
-          }
-          else if( m_eOpMode == CloudOpModeGrid )
-          {
-            gridScene(m_fGridSize, m_scene, points, m_uOptions);
-          }
-
-#endif // NEWYEW
 
           ROS_INFO_STREAM("Update and publish cloud message.");
 
@@ -587,12 +586,8 @@ namespace geofrenzy
       double  m_fFenceHeight;   ///< geofences height from base (m)
 
       // the dynamic scene
-#ifdef NEWYEW
       GeofenceScene   m_scene;
-      SceneScanner    *m_pScanner;
-#else // the old you
-      EigenScene  m_scene;      ///< scene of polygonal shapes with attributes
-#endif // NEWYEW
+      SceneScanner   *m_pScanner;
 
       // messaging processing 
       int                       m_nPublishCnt;  ///< publish counter
@@ -684,16 +679,16 @@ namespace geofrenzy
           if( (m_ePublishFmt == CloudFmtXYZRGB) ||
               (m_ePublishFmt == CloudFmtXYZRGBA) )
           {
-            *iter_r = (uint8_t)(points[i][_XYZRED]   * Color24ChanMax);
-            *iter_g = (uint8_t)(points[i][_XYZGREEN] * Color24ChanMax);
-            *iter_b = (uint8_t)(points[i][_XYZBLUE]  * Color24ChanMax);
+            *iter_r = (uint8_t)COLOR8(points[i][_XYZRED]);
+            *iter_g = (uint8_t)COLOR8(points[i][_XYZGREEN]);
+            *iter_b = (uint8_t)COLOR8(points[i][_XYZBLUE]);
 
             ++iter_r; ++iter_g; ++iter_b;
 
             // include alpha
             if( m_ePublishFmt == CloudFmtXYZRGBA )
             {
-              *iter_a = (uint8_t)(points[i][_XYZALPHA]  * Color24ChanMax);
+              *iter_a = (uint8_t)COLOR8(points[i][_XYZALPHA]);
               ++iter_a;
             }
           }
@@ -709,8 +704,7 @@ namespace geofrenzy
       {
         ROS_DEBUG(TopicNameFcDist);
 
-        EigenSceneObj sceneObj;
-        size_t        i, j, id;
+        size_t  i, j, id;
 
         m_fixTime = msg->fix_time;
         m_scene.clear();
@@ -721,24 +715,12 @@ namespace geofrenzy
 
           for(j = 0; j < feat.geometry.size(); ++j, ++id)
           {
-#ifdef NEWYEW
             m_scene.addFence(id, feat.geometry[j], FenceColorDft,
                              m_fFenceAltitude, m_fFenceHeight, m_bCapFences);
-#else // the old you
-            m_scene.push_back(sceneObj);
-            createSceneObj(feat.geometry[j], FenceColorDft,
-            m_fFenceAltitude, m_fFenceHeight, m_bCapFences,
-            m_scene.back());
-#endif // NEWYEW
-
           }
         }
 
-#ifdef NEWYEW
         if( m_scene.numOfFences() > 0 )
-#else // the old you
-        if( m_scene.size() > 0 )
-#endif // NEWYEW
         {
           ++m_nPublishCnt;
         }
@@ -786,12 +768,12 @@ namespace geofrenzy
        */
       void utCreateFixedScene()
       {
-        EigenSceneObj         sceneObj;
         geofrenzy::Polygon64  polygon;
-        EigenPoint3           offset1(2.0, 0.0, 0.0);
-        EigenPoint3           offset2(7.0, 5.0, 0.0);
-        EigenPoint3           offset3(4.0, -5.0, 0.0);
-        EigenPoint3           offset4(1.0, 4.0, 0.0);
+        EigenPoint3           offset1(2.0, 0.0, 0.0);   // in front
+        EigenPoint3           offset2(7.0, 5.0, 0.0);   // front left
+        EigenPoint3           offset3(4.0, -5.0, 0.0);  // front right
+        //EigenPoint3           offset4(1.0, 4.0, 0.0);   // near front left
+        EigenPoint3           offset4(-1.0, 0.0, 0.0);  // centered over origin
         EigenRGBA             color1 = FenceColorDft;
         EigenRGBA             color2(0.5, 0.5, 0.1, 0.5);
         EigenRGBA             color3(0.5, 0.0, 0.5, 0.5);
@@ -809,48 +791,28 @@ namespace geofrenzy
         // Object one
         //
         utMakeCannedPolygon(UtPolynumTee, offset1, scale, polygon);
-#ifdef NEWYEW
-        m_scene.addFence(1, polygon, color1, alt, height, cap);
-#else // the old you
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color1, alt, height, cap, m_scene.back());
-#endif // NEWYEW
+        m_scene.addFence(1, polygon, color1, alt, height, cap, "tee");
 
         //
         // Object two
         //
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumRectangle, offset2, scale, polygon);
-#ifdef NEWYEW
-        m_scene.addFence(2, polygon, color2, alt, height, cap);
-#else // the old you
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color2, alt, height, cap, m_scene.back());
-#endif // NEWYEW
+        m_scene.addFence(2, polygon, color2, alt, height, cap, "rectangle");
 
         //
         // Object three
         //
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumHexagon, offset3, scale, polygon);
-#ifdef NEWYEW
-        m_scene.addFence(3, polygon, color3, alt+2.0, height, cap);
-#else // the old you
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color3, alt, height, cap, m_scene.back());
-#endif // NEWYEW
+        m_scene.addFence(3, polygon, color3, alt+2.0, height, cap, "hexagon");
 
         //
         // Object four
         //
         polygon.points.clear();
         utMakeCannedPolygon(UtPolynumTriangle, offset4, 0.05, polygon);
-#ifdef NEWYEW
-        m_scene.addFence(4, polygon, color4, alt, height, cap);
-#else // the old you
-        m_scene.push_back(sceneObj);
-        createSceneObj(polygon, color4, alt, height, cap, m_scene.back());
-#endif // NEWYEW
+        m_scene.addFence(4, polygon, color4, -0.5, height, cap, "triangle");
 
         ++m_nPublishCnt;
       }

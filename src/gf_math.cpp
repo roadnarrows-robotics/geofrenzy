@@ -49,15 +49,25 @@ using namespace std;
 using namespace Eigen;
 
 
-
-
-//------------------------------------------------------------------------------
-// Basic Eigen Operators and Geometry Functions
-//------------------------------------------------------------------------------
 namespace geofrenzy
 {
   namespace gf_math
   {
+    using namespace gf_index;
+
+    int OIndent;    ///< output indent level
+
+    string indent()
+    {
+      stringstream  ss;
+
+      if( OIndent > 0 )
+      {
+        ss << setw(OIndent) << "";
+      }
+      return ss.str();
+    }
+
     void print(ostream &os, const EigenPoint2 &obj)
     {
       os << "(" << obj[_X] << ", " << obj[_Y] << ")";
@@ -145,6 +155,75 @@ namespace geofrenzy
       os << "[" << obj.m_min << ", " << obj.m_max << "]";
     }
 
+    void print(std::ostream          &os,
+               const EigenPoint3List &points,
+               const size_t          mod,
+               const Units           cvt,
+               const bool            bIndent)
+    {
+      size_t  n = points.size();
+
+      if( n > 0 )
+      {
+        size_t  k = n - 1;
+
+        for(size_t i = 0; i < n; ++i)
+        {
+          if( i % mod == 0 )
+          {
+            os << endl;
+            if( bIndent )
+            {
+              os << indent();
+            }
+          }
+
+          switch( cvt )
+          {
+            case UnitsDegrees:
+              print(os, degrees(points[i]));
+              break;
+            default:
+              print(os, points[i]);
+              break;
+          }
+
+          if( i < k )
+          {
+            os << ", ";
+          }
+        }
+        os << endl;
+      }
+    }
+
+    ostream &operator<<(ostream &os, const EigenSubtend1 &obj)
+    {
+      os << "(" << obj.m_a0 << ", " << obj.m_omega << ")";
+      return os;
+    }
+
+    ostream &operator<<(ostream &os, const EigenSubtend2 &obj)
+    {
+      os << "[" << obj.m_theta << ", " << obj.m_phi << "]";
+      return os;
+    }
+
+    bool EigenSubtend2::within(const double theta, const double phi) const
+    {
+      // the easy check
+      if( !m_phi.within(phi) )
+      {
+        return false;
+      }
+      
+      // delta theta
+      double d = zero2tau(theta - m_theta.m_a0);
+
+      // check theta range
+      return (d >= 0.0) && (d <= m_theta.m_omega);
+    }
+
     EigenPoint3 cartesianToSpherical(const EigenPoint3 &pt)
     {
       double rho = L2Norm(pt);
@@ -221,6 +300,42 @@ namespace geofrenzy
       {
         return Inf;
       }
+    }
+
+    double x_intercept(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    {
+      if( isApprox(pt0.x(), pt1.x()) )
+      {
+        return (pt0.x() + pt1.x()) / 2.0;
+      }
+
+      // slope
+      double m = (pt1.y() - pt0.y()) / (pt1.x() - pt0.x());
+
+      if( isApproxZero(m) )
+      {
+        return Inf;
+      }
+
+      // y-intercept
+      double b = pt0.y() - m * pt0.x();
+
+      // solve for x at y = 0 in equation y = m * x + b
+      return -b / m;
+    }
+
+    double y_intercept(const EigenPoint2 &pt0, const EigenPoint2 &pt1)
+    {
+      if( isApprox(pt0.x(), pt1.x()) )
+      {
+        return Inf;
+      }
+
+      // slope
+      double m = (pt1.y() - pt0.y()) / (pt1.x() - pt0.x());
+
+      // y-intercept
+      return pt0.y() - m * pt0.x();
     }
 
     int quadrant(const EigenPoint2 &pt, const double precision)
@@ -461,11 +576,11 @@ namespace geofrenzy
         k = n + 1;
       }
 
-      // point is not in the x-y plane at z
-      //RDK if( !isApprox(pt.z(), polygon[0].z()) )
-      //RDK {
-      //RDK   return false;
-      //RDK }
+      // point is not in the x-y plane at z height
+      if( !isApprox(pt.z(), polygon[0].z()) )
+      {
+        return false;
+      }
 
       //
       // Count the edge crossings.
@@ -495,6 +610,23 @@ namespace geofrenzy
       }
 
       return cn & 0x01? true: false;
+    }
+
+    bool pipCnXY(const EigenPoint3 &pt, const EigenPoint3List &polygon)
+    {
+      EigenPoint2List poly2;
+
+      for(size_t i = 0; i < polygon.size(); ++i)
+      {
+        poly2.push_back(xy(polygon[i]));
+      }
+
+      return pipCn(xy(pt), poly2);
+    }
+
+    bool pipCn(const EigenPoint3 &pt, const EigenPoint3List &polygon)
+    {
+      return false; // RDK TODO
     }
 
     void alphaBlend(const EigenRGBA &colorFg,

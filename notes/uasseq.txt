@@ -1,0 +1,40 @@
+MAV Message and Control Sequences
+
+It all flows from the SatNavFix message issued by the UAS via mavros.
+
+Given the launch of gf_uas_demo.launch:
+
+I. At Startup (in parallel):
+  1.  The gf_server is started.
+      a.  It reads from the Portal the list of relevant entitlements.
+            class_entitlements_properties_json()
+      b.  Subscibes to SatNavFix message.
+
+  2. The gf_sensor_relay is also started and instantiates the Mav Sentinel.
+      a.  The Mav Sentinel initializes its state:
+            isOnTheGround = true, isArmed = false, etc
+      b.  The Mav Sentinel subscribes to UAS mavros topics:
+            state, extended_state, home_position/home, global_position/global
+      c.  The Mav Sentinel subscibes to gf_server entitlements topics
+            rtl_gei, altitude_gei
+
+  (*) There are no restrictions on the UAS to fly without knowledge of the
+      geofences. That was a design decision that can be readily changed.
+
+II. Run-Time:
+  1.  The gf_server receives the /fix satellite message from the UAS.
+  2.  It retrieves the feature collection from the  Portal.
+      ambient_fences_geojson_roi()
+  3.  If the feature collection is received, it publishes various forms of
+      the message along with entitlement dwell messages.
+  4.  The Mav Sentinel receives UAS state and position information from the
+      UAS.
+  5.  The Mav Sentinel recieves entitlement information from the gf_server.
+  6.  Base on the information in 4) and 5), the sentinel determines whether
+      the UAS is still safe to fly.
+      a.  If unsafe, then the sentinel invokes an action:
+          One of: RTL, LandNow, GotoWaypoint.
+
+  (*) The tool rqt_graph shows the message dependencies but not the sequence.
+  (!) The tool rqt can be used to watch message flows.
+

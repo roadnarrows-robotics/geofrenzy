@@ -1,10 +1,16 @@
 <launch>
-  <!-- Start Geofrenzy Node -->
+  <!-- Start Geofrenzy Portal Node -->
   <node name="gf_server_168" pkg="geofrenzy" type="gf_server" args="_gf_class_idx:=168" />
-  <param name="gf_server_168/geofrenzy_fence_filename" type="str" value="/home/woundzoom/catkin_ws/src/laelaps_2dnav/samplefences/shape_fences.json" />
+  <param name="gf_server_168/geofrenzy_fence_filename" type="str" value="/prj/ros/kinetic/src/geofrenzy/samples/fences/figure8_fences.json" />
 
   <!-- Start Geofrenzy Map Server -->
   <node name="gf_map_server_168" pkg="geofrenzy" type="gf_map_server" args="_gf_class_idx:=168">
+    <remap from="gf_map_server_168/geofrenzy/map" to="/map"/>
+    <remap from="gf_map_server_168/geofrenzy/map_metadata" to="/map_metadata"/>
+  </node>
+
+  <!-- Start Geofrenzy Virtual Cloud Server -->
+  <node name="gf_vcloud_168" pkg="geofrenzy" type="gf_vcloud" args="_gf_class_idx:=168">
     <remap from="gf_map_server_168/geofrenzy/map" to="/map"/>
     <remap from="gf_map_server_168/geofrenzy/map_metadata" to="/map_metadata"/>
   </node>

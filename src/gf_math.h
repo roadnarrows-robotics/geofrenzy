@@ -70,6 +70,28 @@ namespace geofrenzy
     #define M_TAU (2.0 * M_PI)  ///< tau is defined as 2 pi 
 
     /*!
+     * \brief Units.
+     */
+    enum Units
+    {
+      UnitsUndef,     ///< undefined or "as is" units
+      UnitsMeters,    ///< meters
+      UnitsKm,        ///< kilometers
+      UnitsRadians,   ///< radians
+      UnitsDegrees    ///< degrees
+    };
+
+    /*!
+     * \brief Coordinate systems.
+     */
+    enum Coordinates
+    {
+      Cartesian = 0,  ///< x,y or x,y,z coordinates
+      Spherical,      ///< polar r,theta or spherical rho,theta,phi coordinates
+      Cylindrical     ///< cylindrical r,theta,z coordinates
+    };
+
+    /*!
      * \brief Point in 2D space: 2x1 vector of doubles.
      */
     typedef Eigen::Vector2d EigenPoint2;
@@ -109,62 +131,31 @@ namespace geofrenzy
     typedef Eigen::Matrix<double, 7, 1> EigenXYZRGBA;
 
     /*!
-     * Cartesian x,y,z coordinates indices.
-     *
-     * \sa EigenPoint2(_X, _Y only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
-     */
-    const size_t  _X = 0; ///< x coordinate pt[_X] or pt.x()
-    const size_t  _Y = 1; ///< y coordinate pt[_Y] or pt.y()
-    const size_t  _Z = 2; ///< z coordinate pt[_Z] or pt.z()
-  
-    /*!
-     * \brief Polar and spherical coordinates indices r,theta,phi.
-     *
-     * Polar:     pt[_R], pt[_THETA]
-     * Spherical: pt[_RHO], pt[_THETA], pt[_PHI]
-     *
-     * \sa EigenPoint2(_R, _THETA only), EigenPoint3
-     */
-    const size_t  _R      = 0;  ///< radial distance [0, inf)
-    const size_t  _RHO    = 0;  ///< radial distance [0, inf)
-    const size_t  _THETA  = 1;  ///< azimuthal angle from x+ axis (-pi, pi].
-    const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
-
-    /*!
-     * Size dimensions length x width x height.
-     *
-     * \sa EigenPoint2(_L, _W only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
-     */
-    const size_t  _L = 0; ///< x coordinate pt[_L] or pt.x()
-    const size_t  _W = 1; ///< y coordinate pt[_W] or pt.y()
-    const size_t  _H = 2; ///< z coordinate pt[_H] or pt.z()
-
-    /*!
-     * \brief Color red-green-blue-alpha indices.
-     *
-     * \sa EigenRGB, EigenRGBA
-     */
-    const size_t  _RED    = 0; ///< red   pt[_RED]   or pt.x()
-    const size_t  _GREEN  = 1; ///< green pt[_GREEN] or pt.y()
-    const size_t  _BLUE   = 2; ///< blue  pt[_BLUE]  or pt.z()
-    const size_t  _ALPHA  = 3; ///< alpha pt[_ALPHA] or pt.w()
-  
-    /*!
-     * \brief Color red-green-blue-alpha indices for XYZ+ points.
-     *
-     * \sa EigenXYZRGB, EigenXYZRGBA
-     */
-    const size_t  _XYZRED   = 3; ///< xyzred
-    const size_t  _XYZGREEN = 4; ///< xyzgreen
-    const size_t  _XYZBLUE  = 5; ///< xyzblue
-    const size_t  _XYZALPHA = 6; ///< xyzalpha
-
-    /*!
      * \brief 24-bit color, 8-bits per channel (rgb), values and mask.
      */
     const double        Color24ChanMin  =   0.0;    ///< minimum value
     const double        Color24ChanMax  = 255.0;    ///< maximum value
     const unsigned int  Color24ChanMask = 0x00ff;   ///< mask
+
+    /*!
+     * \brief Macro to convert color channel instensity to 8-bit RGB channel
+     * value.
+     *
+     * \param _i  Channel intensity [0.0, 1.0].
+     *
+     * \return 8-bit color value [0, 255].
+     */
+    #define COLOR8(_i) \
+      (((unsigned int)((_i) * Color24ChanMax)) & Color24ChanMask)
+
+    /*!
+     * \brief Macro to convert 8-bit RGB channel value to intensity.
+     *
+     * \param _c  8-bit color value [0, 255].
+     *
+     * \return Channel intensity [0.0, 1.0].
+     */
+    #define COLORI(_c) (((double)((_c) & Color24ChanMask)) / Color24ChanMax)
 
     /*!
      * \brief Parameterized 1D line in 2D space: l(t) = o + t * d.
@@ -184,18 +175,14 @@ namespace geofrenzy
     /*!
      * \brief One 2-tuple minimum,maximum limit.
      *
-     * Limits: [minmax[_MIN], minmax[_MAX]]
+     * Limits: [m_min, m_max]
      */
-    typedef EigenPoint2 EigenMinMax1; 
+    struct EigenMinMax1
+    {
+      double  m_min;  ///< minimum scalar value.
+      double  m_max;  ///< maximum scalar value.
+    };
 
-    /*!
-     * \brief Minimum and maximum indices.
-     *
-     * \sa EigenPoint2, EigenMinMax1
-     */
-    const size_t  _MIN = 0; ///< x coordinate pt[_MIN] or pt.x()
-    const size_t  _MAX = 1; ///< y coordinate pt[_MAX] or pt.y()
-  
     /*!
      * \brief Two 2-tuple minimum,maximum limits.
      *
@@ -222,6 +209,245 @@ namespace geofrenzy
       EigenPoint3 m_min;  ///< minimum k=0,2 or x,y,z
       EigenPoint3 m_max;  ///< maximum k=0,2 or x,y,z
     };
+
+    /*!
+     * \brief Angle that an object subtends in ambient 2D space.
+     */
+    class EigenSubtend1
+    {
+    public:
+
+      /*!
+       * \brief Default constructor.
+       */
+      EigenSubtend1() : m_a0(0.0), m_omega(0.0) { }
+
+      /*!
+       * \brief Copy constructor.
+       */
+      EigenSubtend1(const EigenSubtend1 &src)
+          : m_a0(src.m_a0), m_omega(src.m_omega) { }
+
+      /*!
+       * \brief Initialization constructor.
+       */
+      EigenSubtend1(const double a0, const double omega)
+          : m_a0(a0), m_omega(omega) { }
+
+      /*!
+       * \brief Destructor.
+       */
+      ~EigenSubtend1() { }
+
+      /*!
+       * \brief Clear data.
+       */
+      void clear()
+      {
+        m_a0    = 0.0;
+        m_omega = 0.0;
+      }
+
+      /*!
+       * \brief Set subtended angle.
+       * 
+       * \param a0    Starting angle (radians).
+       * \param omega Subtended angle ccw from a0 (radians).
+       */
+      void subtend(const double a0, const double omega)
+      {
+        m_a0    = a0;
+        m_omega = omega;
+      }
+
+      /*!
+       * \brief Set subtended angle.
+       * 
+       * \param subtend  Subtended angle.
+       */
+      void subtend(const EigenSubtend1 &subtend)
+      {
+        m_a0    = subtend.m_a0;
+        m_omega = subtend.m_omega;
+      }
+
+      /*!
+       * \brief Set starting angle.
+       * 
+       * \param a0  Starting angle (radians).
+       */
+      void a0(double a0)
+      {
+        m_a0 = a0;
+      }
+
+      /*!
+       * \brief Set subtended angle.
+       * 
+       * \param omega Subtended angle ccw from a0 (radians).
+       */
+      void omega(double omega)
+      {
+        m_omega = omega;
+      }
+
+      /*!
+       * Access functions.
+       */
+      double a0()                 { return m_a0; }
+      const double a0() const     { return m_a0; }
+      double omega()              { return m_omega; }
+      const double omega() const  { return m_omega; }
+
+      /*!
+       * \brief Test if angle is within the subtended angle.
+       *
+       * Naive test that does not check rotation wrap.
+       *
+       * \param  a  Angle to check (radians).
+       *
+       * \return Returns true or false.
+       */
+      bool within(const double a) const
+      {
+        return (a >= m_a0) && (a <= m_a0 + m_omega);
+      }
+
+      /*!
+       * \brief Stream insertion operators.
+       *
+       * \param os  Output stream.
+       * \param obj Object to insert.
+       *
+       * \return Reference to output stream.
+       */
+      friend std::ostream &operator<<(std::ostream        &os,
+                                      const EigenSubtend1 &obj);
+
+      friend class EigenSubtend2;
+
+    protected:
+      double  m_a0;     ///< starting angle (radians)
+      double  m_omega;  ///< subtended angle (radians)
+
+    }; // class EigenSubtend1
+
+    /*!
+     * \brief Solid angle that an object subtends in ambient 3D space.
+     *
+     * Theta is the subtended angle from the +x axis specified as 
+     * counter-clockwise range starting from a0.
+     *
+     * Phi is the subtended angle from the +z axis.
+     */
+    class EigenSubtend2
+    {
+    public:
+      /*!
+       * \brief Default constructor.
+       */
+      EigenSubtend2() { }
+
+      /*!
+       * \brief Copy constructor.
+       */
+      EigenSubtend2(const EigenSubtend2 &src)
+          : m_theta(src.m_theta), m_phi(src.m_phi) { }
+
+      /*!
+       * \brief Destructor.
+       */
+      ~EigenSubtend2() { }
+
+      /*!
+       * \brief Clear data.
+       */
+      void clear()
+      {
+        m_theta.clear();
+        m_phi.clear();
+      }
+
+      /*!
+       * \brief Set theta subtended angle.
+       * 
+       * \param a0    Starting angle (radians).
+       * \param omega Subtended angle ccw from a0 (radians).
+       */
+      void theta(const double a0, const double omega)
+      {
+        m_theta.m_a0    = a0;
+        m_theta.m_omega = omega;
+      }
+
+      /*!
+       * \brief Set theta subtended angle.
+       * 
+       * \param subtend  Subtended angle.
+       */
+      void theta(const EigenSubtend1 &subtend)
+      {
+        m_theta.m_a0    = subtend.m_a0;
+        m_theta.m_omega = subtend.m_omega;
+      }
+
+      /*!
+       * \brief Set phi subtended angle.
+       * 
+       * \param a0    Starting angle (radians).
+       * \param omega Subtended angle downward from a0 (radians).
+       */
+      void phi(const double a0, const double omega)
+      {
+        m_phi.m_a0    = a0;
+        m_phi.m_omega = omega;
+      }
+
+      /*!
+       * \brief Set theta subtended angle.
+       * 
+       * \param subtend  Subtended angle.
+       */
+      void phi(const EigenSubtend1 &subtend)
+      {
+        m_phi.m_a0    = subtend.m_a0;
+        m_phi.m_omega = subtend.m_omega;
+      }
+
+      /*!
+       * Access functions.
+       */
+      EigenSubtend1 &theta()             { return m_theta; }
+      const EigenSubtend1 &theta() const { return m_theta; }
+      EigenSubtend1 &phi()               { return m_phi; }
+      const EigenSubtend1 &phi() const   { return m_phi; }
+
+      /*!
+       * \brief Test if (theta,phi) are within the solid angle.
+       *
+       * \param  theta  Azimuthal angle from x+ axis (-pi, pi].
+       * \param  phi    Polar angle from +z [0, pi].
+       *
+       * \return Returns true or false.
+       */
+      bool within(const double theta, const double phi) const;
+
+      /*!
+       * \brief Stream insertion operators.
+       *
+       * \param os  Output stream.
+       * \param obj Object to insert.
+       *
+       * \return Reference to output stream.
+       */
+      friend std::ostream &operator<<(std::ostream        &os,
+                                      const EigenSubtend2 &obj);
+
+    protected:
+      EigenSubtend1 m_theta;  ///< subtended azimuthal angle from +x axis.
+      EigenSubtend1 m_phi;    ///< subtended polar angle from +z.
+
+    }; // class EigenSubtend2
 
     /*!
      * \brief Rectangular cuboid boundary.
@@ -255,41 +481,30 @@ namespace geofrenzy
     typedef std::vector<EigenXYZRGBA> EigenXYZRGBAList;
 
     /*!
-     * \brief X-Y plane quadrants.
-     */
-    const int _QNone  = 0;    ///< no quadrant - on an axis line
-    const int _QI     = 1;    ///< quadrant 1: x+, y+
-    const int _QII    = 2;    ///< quadrant 2: x-, y+
-    const int _QIII   = 3;    ///< quadrant 3: x-, y-
-    const int _QIV    = 4;    ///< quadrant 4: x+, y-
-
-    /*!
-     * \brief X-Y-Z solid octants.
-     */
-    const int _ONone  = 0;    ///< no octant - on an axis plane
-    const int _OI     = 1;    ///< octant 1: x+, y+, z+
-    const int _OII    = 2;    ///< octant 2: x-, y+, z+
-    const int _OIII   = 3;    ///< octant 3: x-, y-, z+
-    const int _OIV    = 4;    ///< octant 4: x+, y-, z+
-    const int _OV     = 5;    ///< octant 5: x+, y+, z-
-    const int _OVI    = 6;    ///< octant 6: x-, y+, z-
-    const int _OVII   = 7;    ///< octant 7: x-, y-, z-
-    const int _OVIII  = 8;    ///< octant 8: x+, y-, z-
-
-    /*!
      * \brief Infinity
      */
     const double Inf = std::numeric_limits<double>::infinity(); ///< infinity
 
     /*!
-     * \brief Origin in 2D space.
+     * \brief Points at infinity.
      */
-    const EigenPoint2 Origin2(0.0, 0.0);
+    const EigenPoint2 Inf2(Inf, Inf);           ///< ambient 2D space
+    const EigenPoint3 Inf3(Inf, Inf, Inf);      ///< ambient 3D space
 
     /*!
-     * \brief Origin in 3D space.
+     * \brief Origins
      */
-    const EigenPoint3 Origin3(0.0, 0.0, 0.0);
+    const EigenPoint2 Origin2(0.0, 0.0);        ///< ambient 2D space
+    const EigenPoint3 Origin3(0.0, 0.0, 0.0);   ///< ambient 3D space
+
+    /*!
+     * \brief Unit vectors or versors (hat == ^).
+     */
+    const EigenPoint2 Ihat2(1.0, 0.0);          ///< x unit vector in 2D
+    const EigenPoint2 Jhat2(0.0, 1.0);          ///< y unit vector in 2D
+    const EigenPoint3 Ihat3(1.0, 0.0, 0.0);     ///< x unit vector in 3D
+    const EigenPoint3 Jhat3(0.0, 1.0, 0.0);     ///< y unit vector in 3D
+    const EigenPoint3 Khat3(0.0, 0.0, 1.0);     ///< z unit vector in 3D
 
     /*!
      * \brief Default precision.
@@ -299,11 +514,125 @@ namespace geofrenzy
      */
     const double PrecisionDft = 1.0e-5;
 
+    //
+    // Useful Indices
+    //
+    namespace gf_index
+    {
+      /*!
+       * \brief Cartesian x,y,z coordinates indices.
+       *
+       * \sa EigenPoint2(_X, _Y only), EigenPoint3, EigenXYZRGB, EigenXYZRGBA
+       */
+      const size_t  _X = 0; ///< x coordinate pt[_X] or pt.x()
+      const size_t  _Y = 1; ///< y coordinate pt[_Y] or pt.y()
+      const size_t  _Z = 2; ///< z coordinate pt[_Z] or pt.z()
+    
+      /*!
+       * \brief Polar and spherical coordinates indices.
+       *
+       * Polar:     pt[_R], pt[_THETA]
+       * Spherical: pt[_RHO], pt[_THETA], pt[_PHI]
+       *
+       * \sa EigenPoint2(_R, _THETA only), EigenPoint3
+       */
+      const size_t  _R      = 0;  ///< radial distance [0, inf)
+      const size_t  _RHO    = 0;  ///< radial distance [0, inf)
+      const size_t  _THETA  = 1;  ///< azimuthal angle from +x axis (-pi, pi].
+      const size_t  _PHI    = 2;  ///< polar angle from z+ [0, pi].
+  
+      /*!
+       * \brief Size dimensions length x width x height.
+       *
+       * \sa EigenPoint2(_L, _W only), EigenPoint3
+       */
+      const size_t  _L = 0; ///< x coordinate pt[_L] or pt.x()
+      const size_t  _W = 1; ///< y coordinate pt[_W] or pt.y()
+      const size_t  _H = 2; ///< z coordinate pt[_H] or pt.z()
+  
+      /*!
+       * \brief Color red-green-blue-alpha indices.
+       *
+       * \sa EigenRGB, EigenRGBA
+       */
+      const size_t  _RED    = 0; ///< red   pt[_RED]   or pt.x()
+      const size_t  _GREEN  = 1; ///< green pt[_GREEN] or pt.y()
+      const size_t  _BLUE   = 2; ///< blue  pt[_BLUE]  or pt.z()
+      const size_t  _ALPHA  = 3; ///< alpha pt[_ALPHA] or pt.w()
+    
+      /*!
+       * \brief Color red-green-blue-alpha indices for XYZ+ points.
+       *
+       * \sa EigenXYZRGB, EigenXYZRGBA
+       */
+      const size_t  _XYZRED   = 3; ///< xyzred
+      const size_t  _XYZGREEN = 4; ///< xyzgreen
+      const size_t  _XYZBLUE  = 5; ///< xyzblue
+      const size_t  _XYZALPHA = 6; ///< xyzalpha
+
+      /*!
+       * \brief X-Y plane quadrants.
+       */
+      const int _QNone  = 0;    ///< no quadrant - on an axis line
+      const int _QI     = 1;    ///< quadrant 1: x+, y+
+      const int _QII    = 2;    ///< quadrant 2: x-, y+
+      const int _QIII   = 3;    ///< quadrant 3: x-, y-
+      const int _QIV    = 4;    ///< quadrant 4: x+, y-
+  
+      /*!
+       * \brief X-Y-Z solid octants.
+       */
+      const int _ONone  = 0;    ///< no octant - on an axes plane
+      const int _OI     = 1;    ///< octant 1: x+, y+, z+
+      const int _OII    = 2;    ///< octant 2: x-, y+, z+
+      const int _OIII   = 3;    ///< octant 3: x-, y-, z+
+      const int _OIV    = 4;    ///< octant 4: x+, y-, z+
+      const int _OV     = 5;    ///< octant 5: x+, y+, z-
+      const int _OVI    = 6;    ///< octant 6: x-, y+, z-
+      const int _OVII   = 7;    ///< octant 7: x-, y-, z-
+      const int _OVIII  = 8;    ///< octant 8: x+, y-, z-
+
+    } // namespace gf_index
 
 
     //--------------------------------------------------------------------------
     // Print and Insertion Operators
     //--------------------------------------------------------------------------
+
+    //
+    // Print helpers.
+    //
+    extern int OIndent;    ///< stream output indentation
+
+    /*!
+     * \brief Set left indentation level.
+     *
+     * \param n Indentation level in number of spaces.
+     */
+    inline void setIndent(int n)
+    {
+      OIndent = n;
+    }
+
+    /*!
+     * \brief Bump left indentation level.
+     *
+     * \param n +-Delta indentation level.
+     *
+     * \return New indentation level.
+     */
+    inline int bumpIndent(int n)
+    {
+      OIndent += n;
+      return OIndent;
+    }
+
+    /*!
+     * \brief Indent by current indentation level.
+     *
+     * \reutrn Space string.
+     */
+    std::string indent();
 
     ///@{
     /*!
@@ -336,6 +665,28 @@ namespace geofrenzy
 
     void print(std::ostream &os, const EigenMinMax3 &obj);
     ///@}
+
+
+    /*!
+     * \brief Print point list.
+     * 
+     * If conversion units are specfied, then the points are converted to the
+     * specified units prior to printing. Currently on radian-degree conversion
+     * is supported.
+     *
+     * If indentation is true, then the current indentation level is used.
+     *
+     * \param os      Output stream.
+     * \param points  Points to print.
+     * \param mod     Points printed per line.
+     * \param cvt     Conversion units.
+     * \param bIndent Do [not] used current indentation level.
+     */
+    void print(std::ostream          &os,
+               const EigenPoint3List &points,
+               const size_t          mod, 
+               const Units           cvt = UnitsUndef,
+               const bool            bIndent = true);
 
     ///@{
     /*!
@@ -522,7 +873,7 @@ namespace geofrenzy
     /*!
      * \brief Convert degrees to radians.
      *
-     * \param degrees Degrees.
+     * \param degrees Scalar in degrees.
      *
      * \return Radians
      */
@@ -534,7 +885,7 @@ namespace geofrenzy
     /*!
      * \brief Convert radians to degrees.
      *
-     * \param radians  Radians
+     * \param radians  Scalar in radians.
      *
      * \return Degrees
      */
@@ -544,7 +895,129 @@ namespace geofrenzy
     }
 
     /*!
-     * \brief Remap angle into equivalent value in (-pi, pi] range.
+     * \brief Convert radian limits to degrees.
+     *
+     * \param lim   Minimum, maximum range limit in radians.
+     *
+     * \return Minimum,maximum in degrees.
+     */
+    inline EigenMinMax1 degrees(const EigenMinMax1 &lim)
+    {
+      EigenMinMax1  mM;
+
+      mM.m_min = degrees(lim.m_min);
+      mM.m_max = degrees(lim.m_max);
+
+      return mM;
+    }
+
+    /*!
+     * \brief Convert radian limits to degrees.
+     *
+     * \param lim   Two 2-tuple minimum,maximum range limits in radians.
+     *
+     * \param Equivalent ranges in degrees.
+     */
+    inline EigenMinMax2 degrees(const EigenMinMax2 &lim)
+    {
+      EigenMinMax2 mM;
+
+      mM.m_min << degrees(lim.m_min.x()), degrees(lim.m_min.y());
+      mM.m_max << degrees(lim.m_max.x()), degrees(lim.m_max.y());
+
+      return mM;
+    }
+
+    /*!
+     * \brief Convert radian subtended angle to degrees.
+     *
+     * \param subtend   Subtended angle (a0, omega).
+     *
+     * \param Equivalent subtended in degrees.
+     */
+    inline EigenSubtend1 degrees(const EigenSubtend1 &subtend)
+    {
+      EigenSubtend1 s;
+
+      s.subtend(degrees(subtend.a0()), degrees(subtend.omega()));
+
+      return s;
+    }
+
+    /*!
+     * \brief Convert solid subtended angle in radians to degrees.
+     *
+     * \param subtend   Subtended angle [theta, phi].
+     *
+     * \param Equivalent subtended in degrees.
+     */
+    inline EigenSubtend2 degrees(const EigenSubtend2 &subtend)
+    {
+      EigenSubtend2 s;
+
+      s.theta(degrees(subtend.theta()));
+      s.phi(degrees(subtend.phi()));
+
+      return s;
+    }
+
+    /*!
+     * \brief Convert polar point specified in radians to degrees.
+     *
+     * \param rt  Polar point r,theta in radians.
+     *
+     * \param Equivalent polar point in degrees.
+     */
+    inline EigenPoint2 degrees(const EigenPoint2 &rt)
+    {
+      return EigenPoint2(rt[gf_index::_R], degrees(rt[gf_index::_THETA]));
+    }
+
+    /*!
+     * \brief Convert spherical point specified in radians to degrees.
+     *
+     * \param rtp   Spherical point rho,theta,phi in radians.
+     *
+     * \param Equivalent spherical point in degrees.
+     */
+    inline EigenPoint3 degrees(const EigenPoint3 &rtp)
+    {
+      return EigenPoint3(rtp[gf_index::_RHO],
+                        degrees(rtp[gf_index::_THETA]),
+                        degrees(rtp[gf_index::_PHI]));
+    }
+
+    /*!
+     * \brief Convert spherical min,max range specified in radians to degrees.
+     *
+     * \param rtpMinMax   Spherical range in radians.
+     *
+     * \param Equivalent spherical min,max range in degrees.
+     */
+    inline EigenMinMax3 degrees(const EigenMinMax3 &rtpMinMax)
+    {
+      EigenMinMax3  mM;
+
+      mM.m_min = degrees(rtpMinMax.m_min);
+      mM.m_max = degrees(rtpMinMax.m_max);
+
+      return mM;
+    }
+
+    /*!
+     * \brief Remap angle in (-pi, pi] to equivalent value in [0, tau) range.
+     *
+     * \param a   Angle (radians).
+     *
+     * \return Equivalent angle in [0, 2pi).
+     */
+    inline double zero2tau(const double a)
+    {
+      return fmod(a+M_TAU, M_TAU);
+    }
+
+    /*!
+     * \brief Remap angle in (-2pi, 2pi] to equivalent value in (-pi, pi] range.
      *
      * \param a   Angle (radians).
      *
@@ -602,6 +1075,18 @@ namespace geofrenzy
     inline double rot180(const double a)
     {
       return pi2pi(a + M_PI);
+    }
+
+    /*!
+     * \brief Take the supplementary angle of the given angle in radians.
+     * 
+     * \param a   Angle in radians (-pi, pi]
+     * 
+     * \return Supplimentary angle in radians (-pi, pi].
+     */
+    inline double supplementary(const double a)
+    {
+      return a >= 0.0? M_PI - a: -M_PI - a;
     }
 
 
@@ -969,7 +1454,7 @@ namespace geofrenzy
 
     inline EigenPoint2 polarToCartesian(const EigenPoint2 &pt)
     {
-      return polarToCartesian(pt[_R], pt[_THETA]);
+      return polarToCartesian(pt[gf_index::_R], pt[gf_index::_THETA]);
     }
     ///@}
 
@@ -1022,7 +1507,9 @@ namespace geofrenzy
 
     inline EigenPoint3 sphericalToCartesian(const EigenPoint3 &pt)
     {
-      return sphericalToCartesian(pt[_RHO], pt[_THETA], pt[_PHI]);
+      return sphericalToCartesian(pt[gf_index::_RHO],
+                                  pt[gf_index::_THETA],
+                                  pt[gf_index::_PHI]);
     }
     ///@}
     
@@ -1065,9 +1552,9 @@ namespace geofrenzy
      * \param pt1   Line point 1.
      * \param pt2   Line point 2.
      *
-     * \return Projection distance >= 0.0
+     * \return Projection L2 distance >= 0.0
      */
-    inline double projection(const EigenPoint2 &pt1, const EigenPoint2 &pt2)
+    inline double projectionDist(const EigenPoint2 &pt1, const EigenPoint2 &pt2)
     {
       return fabs(pt2.x() * pt1.y() - pt2.y() * pt1.x()) /
               sqrt(pow(pt2.y() - pt1.y(), 2.0) + pow(pt2.x() - pt1.x(), 2.0));
@@ -1087,17 +1574,47 @@ namespace geofrenzy
      * \param pt1   Line point 1.
      * \param pt2   Line point 2.
      *
-     * \return Projection distance >= 0.
+     * \return Projection L2 distance >= 0.
      */
-    inline double projection(const EigenPoint2 &pt0,
-                             const EigenPoint2 &pt1,
-                             const EigenPoint2 &pt2)
+    inline double projectionDist(const EigenPoint2 &pt0,
+                                 const EigenPoint2 &pt1,
+                                 const EigenPoint2 &pt2)
     {
       double dx = pt2.x() - pt1.x();
       double dy = pt2.y() - pt1.y();
 
       return fabs(dy*pt0.x() - dx*pt0.y() + pt2.x()*pt1.y() - pt2.y()*pt1.x()) /
               sqrt(pow(dy, 2.0) + pow(dx, 2.0));
+    }
+
+    /*!
+     * \brief Calculate the the point pt0 onto a line in ambient 3D * space.
+     *
+     * The 3D line is defined by the two points pt1 and pt2.
+     *
+     * The projection on the line pt1,pt2 of the point pt0 forms a point on the
+     * line that defines an orthogonal line between the projection and point
+     * pt0.
+     *
+     * \param pt0   Point to project.
+     * \param pt1   Line point 1.
+     * \param pt2   Line point 2.
+     *
+     * \return Project point on the line.
+     */
+    inline EigenPoint3 projection(const EigenPoint3 &pt0,
+                                  const EigenPoint3 &pt1,
+                                  const EigenPoint3 &pt2)
+    {
+      EigenLine3 line = EigenLine3::Through(pt1, pt2);
+
+      return line.projection(pt0);
+    }
+
+    inline EigenPoint3 projection(const EigenPoint3 &pt1,
+                                  const EigenPoint3 &pt2)
+    {
+      return projection(Origin3, pt1, pt2);
     }
 
     /*!
@@ -1143,52 +1660,34 @@ namespace geofrenzy
      */
     double t_param(const EigenLine3 &line, const EigenPoint2 &pt);
 
+    /*!
+     * \brief Determine the x-intercept of a line defined by two points in
+     * ambient 2D space.
+     *
+     * \param pt0   Line point 0.
+     * \param pt1   Line point 1.
+     *
+     * \returns Returns the x-intercept. If the line does not intersect the
+     * x-axis, Inf is returned.
+     */
+    double x_intercept(const EigenPoint2 &pt0, const EigenPoint2 &pt1);
+
+    /*!
+     * \brief Determine the y-intercept of a line defined by two points in
+     * ambient 2D space.
+     *
+     * \param pt0   Line point 0.
+     * \param pt1   Line point 1.
+     *
+     * \returns Returns the y-intercept. If the line does not intersect the
+     * y-axis, Inf is returned.
+     */
+    double y_intercept(const EigenPoint2 &pt0, const EigenPoint2 &pt1);
+
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
     // Checks on Limits, Locations, and Containment
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-
-    /*!
-     * \brief Check if the value is within the min,max limits.
-     *
-     * \param val   Value to check.
-     * \param lim   Limits.
-     *
-     * \return Returns true or false if value in [min, max].
-     */
-    inline bool within(const double &val, const EigenMinMax1 &lim)
-    {
-      return  (val >= lim[_MIN]) && (val <= lim[_MAX]);
-    }
-
-    /*!
-     * \brief Check if the value is within one of the set of min,max limits.
-     *
-     * \param val   Value to check.
-     * \param lim   Limits.
-     *
-     * \return Returns true or false if value in any [min[k], max[k]], k=0,1.
-     */
-    inline bool withinOneOf(const double &val, const EigenMinMax2 &lim)
-    {
-      return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
-              ((val >= lim.m_min[1]) && (val <= lim.m_max[1]));
-    }
-
-    /*!
-     * \brief Check if the value is within one of the set of min,max limits.
-     *
-     * \param val   Value to check.
-     * \param lim   Limits.
-     *
-     * \return Returns true or false if value in any [min[k], max[k]], k=0,2.
-     */
-    inline bool withinOneOf(const double &val, const EigenMinMax3 &lim)
-    {
-      return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
-              ((val >= lim.m_min[1]) && (val <= lim.m_max[1])) ||
-              ((val >= lim.m_min[2]) && (val <= lim.m_max[2]));
-    }
 
     /*!
      * \brief Determine which x-y quadrant the point is located.
@@ -1238,7 +1737,63 @@ namespace geofrenzy
                const double phi,
                const double precision = PrecisionDft);
 
-    ///@(
+    /*!
+     * \brief Check if the value is within the min,max limits.
+     *
+     * \param val   Value to check.
+     * \param min   Scalar minimum value.
+     * \param max   Scalar maximum value.
+     *
+     * \return Returns true or false if value in [min, max].
+     */
+    inline bool within(const double &val, const double min, const double max)
+    {
+      return  (val >= min) && (val <= max);
+    }
+
+    /*!
+     * \brief Check if the value is within the min,max limits.
+     *
+     * \param val   Value to check.
+     * \param lim   Limits.
+     *
+     * \return Returns true or false if value in [min, max].
+     */
+    inline bool within(const double &val, const EigenMinMax1 &lim)
+    {
+      return  (val >= lim.m_min) && (val <= lim.m_max);
+    }
+
+    /*!
+     * \brief Check if the value is within one of the set of min,max limits.
+     *
+     * \param val   Value to check.
+     * \param lim   Limits.
+     *
+     * \return Returns true or false if value in any [min[k], max[k]], k=0,1.
+     */
+    inline bool withinOneOf(const double &val, const EigenMinMax2 &lim)
+    {
+      return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
+              ((val >= lim.m_min[1]) && (val <= lim.m_max[1]));
+    }
+
+    /*!
+     * \brief Check if the value is within one of the set of min,max limits.
+     *
+     * \param val   Value to check.
+     * \param lim   Limits.
+     *
+     * \return Returns true or false if value in any [min[k], max[k]], k=0,2.
+     */
+    inline bool withinOneOf(const double &val, const EigenMinMax3 &lim)
+    {
+      return  ((val >= lim.m_min[0]) && (val <= lim.m_max[0])) ||
+              ((val >= lim.m_min[1]) && (val <= lim.m_max[1])) ||
+              ((val >= lim.m_min[2]) && (val <= lim.m_max[2]));
+    }
+
+    ///@{
     /*!
      * \brief Seed boundary with initial values.
      *
@@ -1259,7 +1814,7 @@ namespace geofrenzy
     }
     ///@}
 
-    ///@(
+    ///@{
     /*!
      * \brief Conditionally expand bounds to include the point.
      *
@@ -1272,7 +1827,7 @@ namespace geofrenzy
     void growBounds(const EigenPoint3 &pt, EigenBoundary3 &bounds);
     ///@}
 
-    ///@(
+    ///@{
     /*!
      * \brief Uniformally expand the bounds by epsilong
      *
@@ -1288,7 +1843,7 @@ namespace geofrenzy
     void growBounds(const double epsilon, EigenBoundary3 &bounds);
     ///@}
 
-    ///@(
+    ///@{
     /*!
      * \brief Test if point is in bounds.
      *
@@ -1314,16 +1869,20 @@ namespace geofrenzy
     /*!
      * \brief Test if the point is within the polygon in ambient 2D space.
      *
-     * This method uses the edge crossing Counting Number algorithm.
+     * \anchor pipcnalg
+     * Point In Polygon, Crossing Number
+     *
+     * This method uses the edge crossing Crossing Number algorithm.
      *
      * \sa http://geomalgorithms.com/a03-_inclusion.html
      *
-     * If the number of edge crossings is odd, the the point is inside the
+     * If the number of edge crossings is odd, then the point is inside the
      * polygon. Otherwise it lies outside. Any point on an edge or vertex
      * is considered inside.
      *
-     * The polygon is can be either convex or concave. This simple algortihm
-     * does not work well with complex, crossing polygons.
+     * The polygon can either be convex or concave. The polygons should be
+     * simple (i.e. no crossings). This algortihm does not work well with
+     * complex, crossing polygons.
      *
      * \param pt      Point to test.
      * \param polygon Closed polygon. The polygon vertices may or may not
@@ -1335,22 +1894,10 @@ namespace geofrenzy
     bool pipCn(const EigenPoint2 &pt, const EigenPoint2List &polygon);
 
     /*!
-     * \brief Test if the point is within the polygon in ambient 3D space, where
-     * z is constant (i.e. the polygon is horizontal to the x-y plane).
+     * \brief Test if the point is within the polygon in ambient 3D space,
+     * where z is constant (i.e. the polygon is horizontal to the x-y plane).
      *
-     * This algorithm is an optimized version of the more general test of a
-     * point within a polygon at any orientation in ambient 3D space.
-     *
-     * This method uses the edge crossing Counting Number algorithm.
-     *
-     * \sa http://geomalgorithms.com/a03-_inclusion.html
-     *
-     * If the number of edge crossings is odd, the the point is inside the
-     * polygon. Otherwise it lies outside. Any point on an edge or vertex
-     * is considered inside.
-     *
-     * The polygon is can be either convex or concave. This simple algortihm
-     * does not work well with complex, crossing polygons.
+     * \ref pipcnalg "Crossing Number Algorithm"
      *
      * \param pt      Point to test.
      * \param polygon Closed polygon. The polygon vertices may or may not
@@ -1360,6 +1907,35 @@ namespace geofrenzy
      * \return Returns true if inside, false if outside.
      */
     bool pipCnZ(const EigenPoint3 &pt, const EigenPoint3List &polygon);
+
+    /*!
+     * \brief Test if the point is within the polygon in ambient 3D space,
+     * where the polygon and point are projected onto the x-y plane.
+     *
+     * \ref pipcnalg "Crossing Number Algorithm"
+     *
+     * \param pt      Point to test.
+     * \param polygon Closed polygon. The polygon vertices may or may not
+     *                include vertex polygon[last] == polygon[first].
+     *                Regardless, the polygon is treated as closed.
+     *
+     * \return Returns true if inside, false if outside.
+     */
+    bool pipCnXY(const EigenPoint3 &pt, const EigenPoint3List &polygon);
+
+    /*!
+     * \brief Test if the point is within the polygon in ambient 3D space.
+     *
+     * \ref pipcnalg "Crossing Number Algorithm"
+     *
+     * \param pt      Point to test.
+     * \param polygon Closed polygon. The polygon vertices may or may not
+     *                include vertex polygon[last] == polygon[first].
+     *                Regardless, the polygon is treated as closed.
+     *
+     * \return Returns true if inside, false if outside.
+     */
+    bool pipCn(const EigenPoint3 &pt, const EigenPoint3List &polygon);
 
 
     // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
@@ -1399,9 +1975,9 @@ namespace geofrenzy
                                    const unsigned int blue,
                                    EigenRGB           &rgb)
     {
-      rgb <<  (double)(  red & Color24ChanMask)/Color24ChanMax,
-              (double)(green & Color24ChanMask)/Color24ChanMax,
-              (double)( blue & Color24ChanMask)/Color24ChanMax;
+      rgb <<  COLORI(red),
+              COLORI(green),
+              COLORI(blue);
     }
 
     /*!
@@ -1420,9 +1996,9 @@ namespace geofrenzy
                                    const double       alpha,
                                    EigenRGBA          &rgba)
     {
-      rgba << (double)(  red & Color24ChanMask)/Color24ChanMax,
-              (double)(green & Color24ChanMask)/Color24ChanMax,
-              (double)( blue & Color24ChanMask)/Color24ChanMax,
+      rgba << COLORI(red),
+              COLORI(green),
+              COLORI(blue),
               cap(alpha, 0.0, 1.0);
     }
 
@@ -1439,9 +2015,9 @@ namespace geofrenzy
                                    unsigned int   &green,
                                    unsigned int   &blue)
     {
-      red   = (unsigned int)(rgb[_RED]   * Color24ChanMax) & Color24ChanMask;
-      green = (unsigned int)(rgb[_GREEN] * Color24ChanMax) & Color24ChanMask;
-      blue  = (unsigned int)(rgb[_BLUE]  * Color24ChanMax) & Color24ChanMask;
+      red   = COLOR8(rgb[gf_index::_RED]);
+      green = COLOR8(rgb[gf_index::_GREEN]);
+      blue  = COLOR8(rgb[gf_index::_BLUE]);
     }
 
     /*!
@@ -1460,10 +2036,10 @@ namespace geofrenzy
                                    unsigned int    &blue,
                                    double          &alpha)
     {
-      red   = (unsigned int)(rgba[_RED]   * Color24ChanMax) & Color24ChanMask;
-      green = (unsigned int)(rgba[_GREEN] * Color24ChanMax) & Color24ChanMask;
-      blue  = (unsigned int)(rgba[_BLUE]  * Color24ChanMax) & Color24ChanMask;
-      alpha = rgba[_ALPHA];
+      red   = COLOR8(rgba[gf_index::_RED]);
+      green = COLOR8(rgba[gf_index::_GREEN]);
+      blue  = COLOR8(rgba[gf_index::_BLUE]);
+      alpha = cap(rgba[gf_index::_ALPHA], 0.0, 1.0);
     }
 
     /*!
